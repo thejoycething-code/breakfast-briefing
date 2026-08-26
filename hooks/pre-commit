@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Pre-commit: keep the two out-of-repo copies fresh, then gate on the fixture.
+#
+# Lives in hooks/ and is TRACKED, because .git/hooks is not cloned and a hook nobody has is
+# worse than no hook - it looks like a guarantee and is not one. Enabled with:
+#
+#     git config core.hooksPath hooks
+#
+# which is a one-off per clone. `git commit --no-verify` skips it.
+#
+# It does two things, in this order:
+#
+#   1. ./sync_docs.sh  - pulls ~/.claude's SKILL.md and memory/ into the repo, then stages
+#      them. This hook MUTATES the commit: if either had changed, the commit now contains
+#      that change too. That is the point - a stale backup you believe in is the failure
+#      sync_docs.sh exists to prevent - but it is never silent. Anything newly staged is
+#      printed below, so a commit's scope is always visible before it is written.
+#
+#      If you would rather be blocked than have your commit widened, change the call to
+#      `./sync_docs.sh check` and drop the `git add`: it then fails and tells you to sync
+#      by hand, and the commit stays exactly as you scoped it.
+#
+#   2. python3 run_tests.py - 0.84s, and it is the only thing standing between a pattern
+#      edit and a silently wrong briefing at 6am. A failing fixture blocks the commit.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+echo "pre-commit: syncing SKILL.md and memory/"
+./sync_docs.sh >/dev/null
+
+# Stage only the two synced paths - never `git add -A`, which would sweep in whatever else
+# happens to be dirty in the working tree and quietly commit it.
+git add -- task/SKILL.md memory/
+STAGED="$(git diff --cached --name-only -- task/SKILL.md memory/)"
+if [ -n "$STAGED" ]; then
+    # Distinguish "was already staged by you" from "this hook just added it", so the widening
+    # is attributable. Anything in the second list is scope this hook introduced.
+    echo "pre-commit: staged from sync:"
+    echo "$STAGED" | sed 's/^/  /'
+fi
+
+echo "pre-commit: run_tests.py"
+if ! python3 run_tests.py > /tmp/precommit-tests.log 2>&1; then
+    tail -20 /tmp/precommit-tests.log | sed 's/^/  /'
+    echo "pre-commit: FIXTURE FAILED - commit aborted. Full log: /tmp/precommit-tests.log" >&2
+    echo "            Fix it, or commit with --no-verify if you know why it is red." >&2
+    exit 1
+fi
+tail -1 /tmp/precommit-tests.log | sed 's/^/  /'
+echo "pre-commit: ok"

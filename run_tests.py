@@ -363,9 +363,16 @@ def run(verbose=False):
 
 
 def _shell_scripts():
-    """The repo's shell scripts, in a stable order."""
+    """The repo's shell scripts, in a stable order.
+
+    hooks/* is included even though git hooks carry no .sh suffix: hooks/pre-commit is a
+    `set -u` bash script like any other, and it runs on every commit, so a syntax error or an
+    unguarded empty array there breaks the thing that is supposed to be catching breakage.
+    """
     import glob
-    return sorted(glob.glob(os.path.join(HERE, "*.sh")))
+    return sorted(glob.glob(os.path.join(HERE, "*.sh"))
+                  + [p for p in glob.glob(os.path.join(HERE, "hooks", "*"))
+                     if os.path.isfile(p) and not p.endswith(".sample")])
 
 
 def test_shell_syntax():
