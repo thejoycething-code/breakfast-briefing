@@ -1,0 +1,26 @@
+- [Clacton Vercel deployment](clacton-vercel-deployment.md) — live URL, team scope, CLI at ~/.local/node/bin
+- [MP Vote Tracker options](mp-vote-tracker-options.md) — four grouping-layout HTML forks (A–D) in ~/Downloads/files
+- [Lead Ad Builder](lead-ad-builder.md) — web tool that generates a Google Doc brief for Meta Lead Form Ads
+- [Parl Monitor build](parl-monitor-build.md) — parliamentary pipeline, Checkpoint 1 state, live-probed fixtures, open spec questions
+- [Breakfast Briefing](breakfast-briefing.md) — daily news digest automation: scheduled task, format spec, Drive folder ID
+- [Briefing: one-pass ranking](briefing-ranking-single-pass.md) — ~26k tokens beats a 250k fan-out; xN corroboration is the free importance signal
+- [Briefing: never suppress silently](briefing-silent-suppression.md) — hidden filters delete real news; always print discards
+- [Briefing: feed depth decision](briefing-feed-depth-decision.md) — Feedly API is Enterprise-only; truncation deliberately unfixed
+- [Briefing: multilingual ready](briefing-multilingual-ready.md) — classifier speaks Spanish/Italian; sources parked as comments
+- [Briefing: Drive upload limit](briefing-drive-upload-limit.md) — no byte-exact publish path; verify links after upload by diffing the doc
+- [Briefing: cluster provenance](briefing-cluster-provenance.md) — dedup picks the primary source, not the punchiest headline; ADF beats EWTN
+- [Briefing: markup becomes a test case](briefing-markup-becomes-testcase.md) — corrections go in testcases.txt failing-first, never a silent regex tweak
+- [Briefing: two suppression buckets](briefing-suppression-two-buckets.md) — chaff is tiny; "no section matched" is where real news dies
+- [UK campaign calendar](uk-campaign-calendar.md) — assisted dying delivers 4 Sept 2026; OSA submission due 7 Sept; why the TIA brief stays rejected
+- [Briefing: cap drops get retired](briefing-cap-drops-get-marked.md) — cap losers go to cut.json and never come back; over-pick freely
+- [Briefing: decode Google News links](briefing-gnews-decode.md) — batchexecute signature route resolves 100%; never cache resolver failures
+- [Briefing: text for judgement only](briefing-text-for-judgement-only.md) — sheet carries feed/page text for the judge; regex over body text rewards commentary
+- [Briefing: ranking eval corpus](briefing-rank-eval-corpus.md) — archive_day banks daily labels; concordance measures agreement not correctness, testcases has veto
+- [Briefing: clustering has two purposes](briefing-clustering-two-purposes.md) — corroborate is global, same_story is per-section; entity links are token-level with a 3-word floor
+- [Meta organic reports](meta-organic-reports.md) — FB/IG pipeline LIVE; nightly CI into the Clacton Supabase project; reach + organic split survive via breakdowns
+- [Meta System User setup](meta-system-user-setup.md) — four ordered steps; app-role and Pages assignment fail silently and differently
+- [Meta page-portfolio map](meta-page-portfolio-map.md) — which portfolio owns which Page; 13 pages belong to none
+- [Store is a release asset](parl-monitor-store-artifact.md) — db left git at 92MB; phase 2 pending, local sync needs a PAT
+- [parl-monitor repo access](parl-monitor-repo-access.md) — private under thejoycething-code; never add the work account
+- [Briefing: the Slack top-five](briefing-slack-five.md) — UK-only, national press over advocacy releases; a different judgement from the Doc
+- [Briefing: run the tail as a script](briefing-finish-edition-tail.md) — finish_edition.sh, --allow-reclass unconditional, bash 3.2 empty-array trap
