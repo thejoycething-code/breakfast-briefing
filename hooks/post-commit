@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Post-commit: refresh the out-of-repo copies, then say whether they need committing.
+#
+# Safe to write here in a way pre-commit is not: the commit is already sealed, so nothing this
+# does can change what was just recorded. It NEVER runs `git commit` or `git add` - a hook that
+# commits is both surprising and a recursion risk. It only ever leaves files in the working
+# tree and tells you about them.
+#
+# What it is actually for. Given pre-commit already BLOCKS on drift, the pull below is usually
+# a no-op: the commit could only have got this far if the copies were already in step. The case
+# it genuinely catches is the other one - copies that are in sync with ~/.claude but have never
+# been COMMITTED. That happens the ordinary way round: pre-commit blocks, you run
+# ./sync_docs.sh, you commit just your code change, and the refreshed task/SKILL.md and memory/
+# sit in the working tree unstaged indefinitely. In-sync-but-uncommitted means git and GitHub
+# hold an older copy than ~/.claude does, which is the staleness the pre-commit check traded
+# away when it stopped widening commits (26.08.2026). This is the half that reports it.
+#
+# It also covers commits made with --no-verify, where pre-commit never ran at all.
+set -uo pipefail   # NOT -e: a post-commit hook must never look like the commit failed.
+cd "$(git rev-parse --show-toplevel)" || exit 0
+
+./sync_docs.sh >/dev/null 2>&1 || {
+    echo "post-commit: sync_docs.sh failed - task/SKILL.md and memory/ may be stale." >&2
+    exit 0
+}
+
+# Anything differing from HEAD after the pull is a copy that is fresher than the repo.
+DIRTY="$(git status --porcelain -- task/SKILL.md memory/ 2>/dev/null)"
+if [ -n "$DIRTY" ]; then
+    N=$(printf '%s\n' "$DIRTY" | wc -l | tr -d ' ')
+    echo "post-commit: $N tracked cop(y/ies) of ~/.claude are newer than the repo:"
+    printf '%s\n' "$DIRTY" | sed 's/^/  /'
+    echo "post-commit: commit them so the backup is not a commit behind:"
+    echo "             git add task/SKILL.md memory/ && git commit -m 'sync SKILL.md and memory'"
+fi
+exit 0
