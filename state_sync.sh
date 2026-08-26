@@ -108,11 +108,16 @@ JUDGEMENT_FILES="testcases.txt exclusions.txt bylines.txt link_fixes.txt extra_f
 # NOT here, deliberately: ~/.config/breakfast-briefing/oauth.json and sa.json. See the note
 # above - a credential does not go in the box it opens.
 CODE_FILES="shortlist.py run_tests.py regions.py compose.py fetch_feeds.py resolve.py \
-            tiers.py record_tiers.py finish_edition.sh archive_day.py \
+            tiers.py record_tiers.py finish_edition.sh \
 upload-archive-to-drive.sh upload-dir-to-drive.sh state_sync.sh gdrive_auth.sh \
 archive_day.py audit_feeds.py authors.py check_sources.py discover_feeds.py \
 mark_published.py publish.sh rank_eval.py slice_shortlist.py \
-textsignals.py tier_model.py"
+textsignals.py tier_model.py sync_docs.sh"
+# sync_docs.sh added 26.08.2026, and archive_day.py de-duplicated in the same edit - it was
+# listed twice, so every push uploaded it twice. sync_docs.sh is the script that copies
+# ~/.claude's SKILL.md and memory/ into the repo; it was written straight into ~/Downloads and
+# was therefore backed up nowhere, which is the exposure this list exists to close, and it is
+# precisely the "script added later" the note above says should stand out.
 # textsignals.py and tier_model.py added 24.08.2026 with options 1/3/4/5. They were written
 # straight into ~/Downloads and were therefore backed up NOWHERE - the same exposure that made
 # CODE_FILES exist in the first place, after a cp following a symlink overwrote five scripts on

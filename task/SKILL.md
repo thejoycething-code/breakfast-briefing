@@ -563,14 +563,17 @@ Last, and only if Step 7 actually marked against a verified doc:
   cd ~/Downloads/breakfast-briefing && ./state_sync.sh push
   cd ~/Downloads/breakfast-briefing && ./upload-archive-to-drive.sh
 
-Twenty-five files in the first: the eight state files (seen, cut, source_health, resolved,
+Forty files in the first: the eight state files (seen, cut, source_health, resolved,
 authors, ledes, and — added 25.08.2026 — openings and previews, the two article-text caches,
 each worth about ten minutes of refetching), the seven that are judgements (testcases.txt,
 exclusions.txt, bylines.txt, link_fixes.txt, extra_feeds.txt, sources.opml and — added
 25.08.2026 — **tiers.json**, the accumulated record of what was decided about every story
 read, which cannot be rebuilt from anything and whose loss would silently make every story
-look unjudged again) and the ten scripts (shortlist, regions, compose, fetch_feeds, run_tests,
-resolve, tiers, record_tiers, archive_day, finish_edition). The judgement files are the only irreplaceable things here —
+look unjudged again) and **every .py and .sh in the directory** — 25 of them as of 26.08.2026,
+not the ten this line used to name. The list was completed to "everything" on 20.08.2026 for a
+reason state_sync.sh's own header gives: enumerating the rest ends the drift, because a script
+added later is then the exception that stands out rather than one more quiet gap. Count the
+`pushed` lines against 40 if you want to check it ran whole. The judgement files are the only irreplaceable things here —
 weeks of accumulated corrections — and before 19.08.2026 they existed nowhere but ~/Downloads.
 That the scripts are in there is not decoration: on 20.08.2026 a `cp` that followed a symlink
 overwrote five of them with an older copy, and this push was the only thing that got them back.
