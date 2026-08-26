@@ -327,6 +327,20 @@ def run(verbose=False):
                                 "${a[@]+\"${a[@]}\"}, not \"${a[@]}\": %s"
                        % (len(bare), "; ".join("%s:%d %s" % b for b in bare))))
 
+    # Every script must be in state_sync.sh's backup list. See test_all_scripts_backed_up.
+    unbacked, dupes = test_all_scripts_backed_up()
+    if not unbacked and not dupes:
+        passed += 1
+    else:
+        msg = []
+        if unbacked:
+            msg.append("%d script(s) missing from state_sync.sh CODE_FILES, so they are "
+                       "backed up NOWHERE: %s" % (len(unbacked), ", ".join(unbacked)))
+        if dupes:
+            msg.append("%d duplicate entr(y/ies) in CODE_FILES, uploaded twice every push: %s"
+                       % (len(dupes), ", ".join(dupes)))
+        failed.append(("smoke", " | ".join(msg)))
+
     # No configured feed may match the sweep-time block list. See test_no_self_blocked_feed.
     self_blocked = test_no_self_blocked_feed()
     if not self_blocked:
@@ -413,6 +427,41 @@ def test_shell_empty_array_guards():
                 if ("${%s[@]}" % name) in stripped:
                     bad.append((os.path.basename(path), n, name))
     return bad
+
+
+def test_all_scripts_backed_up():
+    """Every .py and .sh here must appear exactly once in state_sync.sh's CODE_FILES.
+
+    Added 26.08.2026. state_sync.sh's own header states the invariant - "every .py and .sh in
+    the directory is now here... a script added later is now the exception that stands out,
+    rather than one more quiet gap nobody notices until the disk goes" - but nothing enforced
+    it, so it was upheld by memory alone and had already slipped twice. textsignals.py and
+    tier_model.py were written straight into ~/Downloads on 24.08.2026 and were backed up
+    nowhere; sync_docs.sh went the same way on 26.08.2026. Both were caught by chance.
+
+    Also asserts no entry appears twice: archive_day.py was listed twice until 26.08.2026, so
+    every morning's push uploaded it a second time. Harmless, but it is the same drift in the
+    other direction, and cheap to hold.
+
+    Returns (missing_from_list, duplicated_in_list).
+    """
+    import glob
+    import re
+    path = os.path.join(HERE, "state_sync.sh")
+    if not os.path.isfile(path):
+        return (["state_sync.sh itself is missing"], [])
+    with open(path) as fh:
+        src = fh.read()
+    m = re.search(r'CODE_FILES="((?:[^"\\]|\\.)*)"', src, re.S)
+    if not m:
+        return (["could not parse CODE_FILES out of state_sync.sh"], [])
+    # Shell line continuations: a backslash-newline is whitespace, not part of a filename.
+    listed = m.group(1).replace("\\\n", " ").split()
+    on_disk = {os.path.basename(p) for p in
+               glob.glob(os.path.join(HERE, "*.py")) + glob.glob(os.path.join(HERE, "*.sh"))}
+    missing = sorted(on_disk - set(listed))
+    dupes = sorted({f for f in listed if listed.count(f) > 1})
+    return (missing, dupes)
 
 
 def test_no_self_blocked_feed():
