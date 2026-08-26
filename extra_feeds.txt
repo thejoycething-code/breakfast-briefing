@@ -1,0 +1,782 @@
+# Additional / corrected feeds for the Breakfast Briefing sweep.
+# Format:  mode | category | outlet name | url
+#   mode = pass       -> every item kept (issue-specific source)
+#          filter     -> only items matching the topical keyword list
+#          gnews      -> Google News site: search (feedless outlet), keep all
+#          gnewsf     -> same, but keyword-filtered (for broad general outlets)
+#          bing       -> Bing News site: search; unlike Google these give DIRECT
+#                        publisher links, but coverage is thin (~14 items)
+#          bingf      -> same, keyword-filtered
+#          scrapesrc  -> read an index page as a source (outlet has no feed at all);
+#                        no dates, so a link absent from seen.json counts as new
+#          scrapesrcf -> same, keyword-filtered
+#          scrape     -> index page read ONLY to resolve gnews links to direct URLs
+#          disable    -> never fetch this url fragment (dead/stale feed)
+#          block      -> drop any item from this outlet/domain (aggregators, junk)
+# An optional 5th field sets a longer sweep window for that source alone:
+#     pass | category | outlet | url | window=168h
+# Use it for sources that publish a few times a WEEK - the default 36h window misses them
+# most days, and a silent miss is indistinguishable from a quiet news week. Never shortens
+# the window, only lengthens it, and must stay under SEEN_RETENTION_DAYS (21d) so a story
+# already published is not offered again. run_tests.py asserts that.
+# Lines starting with # are ignored. Edit freely; the sweep picks changes up
+# on the next run.
+
+# --- outlets missing from the Feedly OPML but frequently cited -------------
+pass   | Media: Christian        | Catholic News Agency        | https://www.catholicnewsagency.com/rss/news.xml
+pass   | Media: Christian        | Catholic World Report       | https://www.catholicworldreport.com/feed/
+pass   | Media: Christian        | The Christian Post          | https://www.christianpost.com/rss/
+pass   | Media: Christian        | Vatican News                | https://www.vaticannews.va/en.rss.xml
+pass   | Issues: Religious Freedom | Bitter Winter             | https://bitterwinter.org/feed/
+pass   | Issues: Religious Freedom | UCA News                  | https://www.ucanews.com/rss/news
+pass   | Issues: Religious Freedom | Open Doors UK             | https://www.opendoorsuk.org/feed/
+pass   | Media: Alternative      | The Daily Signal            | https://www.dailysignal.com/feed/
+pass   | Media: Alternative      | National Review             | https://www.nationalreview.com/feed/
+pass   | Issues: Life            | SPUC                        | https://www.spuc.org.uk/feed
+pass   | Media: Christian        | EWTN Great Britain          | https://ewtn.co.uk/feed/
+pass   | Media: Christian        | OSV News                    | https://www.osvnews.com/feed/
+pass   | Advocacy: Christian     | Christian Concern           | https://christianconcern.com/feed/
+filter | Media: US and World     | New York Post               | https://nypost.com/feed/
+# Newsweek's /rss 404s and /rss/news answers 406 as of 24.08.2026 (it was among the 8 failures
+# on the 23.08 sweep). Left in place deliberately so check_sources.py keeps reporting it
+# rather than the outlet vanishing quietly; the gnewsf line below is the working route.
+filter | Media: US and World     | Newsweek                    | https://www.newsweek.com/rss
+gnewsf | Media: US and World     | Newsweek                    | newsweek.com
+filter | Media: US and World     | Politico                    | https://rss.politico.com/politics-news.xml
+filter | Media: UK Mainstream    | GB News                     | https://www.gbnews.com/feeds/news.rss
+filter | Media: US and World     | The Hill                    | https://thehill.com/news/feed/
+filter | Media: US and World     | Fox News                    | https://moxie.foxnews.com/google-publisher/politics.xml
+filter | Media: US and World     | ABC News (Australia)        | https://www.abc.net.au/news/feed/51120/rss.xml
+filter | Media: US and World     | Brussels Signal             | https://brusselssignal.eu/feed/
+filter | Media: US and World     | The Times of India          | https://timesofindia.indiatimes.com/rssfeedstopstories.cms
+# India coverage was thin: the ToI top-stories feed misses city/state reporting, and
+# All India Radio was absent entirely. Both carried abortion stories on 12.08.2026
+# that the sweep never saw.
+filter | Media: US and World     | The Times of India (India)   | https://timesofindia.indiatimes.com/rssfeeds/-2128936835.cms
+filter | Media: US and World     | The Times of India (cities)  | https://timesofindia.indiatimes.com/rssfeeds/-2128932452.cms
+# Dropped 25.08.2026 (Chris). newsonair.gov.in publishes no working feed, so it only ever
+# arrived via Google News, and its pages refuse the article fetch: 7 of the 104 leads the
+# ranker could not read on 25.08 were All India Radio, the largest non-paywalled block. What
+# it did contribute was mostly Indian government wire copy - ministry announcements, budget
+# procurement, cabinet notes - that never reached a briefing. Indian coverage is still carried
+# by the three Times of India feeds above and the @IN regional Google News edition below.
+# gnewsf | Media: US and World     | All India Radio             | newsonair.gov.in@IN
+
+# --- regional Google News editions ----------------------------------------
+# The GB/US editions barely index non-Western reporting: two Indian abortion stories were
+# missed on 12.08.2026 despite ToI and Google keyword feeds being in the sweep. "@CC" sets
+# the edition, "kw:" makes it a keyword search. Use OR, never a pipe (| is the field
+# separator here).
+gnews  | Issues: Life            | India life & family          | kw:abortion OR surrogacy OR "assisted dying" OR euthanasia@IN
+gnews  | Issues: Religious Freedom | India religious freedom    | kw:"religious freedom" OR "anti-conversion" OR "church attack" OR "Christian persecution"@IN
+gnews  | Issues: Gender & Identity | India gender & family      | kw:transgender OR "same-sex" OR "gender identity" OR marriage@IN
+gnews  | Issues: Religious Freedom | Nigeria persecution        | kw:Christians OR church OR persecution OR kidnapped@NG
+gnews  | Issues: Religious Freedom | Kenya & East Africa faith   | kw:church OR Christians OR "religious freedom"@KE
+gnews  | Issues: Religious Freedom | Pakistan minorities         | kw:blasphemy OR Christian OR minorities OR "forced conversion"@PK
+gnews  | Issues: Religious Freedom | Philippines & SE Asia faith | kw:church OR Christian OR abortion OR "religious freedom"@PH
+gnews  | Issues: Life            | Ireland life & family        | kw:abortion OR surrogacy OR "assisted dying" OR marriage@IE
+gnews  | Issues: Life            | Australia life & family      | kw:abortion OR "voluntary assisted dying" OR surrogacy@AU
+gnews  | Issues: Gender & Identity | Canada gender & life       | kw:transgender OR \"MAiD\" OR abortion OR "parental rights"@CA
+filter | Media: US and World     | Axios                       | https://api.axios.com/feed/
+filter | Media: Alternative      | The Daily Wire              | https://www.dailywire.com/feeds/rss.xml
+filter | Media: UK Mainstream    | BBC UK                      | https://feeds.bbci.co.uk/news/uk/rss.xml
+filter | Media: UK Mainstream    | The Guardian                | https://www.theguardian.com/uk/rss
+filter | Media: UK Mainstream    | Sky News                    | https://feeds.skynews.com/feeds/rss/uk.xml
+filter | Media: UK Mainstream    | The Scotsman                | https://www.scotsman.com/rss
+filter | Media: UK Mainstream    | Belfast News Letter         | https://www.newsletter.co.uk/rss
+filter | Media: UK Mainstream    | Nation.Cymru                | https://nation.cymru/feed/
+filter | Media: UK Periodicals   | Quillette                   | https://quillette.com/rss/
+
+# --- paywalled outlets ----------------------------------------------------
+# The feed still gives headline, link and date even when the article itself is
+# behind the paywall, which is all the briefing needs. Anything matching the
+# PAYWALLED list in fetch_feeds.py is flagged £ in the sweep output so the digest
+# can append "(£)" automatically.
+# The Telegraph's own RSS feeds are gone for good - so it comes in via Bing (direct
+# links, fresh) with Google News as a top-up for breadth. Both routes are healthy.
+# Originally read as "abandoned, last updated June 2026"; re-diagnosed 21.08.2026,
+# when check_sources.py called Telegraph BROKEN on HTTP 402 for three days. 402 is
+# the point: every telegraph.co.uk RSS path now sits behind Tollbit, a pay-per-crawl
+# gate. It serves a JS fingerprinting page that redirects to tollbit-host.com and
+# answers the pipeline with 402 Payment Required - never a feed. This is a licensing
+# decision, not an outage, so no UA swap, retry or alternate path will fix it. Do not
+# re-enable these and do not treat the 402 as transient.
+bingf  | Media: UK Mainstream    | The Telegraph               | telegraph.co.uk
+gnewsf | Media: UK Mainstream    | The Telegraph               | telegraph.co.uk
+filter | Media: UK Periodicals   | The Economist               | https://www.economist.com/britain/rss.xml
+filter | Media: US and World     | The Wall Street Journal     | https://feeds.a.dj.com/rss/RSSWorldNews.xml
+filter | Media: US and World     | The New York Times          | https://rss.nytimes.com/services/xml/rss/nyt/World.xml
+filter | Media: US and World     | The Washington Post         | https://feeds.washingtonpost.com/rss/national
+filter | Media: US and World     | Bloomberg                   | https://feeds.bloomberg.com/politics/news.rss
+filter | Media: US and World     | Sydney Morning Herald       | https://www.smh.com.au/rss/feed.xml
+
+# Bing News site: search - its links wrap the real publisher URL, so unlike
+# Google News these come out as direct links. Coverage is thin (~14 items) but
+# it reaches outlets whose own feeds return 403.
+bingf  | Media: UK Mainstream    | The Herald (Scotland)       | heraldscotland.com
+bingf  | Media: US and World     | The Australian              | theaustralian.com.au
+bingf  | Media: Christian        | National Catholic Register  | ncregister.com
+bingf  | Media: UK Periodicals   | Church Times                | churchtimes.co.uk
+filter | Media: US and World     | The Post (New Zealand)      | https://www.thepost.co.nz/rss
+filter | Media: US and World     | Stuff (New Zealand)         | https://www.stuff.co.nz/rss
+# Salt Lake Tribune's religion desk covers LDS legal and religious-liberty cases; it serves
+# HTML on every feed path, so it arrives through search instead.
+gnewsf | Media: US and World     | The Salt Lake Tribune       | sltrib.com
+bingf  | Media: US and World     | The Salt Lake Tribune       | sltrib.com
+gnewsf | Issues: Religious Freedom | New Zealand faith & speech | kw:"free speech" OR church OR Christian OR abortion@NZ
+# The Tablet serves HTML on /feed, /rss and /feed/ - no usable feed anywhere
+gnewsf | Media: UK Periodicals   | The Tablet                  | thetablet.co.uk
+bingf  | Media: UK Periodicals   | The Tablet                  | thetablet.co.uk
+
+# PinkNews arrives unfiltered via the OPML's "Advocacy: Non-Christian" group, which
+# floods the sweep with celebrity and entertainment items. Keyword-filter it: its
+# genuinely newsworthy pieces (Ofcom rulings, overseas arrests) still come through.
+# (extras load before the OPML and win the URL dedup, so this overrides the OPML entry)
+filter | Advocacy: Non-Christian | PinkNews                    | http://feeds.feedburner.com/Pinknews
+
+# --- commentary magazines: Spectator, Critic, UnHerd, spiked ---------------
+# Deliberately UNFILTERED. These four are read for argued commentary on exactly the
+# briefing's subjects, and their headlines often carry no matching keyword even when
+# the piece is central - spiked's "Jason Arday's enablers are insufferable pseuds" is
+# the free-speech story of the day but matches nothing. Volume is bounded by the
+# per-source cap, and the digest step curates.
+pass   | Media: UK Periodicals   | The Critic                  | https://thecritic.co.uk/feed/
+pass   | Media: UK Periodicals   | UnHerd                      | https://unherd.com/feed/
+pass   | Media: Alternative      | spiked                      | https://www.spiked-online.com/feed/
+# Spectator Australia was on `filter` while its UK sibling was unfiltered - an inconsistency
+# that dropped "It's a mad mad mad mad world" on 13.08.2026 for matching no keyword.
+pass   | Media: UK Periodicals   | The Spectator Australia     | https://www.spectator.com.au/feed/
+
+# The Spectator publishes no RSS anywhere and Google/Bing barely index it, so read its
+# index pages directly. These carry no dates: a link absent from seen.json counts as
+# new, which is accurate given the sweep runs daily. Note the UK Spectator now serves
+# articles from spectator.com, not spectator.co.uk - its own homepage links there.
+scrapesrc | Media: UK Periodicals | The Spectator             | https://spectator.com/
+scrapesrc | Media: UK Periodicals | The Spectator             | https://spectator.com/magazine/
+# The Critic and UnHerd feeds both parse correctly now (UnHerd needed the XML
+# sanitiser), so no scrape fallback is needed. If either breaks, add a line like the
+# Spectator ones above - thecritic.co.uk returns 403 to scrapers, unherd.com does not.
+
+# --- corrected URLs (OPML versions are dead or moved) ----------------------
+# Live Action News: own feed disabled, reached through Google News instead. See the
+# "Replacing Live Action News" block below (Chris, 18.08.2026).
+gnews  | Issues: Life            | Live Action News            | liveaction.org@US
+pass   | Issues: Life            | LifeSiteNews                | https://www.lifesitenews.com/rss/global
+pass   | Media: Christian        | Crux                        | https://cruxnow.com/feed
+pass   | Media: Christian        | Aleteia                     | https://aleteia.org/feed/
+pass   | Media: Christian        | Christianity Today          | https://www.christianitytoday.com/feed/
+pass   | Media: UK Periodicals   | First Things                | https://www.firstthings.com/feed
+filter | Media: UK Mainstream    | Metro                       | https://metro.co.uk/feed/
+filter | Govt: News & Research   | GOV.UK news                 | https://www.gov.uk/search/news-and-communications.atom
+
+# --- feedless outlets: Google News site: search ---------------------------
+# These outlets publish no usable RSS. Google News gives an accurate headline,
+# date and outlet, but its link is an opaque redirect that cannot be resolved
+# server-side, so the sweep scrapes each outlet's index page (below) and swaps in
+# the direct URL when the headlines match. Broad outlets use `filter` mode so
+# only on-topic headlines come through.
+gnews  | Media: Christian        | Catholic Herald             | thecatholicherald.com
+gnews  | Media: Christian        | National Catholic Register  | ncregister.com
+gnews  | Media: Christian        | Premier Christian News      | premierchristian.news
+gnews  | Media: Christian        | Baptist Press               | baptistpress.com
+gnews  | Media: Alternative      | The Washington Stand        | washingtonstand.com
+gnewsf | Media: Christian        | CBN News                    | cbn.com
+gnewsf | Media: Alternative      | WORLD                       | wng.org
+gnewsf | Media: Alternative      | The Heritage Foundation     | heritage.org
+gnewsf | Media: UK Mainstream    | The Times                   | thetimes.com
+
+# --- index pages scraped only to turn gnews redirects into direct links ---
+scrape | -                       | Catholic Herald             | https://thecatholicherald.com/
+scrape | -                       | EWTN News                   | https://www.ewtnnews.com/
+scrape | -                       | National Catholic Register  | https://www.ncregister.com/
+scrape | -                       | Premier Christian News      | https://premierchristian.news/en/news
+scrape | -                       | The Washington Stand        | https://washingtonstand.com/
+scrape | -                       | CBN News                    | https://cbn.com/news
+scrape | -                       | WORLD                       | https://wng.org/
+scrape | -                       | Baptist Press               | https://www.baptistpress.com/
+scrape | -                       | Heritage Foundation         | https://www.heritage.org/
+
+# --- aggregators and reprint mills: never include -------------------------
+# Daily Pioneer: link integrity not trustworthy (Chris, 13.08.2026) - the URL that
+# reached the 13.08 briefing was a resolver guess that does not resolve.
+block | dailypioneer.com
+block | Daily Pioneer
+block | msn.com
+block | news.yahoo.com
+block | sports.yahoo.com
+block | einnews.com
+block | einpresswire.com
+block | facebook.com
+block | x.com
+block | twitter.com
+block | reddit.com
+block | flipboard.com
+block | newsbreak.com
+block | Yahoo
+block | EIN News
+block | Snopes
+block | Explained PH
+block | National News Desk
+
+# --- dead or hijacked feeds in the OPML: never fetch ----------------------
+# TheyWorkForYou search feeds: 20 feeds on one rate-limiting host, and Hansard
+# mentions are not news stories - the briefings have never cited them.
+disable | theyworkforyou.com
+# cmfblog.org.uk now redirects to an unrelated site (domain lapsed)
+disable | cmfblog.org.uk
+disable | www.cmfblog.org.uk
+disable | capx.co/feed
+disable | catholicherald.co.uk/feed.xml
+disable | firstthings.com/rss/onthesquare.php
+disable | worldwatchmonitor.org
+disable | ofsted.gov.uk/news/rss
+disable | mod.uk/DefenceInternet
+disable | gov.uk/government/announcements.atom
+disable | liveactionnews.org
+disable | liveaction.org/news/feed
+# Christian Medical Fellowship dropped (Chris, 18.08.2026). Its own feed answers only
+# intermittently - Cloudflare Turnstile 403s most requests - and when it does answer the
+# newest item was 21.07.2026, four weeks stale. The feedburner copy in the OPML last
+# published in July 2024. A source this quiet is indistinguishable from a dead one, so it
+# was costing a daily check_sources alarm and returning nothing.
+disable | cmf.org.uk
+disable | feeds.feedburner.com/Cmforguk
+disable | www.cruxnow.com/feed
+disable | thesun.co.uk/sol/homepage
+disable | newsrss.bbc.co.uk
+disable | guardian.co.uk/rssfeed
+disable | un.org/apps/news/rss
+disable | senedd.assembly.wales
+disable | chathamhouse.org/path
+disable | people-press.org/rss.xml
+disable | economist.com/rss/britain_rss.xml
+disable | newyorker.com/services/rss
+disable | rian.ru/export
+disable | newslookup.com/rss
+disable | straitstimes.com/news/politics/rss.xml
+disable | technologyreview.com
+disable | nytimes.com/services/xml
+disable | dailywire.com/rss.xml
+disable | news.sky.com/sky-news/rss
+disable | theguardian.com/rssfeed
+disable | quillette.com/feed
+disable | rss.cnn.com
+disable | feeds2.feedburner.com/time
+disable | voxpoliticalonline.com
+disable | pamelageller.com
+disable | hitchensblog.mailonsunday.co.uk
+disable | tortoisemedia.com/feed
+disable | thearticle.com/feed
+disable | leftfootforward.org/feed
+disable | libdemvoice.org/feed
+disable | licc.org.uk/resources/feed
+disable | conservativesforwomen.org//feed
+disable | curia.europa.eu
+disable | telegraph.co.uk/newsfeed/rss
+disable | christianitytoday.com/lyris
+disable | gov.uk/government/publications.atom
+disable | gov.uk/government/statistics.atom
+disable | researchbriefings.parliament.uk
+disable | supremecourt.uk/rss
+disable | schoolsweek.co.uk/feed
+disable | news.com.au/feed
+disable | carenotkilling.org.uk/rss/articles
+# Telegraph's own feeds are behind the Tollbit pay-per-crawl gate - HTTP 402, never a
+# feed (see bingf entry above). The bare /rss and /technology/rss paths are the two
+# that sources.opml still lists and that no rule below caught: "telegraph.co.uk/rss.xml"
+# is not a substring of either, so /rss kept being fetched and 402'd every morning.
+disable | telegraph.co.uk/rss
+disable | telegraph.co.uk/technology/rss
+disable | telegraph.co.uk/rss.xml
+disable | telegraph.co.uk/news/rss.xml
+disable | telegraph.co.uk/politics/rss.xml
+disable | telegraph.co.uk/opinion/rss.xml
+disable | newstatesman.com/feed
+
+# --- feeds for outlets that previously only reached us via Google News ------
+# Discovered by discover_feeds.py on the 12.08.2026 round-up. The
+# corresponding gnews/gnewsf entries above are deliberately kept: they stay
+# as the safety net for outlets with no feed of their own.
+# All are `filter` (keyword-matched) because most are general or local news;
+# flip any single-issue outlet to `pass` if it is being under-collected.
+filter | Media: US and World     | Christianity Daily News    | https://christianitydaily.com/rss
+filter | Media: US and World     | The 74                     | https://www.the74million.org/feed/
+filter | Media: US and World     | NBC Boston                 | https://www.nbcboston.com/?rss=y
+filter | Media: US and World     | WPRI.com                   | https://wpri.com/feed/
+filter | Media: US and World     | iObserve                   | https://iobserve.org/feed/
+filter | Media: US and World     | Abortion, Every Day - Jess | https://jessica.substack.com/feed
+filter | Media: US and World     | Boston.com                 | https://www.boston.com/feed/
+filter | Media: US and World     | Newstalk                   | https://newstalk.com/feed/
+filter | Media: US and World     | STAT                       | https://www.statnews.com/feed/
+filter | Media: US and World     | Los Angeles Times          | https://www.latimes.com/index.rss
+filter | Media: US and World     | Rewire News Group          | https://rewirenewsgroup.com/feed/
+filter | Media: US and World     | Ms. Magazine               | https://msmagazine.com/feed/
+filter | Media: US and World     | voz.us                     | https://voz.us/es/rss/home.xml
+filter | Media: US and World     | La Veu Lliure              | https://laveulliure.ad/rss.xml
+filter | Media: US and World     | National Right to Life Com | https://nrlc.org/feed/
+filter | Media: US and World     | WBUR                       | https://rss.wbur.org/wbur/rss
+filter | Media: US and World     | Arkansas Times             | https://arktimes.com/feed
+filter | Media: US and World     | Truthout                   | https://truthout.org/feed/?withoutcomments=1
+filter | Media: US and World     | deseret.com                | https://www.deseret.com/rss/latest.rss
+# Post and Courier's search-based feed returns HTTP 429; left to Google News
+filter | Media: US and World     | WCIA.com                   | https://wcia.com/feed/
+filter | Media: US and World     | Arizona Capitol Times      | https://azcapitoltimes.com/feed/
+filter | Media: US and World     | citynewsqbn.com.au         | https://citynewsqbn.com.au/feed/
+filter | Media: US and World     | Courthouse News            | https://courthousenews.com/feed/
+filter | Media: US and World     | Urban Milwaukee            | http://feeds.feedburner.com/UrbanMilwaukee
+filter | Media: US and World     | FOX 26 Houston             | https://www.fox26houston.com/rss.xml
+# Blocked as a source 25.08.2026, so stop fetching it too - the self-block assertion in
+# run_tests.py caught this the moment the block was added.
+disable | lgbtqnation.com/feed
+filter | Media: US and World     | Advocate.com               | https://www.advocate.com/feeds/feed.rss
+filter | Media: US and World     | Around Prague              | https://aroundprague.cz/rss/ap.rss
+filter | Media: US and World     | WQAD                       | https://www.wqad.com/feeds/syndication/rss/news
+filter | Media: US and World     | RealClearPolicy            | https://realclearpolicy.com/index.xml
+filter | Media: US and World     | TribLIVE.com               | https://triblive.com/feed/
+filter | Media: US and World     | Lost Coast Outpost         | https://lostcoastoutpost.com/feed/
+filter | Media: US and World     | KNSI                       | https://knsiradio.com/feed/
+filter | Media: US and World     | The Argument               | https://theargumentmag.com/feed
+filter | Media: US and World     | en.antaranews.com          | https://en.antaranews.com/feed/
+filter | Media: US and World     | FOX 2 Detroit              | https://www.fox2detroit.com/rss.xml
+filter | Media: US and World     | The Walrus                 | https://thewalrus.ca/feed/
+filter | Media: US and World     | DutchNews.nl               | https://dutchnews.nl/feed/
+filter | Media: US and World     | FireRescue1                | https://www.firerescue1.com/index.rss
+filter | Media: US and World     | Kenyans.co.ke              | https://www.kenyans.co.ke/feeds/news
+filter | Media: US and World     | SCOTUSblog                 | https://www.scotusblog.com/feed/
+filter | Media: US and World     | Washington Blade           | https://www.washingtonblade.com/feed/
+filter | Media: US and World     | Business News Nigeria      | https://businessday.ng/feed/
+filter | Media: US and World     | Middle East Eye            | https://middleeasteye.net/rss
+filter | Media: US and World     | Peoples Gazette Nigeria    | https://gazettengr.com/feed/
+filter | Media: US and World     | Front Office Sports        | https://frontofficesports.com/rsslatest.xml
+filter | Media: US and World     | Fox Business               | https://moxie.foxbusiness.com/google-publisher/latest.xml
+filter | Media: US and World     | Out Magazine               | https://out.com/feeds/feed.rss
+filter | Media: US and World     | The Vallejo Sun            | https://www.vallejosun.com/rss/
+filter | Media: US and World     | Rolling Stone Australia    | https://au.rollingstone.com/feed/
+filter | Media: US and World     | san.com                    | https://san.com/feed/
+filter | Media: US and World     | KHOU                       | https://www.khou.com/feeds/syndication/rss/news
+filter | Media: US and World     | Congressional Equality Cau | https://equality.house.gov/rss.xml
+filter | Media: US and World     | Межа. Новини України.      | https://mezha.net/feed/
+filter | Media: US and World     | News of the United States  | https://www.notus.org/index.rss
+filter | Media: US and World     | Mother Jones               | https://www.motherjones.com/feed/
+filter | Media: US and World     | Carson Now                 | https://www.carsonnow.org/feed
+filter | Media: US and World     | upi.com                    | https://rss.upi.com/news/news.rss
+filter | Media: US and World     | Nepalnews.com              | https://english.nepalnews.com/feed/
+filter | Media: US and World     | Dallas Voice               | https://dallasvoice.com/feed/
+filter | Media: US and World     | The Trevor Project         | https://thetrevorproject.org/feed/
+filter | Media: US and World     | Q News Pty Ltd             | https://qnews.com.au/feed/
+filter | Media: US and World     | Pittsburgh Post-Gazette    | https://www.post-gazette.com/rss
+filter | Media: US and World     | Tribune Online             | https://tribuneonlineng.com/feed/
+filter | Media: US and World     | New Ways Ministry          | https://www.newwaysministry.org/feed/
+filter | Media: US and World     | Oragark                    | https://www.oragark.com/feed/
+filter | Media: US and World     | jurist.org                 | https://jurist.org/news/feed/
+filter | Media: US and World     | Development Diaries        | https://developmentdiaries.com/feed/
+filter | Media: US and World     | www.christiandaily.com     | https://www.christiandaily.com/rss.xml
+filter | Media: US and World     | WyoFile                    | https://wyofile.com/feed/
+filter | Media: US and World     | standingforfreedom.com     | https://standingforfreedom.com/feed/
+filter | Media: US and World     | Word&Way                   | https://wordandway.org/feed/
+filter | Media: US and World     | The Express Tribune        | https://tribune.com.pk/news/feed/
+filter | Media: US and World     | Counterview                | https://www.counterview.net/feeds/posts/default
+filter | Media: US and World     | Church News                | https://www.thechurchnews.com/rss/latest.rss
+filter | Media: US and World     | cbn.com                    | https://www1.cbn.com/rss.xml
+gnews  | Media: UK Religious     | Independent Catholic News   | indcatholicnews.com
+filter | Media: Europe           | The Local Sweden            | https://feeds.thelocal.com/rss/se
+filter | Media: Europe           | The Local (Europe)          | https://feeds.thelocal.com/rss/
+gnewsf | Media: US and World     | The Hill (state watch)      | kw:abortion OR transgender OR religious site:thehill.com@US
+# Added 13.08.2026 after Chris asked for newsletters: these had working RSS, so no signup
+# is needed. Single-issue advocacy bodies are `pass` (their headlines are allusive and all
+# of their output is on-topic); the general think tanks are `filter` because they also
+# publish tax and economics material that is not ours.
+pass   | Advocacy: Christian     | Release International       | https://voiceofpersecutedchristians.org/feed/
+pass   | Advocacy: Christian     | Human Life International    | https://www.hli.org/feed/
+# Christian Medical Fellowship removed 18.08.2026 - see the disable lines above.
+pass   | Advocacy: Christian     | Catholic Union              | https://catholicunion.org.uk/feed/
+pass   | Advocacy: Non-Christian | Campaign Against Antisemitism| https://antisemitism.org/feed
+pass   | Think Tanks: Secular    | Institute of Economic Affairs| https://iea.org.uk/feed/
+pass   | Think Tanks: Secular    | Civitas                     | https://civitas.org.uk/feed/
+# Second discovery pass, 13.08.2026. Same rule: single-issue bodies are `pass`, broad
+# publishers are `filter`. The Daily Sceptic files heavily on covid, climate and culture and
+# needs the keyword gate; the rest are narrow enough that everything they publish is ours.
+pass   | Advocacy: Christian     | Middle East Concern         | https://www.meconcern.org/feed/
+pass   | Advocacy: Christian     | In Defense of Christians    | https://indefenseofchristians.org/feed/
+pass   | Advocacy: Christian     | Jubilee Campaign            | https://jubileecampaign.org/feed/
+pass   | Advocacy: Christian     | 21Wilberforce               | https://21wilberforce.org/feed/
+pass   | Advocacy: Christian     | Care Not Killing            | https://carenotkilling.org.uk/feed/
+pass   | Advocacy: Christian     | Charlotte Lozier Institute  | https://lozierinstitute.org/feed/
+pass   | Advocacy: Christian     | SBA Pro-Life America        | https://sbaprolife.org/feed
+pass   | Advocacy: Christian     | Marriage Foundation         | https://marriagefoundation.org.uk/feed/
+pass   | Advocacy: Christian     | GAFCON                      | https://gafcon.org/feed/
+pass   | Advocacy: Christian     | Save the Parish             | https://www.savetheparish.com/feed/
+pass   | Advocacy: Non-Christian | Our Duty                    | https://ourduty.group/feed/
+pass   | Advocacy: Non-Christian | Bayswater Support Group     | https://www.bayswatersupport.org.uk/feed/
+pass   | Advocacy: Non-Christian | Women's Rights Network      | https://www.womensrights.network/blog-feed.xml
+pass   | Comment: Secular        | The Daily Sceptic           | https://dailysceptic.org/feed/
+# Third discovery pass, 13.08.2026 - English-language international, aimed at the regional
+# gaps: Africa, Asia, Canada, Australia/NZ and Ireland were all thin, and persecution
+# reporting from those places is exactly what we have been missing. General newspapers are
+# `filter`; diocesan and single-issue titles are `pass`.
+# NOTE: genethique.org is French. It will parse but its headlines will not match the
+# English-only classifier, so it may produce nothing until that is addressed.
+pass   | Media: Christian        | Morning Star News           | https://morningstarnews.org/feed/
+pass   | Media: Christian        | Matters India               | https://mattersindia.com/feed/
+pass   | Media: Christian        | Church of Nigeria           | https://anglican-nig.org/feed/
+pass   | Media: Christian        | SA Catholic Bishops         | https://sacbc.org.za/feed/
+pass   | Media: Christian        | The Southern Cross          | https://www.scross.co.za/feed/
+pass   | Media: Christian        | The Pillar                  | https://pillarcatholic.com/feed
+pass   | Media: Christian        | The B.C. Catholic           | https://bccatholic.ca/content/feed
+pass   | Media: Christian        | Catholic Review             | https://catholicreview.org/feed/
+pass   | Media: Christian        | Catholic Sun                | https://www.catholicsun.org/feed/
+pass   | Media: Christian        | Angelus News                | https://angelusnews.com/feed/
+pass   | Media: Christian        | The Catholic Weekly         | https://catholicweekly.com.au/feed/
+pass   | Media: Christian        | The Irish Catholic          | https://www.irishcatholic.com/feed/
+pass   | Media: Christian        | Gript                       | https://gript.ie/feed/
+pass   | Advocacy: Christian     | Australian Christian Lobby  | https://www.acl.org.au/feed/
+pass   | Advocacy: Christian     | Family First NZ             | https://familyfirst.org.nz/feed/
+pass   | Advocacy: Christian     | LifeCanada                  | https://lifecanada.org/feed/
+pass   | Advocacy: Christian     | Bioethics Observatory       | https://bioethicsobservatory.org/feed/
+pass   | Advocacy: Christian     | Genethique                  | https://genethique.org/feed/
+filter | Media: US and World     | Daily Post Nigeria          | https://dailypost.ng/feed/
+filter | Media: US and World     | Premium Times Nigeria       | https://www.premiumtimesng.com/feed
+
+# ---------------------------------------------------------------------------
+# SPANISH / ITALIAN / FRENCH SOURCES - VERIFIED BUT PARKED (13.08.2026)
+#
+# Chris: "Keep it mostly English for now but have the sources ready for the future."
+# Every URL below was fetched and parsed on 13.08.2026 with the item count shown, so these
+# are known-good, not guesses. To switch them on, delete the leading '# ' from the lines.
+#
+# The classifier is ALREADY READY for these: shortlist.ML_SECTIONS carries Spanish and
+# Italian vocabulary for all six specific sections, OTHER_ALLOW covers their public-affairs
+# terms, and importance() knows their outcome verbs in both present and preterite - Spanish
+# headlines use the present tense ("el Supremo anula"), which the first attempt missed.
+# fetch_feeds.KEYWORDS carries the matching prefilter terms. Tested 14/15 on real headlines.
+#
+# Not found, needing a manual look if wanted later: ACI Prensa (aciprensa.com - the major
+# Spanish-language Catholic wire, worth the effort), Actuall, Avvenire, La Nuova Bussola
+# Quotidiana, Il Timone, Pro Vita e Famiglia, ACI Digital, Gaudium Press.
+# ---------------------------------------------------------------------------
+# pass   | Media: Christian        | Religion en Libertad        | https://www.religionenlibertad.com/rss/home.xml
+# pass   | Media: Christian        | InfoCatolica                | https://www.infocatolica.com/atom.php
+# pass   | Media: Christian        | Infovaticana                | https://infovaticana.com/feed/
+# pass   | Media: Christian        | ACI Stampa                  | https://acistampa.com/rss
+# pass   | Media: Christian        | Tempi                       | https://www.tempi.it/feed/
+# pass   | Media: Christian        | Le Salon Beige              | https://lesalonbeige.fr/feed/
+# Civil liberties, 14.08.2026. Free Speech & Civil Liberties had 19 candidates because we
+# had no sources on this beat - only four such headlines existed in a 1,312-item sweep. The
+# regex was never the problem. BBW and ORG are `pass` (allusive headlines, all output in
+# scope); Rebel News is `filter` (broad Canadian output including fundraising appeals).
+# Note: BBW advertises no feed in its HTML head, so head-link discovery missed it; /feed/
+# works directly.
+pass   | Advocacy: Non-Christian | Big Brother Watch           | https://bigbrotherwatch.org.uk/feed/
+pass   | Advocacy: Non-Christian | Open Rights Group           | https://www.openrightsgroup.org/feed/
+filter | Media: Alternative      | Rebel News                  | https://www.rebelnews.com/rss
+
+# Sources Chris ruled out on 16.08.2026. Most arrive only as Google News redirects, so they
+# are blocked by publisher name as well as domain.
+block | clarionledger.com
+block | Clarion-Ledger
+block | businessmirror.com.ph
+block | BusinessMirror
+block | quiverquant.com
+block | Quiver Quantitative
+block | leadership.ng
+block | LEADERSHIP Newspapers
+block | telanganatoday.com
+block | Telangana Today
+block | dailycountrytodaybd.com
+block | nydailynews.com
+block | New York Daily News
+block | massterlist.com
+block | MASSterList
+
+# --- Long-form ideas essays for the "Other" section (Chris, 17.08.2026) ---
+# He pointed at a Cosmos Institute AI reading list and a Poetry Foundation essay on
+# nostalgia as "the kind of articles we should populate it with". Both reached him via
+# The Browser (the ?ref= on his links), so that is the vein these tap.
+# All 'pass': same reasoning as the commentary magazines - keyword-gating an essay feed
+# drops exactly the pieces they are read for. Volume is low (most publish weekly or less)
+# and ESSAY_SOURCES in shortlist.py routes them to Other without a subject keyword.
+pass   | Ideas: Essays          | Cosmos Institute            | https://blog.cosmos-institute.org/feed
+pass   | Ideas: Essays          | The Browser                 | https://thebrowser.com/notes/feed
+pass   | Ideas: Essays          | Aeon                        | https://aeon.co/feed.rss
+pass   | Ideas: Essays          | The New Atlantis            | https://www.thenewatlantis.com/feed
+pass   | Ideas: Essays          | Comment Magazine            | https://comment.org/feed
+pass   | Ideas: Essays          | Asterisk                    | https://asteriskmag.com/feed
+pass   | Ideas: Essays          | Nautilus                    | https://nautil.us/feed
+pass   | Ideas: Essays          | The Marginalian             | https://www.themarginalian.org/feed
+# Poetry Foundation is NOT here on purpose: poetryfoundation.org returns 403 to every
+# request (feed and article alike), and its Google News feed carries only section index
+# pages - "Poems", "Awards", "Mourning" - not essays. No usable route found.
+
+# --- Unfilter commentary and think-tank feeds (Chris, 17.08.2026) ----------
+# Measured, not guessed: keyword-gating these 10 feeds was keeping 51 of their items and
+# discarding 18 that the section classifier places perfectly well - Burnham policy pieces,
+# Farage analysis, a digital-ID/online-safety story that belongs in Free Speech, civil
+# service reform. Same lesson as Spectator Australia on 13.08.2026: a source read for its
+# judgement cannot be keyword-gated, because the pieces it is read for rarely name the topic.
+# These re-declare the OPML's URL; extras win the dedup, so the mode here is what applies.
+#
+# PinkNews is deliberately NOT here. It was the one feed where unfiltering added nothing
+# but chaff (a Jodie Foster celebrity item), so it stays on 'filter'.
+pass   | Comment: Secular        | Alastair Campbell           | http://www.alastaircampbell.org/feed/
+pass   | Comment: Secular        | Iain Dale                   | http://iaindale.blogspot.com/feeds/posts/default
+pass   | Comment: Secular        | Statement                   | https://statement.com/feed/
+pass   | Comment: Secular        | The European Conservative   | https://europeanconservative.com/feed/
+pass   | Think Tanks: General    | Joseph Rowntree Foundation  | https://www.jrf.org.uk/rss.xml
+pass   | Think Tanks: General    | Fabian Society              | http://www.fabians.org.uk/feed/
+pass   | Think Tanks: General    | Resolution Foundation       | http://www.resolutionfoundation.org/feed/
+
+# --- Replacing Live Action News (Chris, 17.08.2026) ------------------------
+# liveaction.org sits behind a Vercel bot challenge (HTTP 429, x-vercel-mitigated: challenge)
+# and cmf.org.uk behind Cloudflare Turnstile (403). Those are deliberate blocks on automated
+# access, so they are not worked around.
+#
+# CORRECTION, 18.08.2026: "their Google News index is stale since April 2026" was wrong, and
+# wrong in a way worth remembering. It is edition-specific. Asking the GB edition
+# (liveaction.org@GB) does return nothing newer than 28.04.2026 - but the US edition
+# (liveaction.org@US) returns 16 items with the newest timestamped the same morning. An
+# American outlet is indexed in the American edition; the @GB test measured the wrong shelf,
+# not an empty one. Check both editions before recording a source as unreachable.
+#
+# The give-away was in the output all along: Live Action stories kept reaching the briefing
+# anyway, arriving incidentally through the "assisted suicide" and "Australia life & family"
+# keyword searches. A source that is supposedly dark but keeps appearing is not dark.
+# It is now a deliberate gnews source rather than a lucky by-catch, and its own feed is
+# disabled so check_sources stops raising an alarm for a solved problem. Bot challenges are
+# still not worked around - going through Google News is a different, public route, and
+# decode_gnews() turns the redirects back into real liveaction.org URLs.
+# The daily pro-life beat is not actually lost - LifeSiteNews gave 21 candidates and LifeNews
+# 6 in the 17.08 sweep alone. What went with Live Action was investigative depth, so these
+# two replace that rather than the volume. Both feeds verified live on 17.08.2026.
+pass   | Issues: Life            | Charlotte Lozier Institute  | https://lozierinstitute.org/feed/
+# These two stay: the gnews route restores Live Action's volume, but Lozier and the other
+# addition bring their own reporting, so nothing is gained by dropping them again.
+# To test whether the Vercel challenge has lifted, re-enable the direct feed by deleting the
+# "disable | liveaction.org/news/feed" line - the sweep prefers direct links over Google News
+# redirects when both carry a story, so the two can safely run side by side.
+
+# --- Dead sources found by the first check_sources.py run (17.08.2026) -----
+# ADF International is a FOLLOWED_ORG (+5 in the ranker) and had no working feed at all:
+# adf.uk/feed/ and adfinternational.org/feed/ both parse but serve zero items, and Google
+# News indexes nothing for the domain. Their news index scrapes fine (261 article links),
+# which is how the Nigerian court story was recovered by hand on 12.08.2026 - so read it as
+# a source rather than only as a resolver target.
+# First attempt was scrapesrc on adfinternational.org/news. Reverted the same day: the page
+# scrapes as raw boilerplate ("Press Release July 9, 2026 ... Read More") and, because
+# scrapesrc carries no dates, June and July press releases all entered as new. A gnews keyword
+# search instead gives dated items with direct publisher links, and covers ADF's cases as
+# reported by others - better for a news briefing than their own press releases.
+scrapesrc | Advocacy: Christian  | ADF International           | https://adfinternational.org/newsroom/
+# A gnews keyword feed for ADF's cases as covered by other outlets was tried here and removed
+# on Chris's instruction (17.08.2026): he wants ADF's own releases. Nothing is lost by it -
+# where another outlet covers an ADF case, that outlet's own feed already carries the story.
+disable | adf.uk/feed/
+disable | adfinternational.org/feed/
+
+# Church Times was on 'bingf' and Bing returns nothing at all for the domain; Google News
+# has 36 items. Switching route, not dropping the source.
+#
+# 25.08.2026: its own RSS exists and is better than either. Google News gave us a redirect
+# and nothing else - churchtimes.co.uk answers 403 to the article fetch, so both of that
+# day's Church Times leads reached the ranker as bare headlines, the only outlet with 100%
+# of its leads unreadable. The native feed carries real standfirsts: 96 of 100 items with a
+# description, mean 240 chars. The gnews route stays as well - it finds Church Times stories
+# syndicated elsewhere, and a duplicate costs nothing because dedup prefers the direct link.
+pass   | Media: Christian        | Church Times                | https://www.churchtimes.co.uk/rss
+gnews  | Media: Christian        | Church Times                | churchtimes.co.uk
+disable | bing.com/news/search?q=site%3Achurchtimes.co.uk
+
+# Stale/empty and not worth a fetch every run. The Church of England one is a 2023 listing
+# page that has served nothing since; the other two return an empty feed.
+disable | churchofengland.org/listing-page-rss/2452
+disable | data.niassembly.gov.uk/questions_rss.aspx
+disable | inews.co.uk/topic/islam/feed
+
+# --- Three sources Chris asked for on 17.08.2026 --------------------------
+# All three were reaching us only when a Google News query happened to surface them, which is
+# why coverage was erratic: the Korea Times nuns story got in, the First Liberty "freedom FROM
+# religion" piece did not. Direct routes, verified live 17.08.2026.
+#
+# First Liberty has no working RSS at all (every feed path 500s), but its /news/ index scrapes
+# cleanly - 6 cards, clean headlines, including the exact piece Chris flagged. Dateless, so
+# freshness comes from the seen-cache diff.
+scrapesrc | Advocacy: Christian  | First Liberty Institute     | https://firstliberty.org/news/
+# Korea Times' own rss.xml carries the whole paper (apple ads, TV dramas), so it is filtered.
+filter | Media: US and World     | The Korea Times             | https://www.koreatimes.co.kr/www/rss/rss.xml
+# Reuters retired its public RSS; feeds.reuters.com no longer resolves and the arc outboundfeeds
+# paths 404. Bing site: search is the only working route and gives DIRECT publisher links.
+bingf  | Media: US and World     | Reuters                     | reuters.com
+
+# --- Chris, 17.08.2026: "Remove Christian Daily International as they report only old news" -
+# NOTE THE COST, recorded so it is not rediscovered later: christiandaily.com was the ONLY
+# carrier in the 17.08 sweep of "Pastor sentenced to two years in prison in Indonesia" - one of
+# the five Religious Freedom stories Chris had asked for that same day. The story originates
+# with Morning Star News, which is already a source, but its own feed served only 2 items in an
+# 84h window, so it is thin rather than absent. Watch whether persecution coverage drops.
+disable | christiandaily.com
+disable | www.christiandaily.com
+
+# --- Chris's markup on the 20.08.2026 edition ------------------------------
+# Four sources removed above: ZENIT, Evangelical Times, THISDAYLIVE and Truth Nigeria.
+# They are also in BLOCKED_OUTLETS (shortlist.py), which is what catches them when they
+# arrive as a Google News redirect rather than from their own feed.
+#
+# Religion Unplugged was never a subscribed source - its "As Religious-Based Violence Rises"
+# reached the 20.08 sweep only as a low-ranked Google News redirect, and Chris wanted it.
+pass   | Media: Christian        | Religion Unplugged          | https://religionunplugged.com/news?format=rss
+# FoRB in Full is already in sources.opml and fetches fine; its 18.08 Nicaragua interview
+# simply fell 2h32m outside the 36h window. It publishes a few times a month, so it needs a
+# week. Extras win dedup over the OPML, so this line is what takes effect.
+pass   | Issues: Religious Freedom | FoRB in Full               | https://forbinfull.org/feed/ | window=168h
+# The Australian reached us only through a Bing site: search capped at 40 results, which on
+# 20.08 returned three /nation/ stories and no opinion at all - so "Covert gender activism
+# wags the care watchdog" never arrived. Google's AU edition returns 100, and the commentary
+# path on its own returns 24 including that piece. The bingf line above is kept because Bing
+# gives DIRECT publisher links where Google gives redirects; these two add the coverage.
+gnewsf | Media: US and World     | The Australian              | theaustralian.com.au@AU
+gnewsf | Media: US and World     | The Australian              | theaustralian.com.au/commentary@AU
+
+# --- Polish sources, 20.08.2026 -------------------------------------------
+# ZENIT was the only outlet in the 20.08 sweep carrying the Polish president's veto of the
+# same-sex unions bill, so blocking ZENIT lost the story outright. Chris asked for a
+# replacement. Both are keyword-filtered: they are general national outlets and would
+# otherwise flood the sweep with trains, tax and tourism.
+# Notes from Poland has a real feed, so its links are DIRECT rather than ↗ redirects.
+filter | Media: US and World     | Notes from Poland          | https://notesfrompoland.com/feed/
+# TVP World has no working feed - /feed, /rss and /rss.xml all 404 - so it is reached by
+# Google News site search on the PL edition, which returned 86 items when checked. It is the
+# stronger of the two on the church-and-state beat: a site-scoped search for church, bishops,
+# abortion and same-sex returned 19 items against Notes from Poland's 7.
+gnewsf | Media: US and World     | TVP World                  | tvpworld.com@PL
+
+# --- Chris's markup of the TEST 20260824 draft, 24.08.2026 ---------------------------------
+# ADF: he flagged adflegal.org's "The ball's in your court: WNBA, stand for women and free
+# speech" as "This one is a huge miss". ADF was never a configured source - exactly ONE ADF
+# item reached the 23.08 sweep, incidentally, as a Google News redirect. For an advocacy body
+# the provenance rule tells us to prefer over a newsroom's write-up, accidental coverage is
+# not coverage. gnews (not gnewsf) because ADF only publishes on this briefing's beats.
+gnews  | Advocacy: Christian     | ADF                         | adflegal.org
+# The two Religious Freedom stories he said should have been included. Both are general
+# outlets, so keyword-filtered: the EU religious-freedom report and China's curbs on Catholic
+# activity in Shanghai were the misses, not their news pages wholesale.
+gnewsf | Media: Europe           | The Brussels Times          | brusselstimes.com
+gnewsf | Media: Asia             | ANI                         | aninews.in
+
+# --- Chris's markup of the TEST 20260824 draft, 24.08.2026: the reachability gaps -----------
+# Of the 33 stories he listed, most were already in the sweep and were a curation miss. These
+# were genuinely unreachable - no configured source at all - so no amount of better picking
+# would have found them. Live RSS where the publisher offers one, keyword-filtered because
+# these are general outlets and only their life/family/free-speech reporting is wanted.
+filter | Media: US and World     | Global Times                | https://www.globaltimes.cn/rss/outbrain.xml
+filter | Media: Asia            | The News International      | https://www.thenews.pk/rss/1/1
+# The Hill was configured on its news feed only, so "female earnings and separation risk" -
+# an opinion piece - was never fetched. Opinion is where its family-policy writing lives.
+filter | Media: US and World     | The Hill                    | https://thehill.com/opinion/feed/
+# No usable feed: swissinfo returns 410, NT News 403, NZ Herald's RSS is empty, Globe and Mail
+# indexes only by section. Google News site-search is the only route that works for these.
+gnewsf | Media: Europe           | SWI swissinfo.ch            | swissinfo.ch
+gnewsf | Media: US and World     | NT News                     | ntnews.com.au
+gnewsf | Media: US and World     | The New Zealand Herald      | nzherald.co.nz
+gnewsf | Media: US and World     | The Globe and Mail          | theglobeandmail.com
+# Desiring God: both of his Life picks were "The Church That Fights for Life" and "The Women
+# Who Guarded the Womb". They DO reach us as Google News redirects, but only incidentally and
+# the second had already run 08-20 as an "Other" item. A named source keeps them in Life.
+gnews  | Advocacy: Christian     | Desiring God                | desiringgod.org
+# The Mail's US edition is a separate site from dailymail.co.uk ("Mail Online UK", configured):
+# the Pauline Hanson free-speech story was on .com and no feed covered it.
+gnewsf | Media: US and World     | Mail Online US              | dailymail.com
+
+# --- Anglican Mainstream: excluded at SWEEP time, not just in the shortlist ------------------
+# Chris, 24.08.2026: "Don't use anglican mainstream in editorial decisions, just don't include
+# or count anything on their site." BLOCKED_OUTLETS (shortlist.py) drops them at CLASSIFY time,
+# which is too late: 8 of their items entered the 23.08.2026 corpus first, where they join the
+# sweep's url/title dedup race. They repost under the ORIGINAL headline, so a repost arriving
+# ahead of the real publisher silently drops the publisher's copy - and the repost is then
+# blocked, taking the story with it. That is how "Anger as Belfast City Hall to be lit in
+# support of abortion campaign" reached the sweep ONLY as an Anglican Mainstream line and so
+# reached nobody. Blocking here means they never enter, never dedupe, never count.
+block | anglicanmainstream.net
+block | Anglican Mainstream
+
+# --- every remaining BLOCKED_OUTLETS source, now blocked at SWEEP time too ------------------
+# Chris, 24.08.2026: "do the same sweep-time block for the other blocked sources." Same defect
+# as Anglican Mainstream: BLOCKED_OUTLETS (shortlist.py) drops these at CLASSIFY time, by which
+# point they have already entered the corpus and joined the sweep's url/title dedup race. These
+# are reposters and late-news sources, so they carry the ORIGINAL headline - a repost arriving
+# first silently drops the real publisher's copy, and is then blocked, taking the story with it.
+#
+# READ THIS BEFORE ADDING ONE. A sweep-time block is a plain substring test against
+# outlet + " " + url, NOT the outlet-only regex BLOCKED_OUTLETS uses, so short tokens are
+# dangerous in a way they are not there. Measured against the 23.08.2026 corpus: a bare "adf"
+# matches 10 items and not one of them is ADF (India Today, NT News, PR Underground, Ottumwa
+# Courier - all URL slugs), which would have silently deleted a source added the same day.
+# "aol" hits "gaol", "zenit" hits "zenith". So: full display names and domains only.
+# Verified on that corpus - these 20 matches are all the intended outlet, no false positives.
+# Names matter more than domains here: most of these arrive as Google News redirects, where the
+# URL is news.google.com and only the outlet name can match. BLOCKED_OUTLETS stays as the
+# backstop for anything that slips through under an unexpected name.
+block | businessmirror
+block | quiverquant.com
+block | Quiver Quantitative
+block | leadership.ng
+block | Leadership Newspaper
+block | telanganatoday.com
+block | Telangana Today
+block | Daily Country Today
+block | nydailynews.com
+block | New York Daily News
+block | massterlist
+block | barnabasaid.org
+block | Barnabas Aid
+block | christiandaily.com
+block | christianitydaily.com
+block | Christian Daily
+block | Christianity Daily
+block | truthnigeria.com
+block | Truth Nigeria
+block | 24-7pressrelease.com
+block | 24-7 Press Release
+block | thisdaylive.com
+block | zenit.org
+block | ZENIT -
+block | evangelical-times.org
+block | Evangelical Times
+block | voiceofemirates.com
+block | صوت الإمارات
+block | rediff
+block | chinadaily.com
+block | China Daily
+block | aol.com
+
+# The domain above was written as anglicanmainstream.NET on 24.08.2026; the configured feed is
+# anglicanmainstream.ORG. The display-name block caught their items anyway, so the mistake was
+# invisible - which is the argument for the self-block check that found it.
+block | anglicanmainstream.org
+# ...and stop FETCHING the sources whose every item is now discarded. Leaving them enabled
+# spends a request per run on content that can never be used, and worse, check_sources.py
+# counts them as healthy contributing sources. Found by asserting that no configured feed
+# matches its own block list - which is now part of run_tests.py.
+disable | anglicanmainstream.org/feed
+disable | christianitydaily.com/rss
+block | thisday
+block | this day
+
+# Chris, 25.08.2026 (TEST 20260825 markup): "Remove as a source" x4. Blocked at sweep time as
+# well as in the shortlist, per the 24.08 change - all four are distinctive enough as bare
+# substrings that no domain form is needed.
+block | moneycontrol
+block | brobible
+block | lgbtqnation
+block | queerty
+
+# --- sources Chris asked for after the TEST 20260825 markup, 25.08.2026 ---------------------
+# FIRE: he cited two of their pieces as free-speech misses (a school district's prior-review
+# policy after censoring an anti-ICE cartoon, and a Michigan city hiding evidence after
+# threatening critics). A primary free-speech litigator, so pass-all rather than filtered.
+pass   | Advocacy: Free Speech  | FIRE                        | https://www.thefire.org/feed
+# "Add Politics Home as a source if it isn't already" - cited on assisted dying and care homes.
+filter | Media: UK Mainstream    | PoliticsHome               | https://www.politicshome.com/news/rss
+# "Add Humanists UK as a source if they aren't already" - the other side of the assisted-dying
+# argument, and the briefing should see what they are actually organising.
+pass   | Advocacy: Secular       | Humanists UK               | https://humanists.uk/feed/
+# CathNews: cited for Archbishop Fisher on freedom to protest.
+filter | Media: Christian        | CathNews                   | https://cathnews.com/feed/

@@ -1,0 +1,58 @@
+# Items Chris has judged not worth running, where the reason does not generalise into a
+# rule. One per line: a substring matched against the headline, case-insensitive. Comments
+# with '#'. Added 16.08.2026 after he asked me to remove the "not interesting" pieces
+# outright rather than cap the section to squeeze them out - capping works by crowding, so
+# on a quiet day they come straight back.
+#
+# Keep this short. If the same kind of thing keeps appearing, it wants a rule, not a line.
+Inside the Albanian revolution
+Eric Hobsbawm’s age of contradictions
+Take your time with this US doc
+Kiwi basketball coach banned from university sport
+Federal judge allows amended lawsuit over 3 Baltimore firefighter deaths
+# Chris 17.08.2026: "not onside nor is it big enough in intersecting with other concerns
+# like harm to the family or children, or free speech". A slur row with no policy stake.
+Recall when a woman called her gay neighbors
+# Chris said not to include this one, twice (16 and 17.08.2026).
+How to Nixonmaxx the right way
+# --- Chris's markup on the 19.08.2026 edition ---
+# "This is small news and shouldn't be included." A parish faculty case with no wider stake.
+Bells could be removed from listed church
+# "This has been covered in past briefings and doesn't add anything interesting enough like a
+# fresh comment to include again." The French under-15 social media ruling itself ran on
+# 17.08; this is a later write-up of the same decision with no new argument. Note the ruling
+# is NOT excluded as a subject - a fresh development or a signed comment piece would run.
+France Strikes Down Social Media Ban for Under-15s
+# "Explain why this was included. It's not freedom or liberty related?" - and he is right:
+# it is UnHerd on detective fiction, routed to Free Speech only because UnHerd is hinted
+# there. My error at the curation step, not the classifier's.
+The Japanese crime wave sweeping Britain
+
+# --- Chris, 24.08.2026: the A66 and M9 road crashes ------------------------------------------
+# He had already ruled these out of Marriage, Family & Education ("only loosely about family and
+# doesn't cross-section into our other issues such as family law, gender ideology, etc.") and the
+# ROAD_TRAFFIC rule in shortlist.py now suppresses those. It does NOT reach the ones that land in
+# "Other", because Other is in RESIDUAL_SECTIONS and the whole incident gate is switched off
+# there - deliberately, since applying it to residual sections once suppressed 52 real items
+# including an ICE custody death. So the rule cannot cover these three lines without breaking
+# something that matters more, which is exactly the case this file exists for.
+#
+# One incident, 19 items in the 24.08 sweep across nine outlets: two police officers and five
+# young men died on the A66, and three teenagers on the M9. Genuinely sad, no issue behind it.
+# "A66" is a road designation and specific enough to be safe as a substring.
+A66
+# "M9 crash" was too narrow (Chris, 24.08.2026, asking for the M9 items too): it missed
+# "Mother of M9 joyrider reveals her desperate plea to judge" and, in the 18.08 sweep,
+# "M9 horror: This is what happens when we go soft on juvenile thugs" - a comment piece on
+# the same crash. One incident acquires new phrasings for days, so match the road, not the
+# wording. Bare "M9" over 5 archived sweeps returns 10 headlines and all 10 are this crash.
+# Residual risk is a substring hit on "M90"/"M96"/"BMW M9" - there has never been one here,
+# and if it happens it surfaces in the CHAFF bucket, where a wrong suppression is visible by
+# design rather than silently dropped.
+M9
+# The only one of the 19 that names neither road.
+Five youngsters who died after crashing into police car pictured
+
+# Chris, 25.08.2026: "Without amending our rules, remove this from today's briefing" - i.e.
+# exactly what this file is for, rather than a pattern that would catch other spiked pieces.
+When the woke left hounded a black researcher

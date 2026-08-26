@@ -1,0 +1,663 @@
+# Regression fixture for the classifier, the region map and the suppression gates.
+#
+# THIS FILE IS THE RECORD OF CHRIS'S MARKUP. Every correction he makes on a briefing goes in
+# here as a case BEFORE any pattern is edited: write the case, watch it fail, then fix the
+# rule until it passes. Done in that order the reasoning is preserved as an executable claim
+# rather than as a comment next to a regex, and the correction can never silently regress.
+#
+# Run:  python3 run_tests.py
+#
+# Format, one assertion per line, fields separated by |
+#   SECTION <name>   | <outlet> | <headline>
+#   REGION  <tier>   | <outlet> | <url or -> | <headline>
+#   SUPPRESS         | <outlet> | <headline>      (chaff / school gates / local incident)
+#   KEEP             | <outlet> | <headline>      (must NOT be suppressed)
+#   OUTLET  <shown>  | <raw outlet name>          (tidy_outlet, incl. paywall renames)
+#   ABOVE            | <headline A> | <headline B>  (A must outrank B in importance())
+#
+# ABOVE is the RANKING record - the ground truth the other kinds are for classification.
+# Every time Chris says a story ran too low or too high, that judgement becomes an ABOVE
+# pair here, failing first, before any scoring pattern is touched. This is what makes a
+# scoring change measurable: without it every importance() edit is justified by one
+# anecdote and silently free to regress the last one. Pairs are scored on headline
+# vocabulary alone (no corroboration), so use them for the said-versus-happened, scale
+# and commentary axes - not for "this was a bigger story that day".
+# Lines starting with # are comments. Keep the date and the reason on the comment above a
+# block - a future reader needs to know whose judgement a case encodes.
+
+# --- Chris, 17.08.2026: five religious-liberty stories filed as Church & Religion ----------
+SECTION Religious Freedom & Persecution | Catholic World Report | Military chaplain candidates denied financial aid due to their religious beliefs
+SECTION Religious Freedom & Persecution | The Washington Post | Opinion | Virginia is putting military chaplains in an impossible position
+SECTION Religious Freedom & Persecution | First Liberty Institute | Does the First Amendment Protect Freedom From Religion?
+SECTION Religious Freedom & Persecution | The Korea Times | Spitting at nuns: Religious harassment by Jewish extremists becomes routine in Jerusalem
+SECTION Religious Freedom & Persecution | Morning Star News | Pastor sentenced to two years in prison in Indonesia
+# ...but ordinary church life must still be Church & Religion, not persecution.
+SECTION Church & Religion | Catholic Sun | Pope at Angelus: Mary a sign of hope, consolation for the world
+SECTION Church & Religion | Christian Today | Welsh Christians launch the Gospels in Pembrokeshire dialect
+
+# --- Chris, 17.08.2026: the Jurist piece "should have stood as a free speech issue" --------
+SECTION Free Speech & Civil Liberties | jurist.org | France Constitutional Council rules under-15 social media ban violates free speech rights
+SECTION Free Speech & Civil Liberties | POLITICO | French court blocks social media ban for under 15s
+
+# --- Chris, 17.08.2026: "born alive" matched nothing at all, so this had no section --------
+SECTION Life | The Daily Telegraph | 10,000 booties on lawn in 'born alive' bill push
+SECTION Life | MaltaToday | Abortion survey: No jail for women but yes for doctors
+
+# --- Chris, 17.08.2026: uni/school stories only where they overlap our other concerns ------
+SUPPRESS | Mail Online UK | Scots College principal claims a 'number of people' were arrested after allegedly threatening three students accused of raping a teenage girl
+SUPPRESS | Carson Now | Carson City School District opens doors to students, teachers with 2026 back-to-school events
+SUPPRESS | FOX 26 Houston | 3 Pasadena ISD students arrested for reported threat against high school
+KEEP | Urban Milwaukee | Gay Wisconsin Principal Says School Board Fired Him Over Sexuality
+KEEP | Community Newspaper Group | WATCH: Washington parental rights initiative draws national spotlight
+KEEP | The Daily Signal | 'Teach Children What to Think': Lawsuit Targets Nebraska Schools' Funding Formula
+# "assembly" in the school-routine rule matched legislative assemblies once it was wired in.
+KEEP | News On AIR | Campaigning Intensifies for Second Phase of West Bengal Assembly Election
+
+# --- Region: substring collisions. Seven of these surfaced on 16-17.08.2026 alone. --------
+# \bWHO\b was case-insensitive and matched the ordinary word "who": 32 items in one sweep.
+REGION New Zealand | The Post (New Zealand) | - | Nurse who cared for student who died at mental health unit can be named
+REGION International | The Telegraph | - | Ebola doctors 'step back' from WHO in drug trial ethics row
+REGION International | Biometric Update | - | UNICEF urges governments to use schools to close global birth registration gaps
+# "oman\b" had no leading boundary and matched Woman, Roman, Ottoman: 17 items in one sweep.
+REGION Africa | ADF International | - | Nigerian Court Rules Religious Police Cannot Arrest Christian Woman for Converting from Islam
+REGION Latin America | Reduxx | - | Brazilian Woman Jailed For Misgendering Trans Politician
+REGION Middle East | Aleteia | - | Lebanese Parliament votes to abolish the death penalty
+REGION Middle East | The Korea Times | - | Spitting at nuns: Religious harassment by Jewish extremists becomes routine in Jerusalem
+# "india" matched Indiana; "telegraph" matched telegraphindia; "herald"/"express" matched
+# Deccan Herald, Miami Herald and The Indian Express; "the federal" matched The Federalist.
+REGION United States | Local paper | - | Indiana school board votes on library policy
+REGION Asia | telegraphindia.com | - | Himanta crackdown on child marriage, month-long drive from November 1
+REGION Asia | Deccan Herald | - | A story with no place name at all
+REGION United States | Miami Herald | - | A story with no place name at all
+REGION Asia | The Indian Express | - | A story with no place name at all
+REGION United States | The Federalist | - | A story with no place name at all
+REGION Asia | The Federal | https://thefederal.com/news/x | A story with no place name at all
+# Chris, 17.08.2026: "The Daily Telegraph is Australian, The Telegraph (£) is London."
+REGION Australia | The Daily Telegraph | https://www.dailytelegraph.com.au/news/nsw/booties | 10,000 booties on lawn in 'born alive' bill push
+REGION UK | The Telegraph | https://www.telegraph.co.uk/news/2026/08/15/retired-police-officer | Blasphemy law is back, says ex-policeman fined for offensive posts
+# Chris, 17.08.2026: SNP is a UK story; JP Morgan is a US one even in a UK paper.
+REGION UK | The Times | - | SNP plans human rights law to 'get around' Supreme Court sex ruling
+REGION United States | The Times | - | JP Morgan debanked Polymarket over regulatory fears
+# Outlets added 17.08.2026 that had no home at all and so sorted last, behind Australia.
+REGION UK | The Daily Sceptic | - | Retired Police Officer Convicted For Sharing 'Offensive' Joke About Islam
+REGION UK | Canary | - | Censored for satire? Comic's YouTube ban ignites free-speech debate
+REGION Asia | CNA | - | Marriage, parenthood workgroup advances early proposals on falling birth rates
+
+# --- Outlet display names Chris has asked for by name -------------------------------------
+OUTLET Breitbart | Breitbart News
+OUTLET National Secular Society | NSS
+OUTLET Egyptian Initiative for Personal Rights | المبادرة المصرية للحقوق الشخصية
+OUTLET Christian Post | The Christian Post
+OUTLET Premier | Premier Christian News
+OUTLET ABC | ABC News (Australia)
+OUTLET World Religion News | worldreligionnews.com
+OUTLET Express | Daily Express
+
+# --- Ranking: outcome beats process (Chris, 17.08.2026, on the surrogacy story) -----------
+# "her giving the baby back is new detail compared to what we had before". The outcome verbs
+# were missing entirely, so both outcome headlines scored ZERO and lost to the process one;
+# and \bruled?\b matched the future "to rule", scoring an unheld ruling above a real one.
+ABOVE | Parents get baby surrogate wouldn't abort | Surrogate mother who saved baby from abortion to fight for custody
+ABOVE | Couple receives custody of baby they wanted surrogate to abort | Surrogate mother who saved baby from abortion to fight for custody
+ABOVE | France Constitutional Court approves euthanasia law | Judge to rule on assisted dying bill next month
+ABOVE | Nigerian court bars Islamic police from arresting Christian convert | Campaigners urge Nigeria to protect Christian converts
+
+# --- Chris, 17.08.2026: "weight it by importance not corroboration for small countries" ----
+# Corroboration counts the press corps, not the story: MaltaToday's abortion survey ran x1 and
+# scored 0 for reach because Malta has one English paper. Small markets now get a floor.
+# The floor must never DEMOTE a well-covered story that merely mentions a small country, and
+# "timor" must not match inside Baltimore - the eighth substring collision of the same family.
+ABOVE | Malta court orders life-saving care for baby | Campaigners in Malta call for a debate on abortion
+KEEP | MaltaToday | Abortion survey: No jail for women but yes for doctors
+REGION United States | FireRescue1 | - | Federal judge allows amended lawsuit over 3 Baltimore firefighter deaths
+
+# --- Chris, 17.08.2026 markup on the v3 edition --------------------------------------------
+# Harassment of a whole Christian population is persecution, not church life. The rule only
+# caught harassment of named clergy, so this sat in Church & Religion.
+SECTION Religious Freedom & Persecution | Crux | Israel's Christians rely on faith and allies as they fear rising harassment
+SECTION Church & Religion | Christian Today | Welsh Christians launch the Gospels in Pembrokeshire dialect
+# "Make sure to include the debanking story in free speech." The rule was already right; the
+# story had simply aged out of the window between sweeps. Pinned so it cannot regress.
+SECTION Free Speech & Civil Liberties | The Times | JP Morgan debanked Polymarket over regulatory fears
+SECTION Free Speech & Civil Liberties | The Telegraph | Nigel Farage says Coutts debanked him over his political views
+OUTLET Union of Orthodox Journalists | Спілка православних журналістів
+
+# --- Chris, 18.08.2026: a law's EFFECT is an outcome, not just its enactment ---------------
+# "Massachusetts Now Protects Abortion Throughout Pregnancy" and "...New Law Legalizing
+# Abortions Up Until Birth" both scored zero on outcome/process/scale and ranked below
+# commentary. The law exists; describing what it now does is as much an outcome as passing it.
+ABOVE | Massachusetts Now Protects Abortion Throughout Pregnancy | Abortion is on the ballot this year, and Democrats are making it an economic issue
+ABOVE | Several Massachusetts Democrats Break with Party over Barbaric New Law Legalizing Abortions Up Until Birth | They Cheered Abortions Up to Birth, And They Want More
+ABOVE | Ireland decriminalises blasphemy after referendum | Campaigners call on Ireland to decriminalise blasphemy
+# ...but PROSPECTIVE legalisation is still process, not outcome. An open letter against
+# legalising something must not gain an outcome bonus from the word "legalising".
+ABOVE | France legalises assisted suicide | An open letter against legalising assisted suicide
+
+# --- Chris, 18.08.2026: devolved and state legislatures are SCALE ---------------------------
+# Holyrood, the Senedd and Stormont scored as if no institution were involved; only the
+# literal word "statewide" matched. A UK-focused briefing cannot be blind to Holyrood.
+ABOVE | Senedd approves relationships education curriculum | Council approves relationships education curriculum
+ABOVE | Holyrood passes assisted dying safeguards | Charity passes assisted dying safeguards motion
+ABOVE | Stormont backs conscience clause for religious employers | Trade body backs conscience clause for religious employers
+
+# --- 18.08.2026: ES/IT outcome tokens lacked word boundaries and fired on English ----------
+# Found by running the patterns over article text: "Senegal" contains "nega", "Confirmation"
+# and "affirmation" contain "firma", "approval" contains Italian "approva", "declaration"
+# contains "declara". Each pair below ties under the bug (both sides +8) and separates once
+# the boundaries are fixed. The Spanish keep-case guards the fix from going too far.
+ABOVE | Senegal parliament passes family code | Senegal parliament debates family code
+ABOVE | Confirmation hearing ends with judge confirmed | Confirmation hearing set for judge
+ABOVE | Bishops affirm marriage doctrine in new ruling | An affirmation of marriage from the bishops
+ABOVE | Council wins approval for church demolition | Council seeks approval for church demolition
+ABOVE | UN adopts declaration on religious freedom | UN debates declaration on religious freedom
+# genuine Spanish/Italian outcomes must keep matching:
+ABOVE | El Constitucional aprueba la ley de eutanasia | El Constitucional estudia la ley de eutanasia
+ABOVE | El presidente firma la ley del aborto | El presidente estudia la ley del aborto
+# "freed" matched inside "freedom": every religious-freedom headline gained +8 outcome.
+ABOVE | Missionary pilot freed in Niger | Missionary pilot faces religious freedom hearing
+
+# --- 18.08.2026: PROCESS ES/IT tokens had the same bare-substring disease as OUTCOME -------
+# Measured on the day's sweep: "urge[n]?" fired inside "sURGEry" (the Baby Gabriel headlines
+# collected a process tag from the word surgery), "critica" inside "CRITICAlly injured"
+# (shooting reports tagged as commentary-adjacent), "insta" inside "INSTAgram". Each pair
+# ties under the bug and separates after boundaries. Spanish keep-case guards the fix.
+ABOVE | Campaigners urge ban on commercial surrogacy | Baby recovering well after heart surgery
+ABOVE | Charity criticises hospital chaplaincy cuts | Pastor critically ill in hospital
+ABOVE | Ministers insist prayer ban review is needed | Instagram rolls into new teen account rules
+ABOVE | El obispo insta al gobierno a proteger la vida | La vida parroquial en el barrio antiguo
+
+# --- 19.08.2026: entity-anchored clustering needed a co-occurrence floor -------------------
+# Measured against 18.08's picks: 32 of 219 "(same story as N - prefer that)" flags were
+# demonstrably wrong - Chris kept the flagged item and rejected its lead. A shared rare-ish
+# entity plus ONE other word was enough to merge, which is nearly free. Floor raised to 3.
+# Must NOT merge (each shares 0-1 significant words with its supposed duplicate):
+NOCLUSTER | Welcome Back to School! Does Your Kid Have a Teacher? | Two dead including gunman in school shooting in southern Philippines
+NOCLUSTER | Indonesia: Archbishop of Ende says earthquake could not destroy the people's love | Dearborn city, religious leaders speak out after "Christian Crusader March" plans
+NOCLUSTER | Pope Leo's 'last word' on TLM not yet spoken: US bishops' head to Raymond Arroyo | Pope calls for an end to West Bank violence against Palestinians
+NOCLUSTER | Surrogate Challenges California Couple's Parental Rights After Giving Birth | Texas families ask Supreme Court to hear appeal on Ten Commandments law
+# Must STILL merge - genuine duplicates the plain overlap rule misses, which is why the
+# entity anchor exists. Each shares 3-4 significant words at an overlap of only 0.44-0.50:
+SAMESTORY | UK Prime Minister Texted With a Susie Wiles Impersonator | White House denies Wiles hack after UK PM Burnham texts with impersonator
+SAMESTORY | France's Constitutional Court approves assisted dying bill, highlights reservations | The last chance to save France: Assisted suicide passes the Constitutional Court
+SAMESTORY | Reform proposes ban on most benefits for foreign nationals in UK | Reform vows to slash £50bn from welfare bill by scrapping PIP and banning EU nationals from benefits
+SAMESTORY | Two students killed in shooting at Philippine school in Zamboanga | Student killed classmate and himself at school in Philippines, mayor says
+
+# --- 19.08.2026: 40 stories rescued by hand from NO SECTION MATCHED ------------------------
+# Diagnosis matters here. These did NOT fail because the "Other" gate was too narrow - they
+# failed because their OWN section had no vocabulary for them, so they fell through to the
+# Other gate as a last resort. Widening OTHER_ALLOW would have "fixed" them by filing Life
+# and Church stories under Other/Politics, which is the landfill Chris ruled out on
+# 16.08.2026 and would also pollute the one section carrying a 40-cap and a US share test.
+# So each case below asserts the section the story actually belongs to.
+# Missing entirely from shortlist.py before today: preborn, faith-based, disclaimer,
+# Virgin Mary, sabbath, organ don*.
+SECTION Life | liveaction.org | Oklahoma law takes effect with hope of saving thousands of preborn children yearly
+SECTION Life | liveaction.org | 'Magic' micropreemie home after 167 days in NICU
+SECTION Life | Statement | German Lawmakers Push for Automatic Organ Donor Status
+SECTION Life | www.christiandaily.com | Argentina raises its voice for life once again
+SECTION Religious Freedom & Persecution | The Christian Post | US Forest Service officer granted exemption from working on Sundays
+SECTION Church & Religion | The Washington Stand | State Dept. Announces Nearly $2 Billion in Grants to Faith-Based Charities
+SECTION Church & Religion | Catholic World Report | Poland inaugurates Europe's tallest statue of the Virgin Mary
+SECTION Free Speech & Civil Liberties | Statement | Babylon Bee Sues New Mexico over Satire Disclaimer
+SECTION Free Speech & Civil Liberties | Statement | London Takes Another Step Toward Total Surveillance
+SECTION Free Speech & Civil Liberties | American Legislative Exchange | South Korea's New Internet Law Raises Global Free-Speech Concerns
+# Genuine "Other" residue - no section of its own, but public affairs of consequence.
+SECTION Other | Gatestone Institute | The Arctic: China Taking Over the Top of the World
+SECTION Other | Sky News | Children becoming 'intoxicated by extremism' online, report warns
+# ...and the landfill guard must hold: these still belong nowhere.
+SECTION None | The Spectator | Why are the young obsessed with drinking water?
+SECTION None | The Spectator | Confessions of a dog hater
+SECTION None | The Spectator | The 'Kinda chic' trend is mere humblebrag
+# Guard for the same day's near-miss: adding Marian vocabulary must not claim every "shrine".
+SECTION Politics, Government & Society | Brussels Signal | Japanese PM and ministers honour war-criminals at imperial shrine
+# ...and "extremists" in a fitness column is not radicalisation.
+SECTION None | The Guardian | ‘Audiences ask to feel my calves!’ The endurance extremists pounding treadmills and pumping pedals
+
+# === Chris's markup on the 19.08.2026 edition =============================================
+# Four outlets printed as bare domains. He has asked for the masthead name each time.
+OUTLET Morning Star News | morningstarnews.org
+OUTLET NT News | ntnews.com.au
+OUTLET Live Action | liveaction.org
+OUTLET spiked | spiked-online.com
+# "spiked-online.com should become spiked and marked with a (£) paywall indicator" - the
+# paywall half is asserted separately because tidy_outlet only renames.
+PAYWALLED spiked | spiked-online.com
+
+# Three sources he has now ruled out entirely. Barnabas Aid and the Christian Daily family
+# (Christian Daily International, Christianity Daily, christiandaily.com) are dropped, not
+# merely deprioritised: "Remove Barnabas Aid as a source", "I asked for Christian Daily
+# International not to be included as a source", "Drop Christian Daily as a source".
+BLOCKED | Barnabas Aid
+BLOCKED | Christian Daily International
+BLOCKED | Christianity Daily
+BLOCKED | www.christiandaily.com
+
+# A charge against a sitting MP is a politics story even when the MP's faith is in the
+# headline: "This is more of a politics article as the subject is a politician".
+SECTION Politics, Government & Society | Premier Christian News | Christian DUP MP Jim Shannon charged with common assault
+
+# Rebel News is a Canadian outlet, but this story is a British activist questioned by British
+# police - "This should be in the UK section". Region must follow the story, not the masthead.
+REGION UK | Rebel News | https://www.rebelnews.com/uk_activist_grilled_by_police_over_offensive_social_posts | U.K. activist grilled by police over 'offensive' social posts
+# "Statement articles usually have a listed author which should be included" (Chris, twice,
+# 19.08.2026). Statement was absent from COMMENTARY_OUTLETS, so its byline was dropped at the
+# credit line even when known - the manual bylines.txt entry alone would not have printed.
+BYLINE shown | Statement | Peter Winnemöller
+# ...and a straight news report still carries no byline, per Chris 15.08.2026.
+BYLINE hidden | Reuters | Jane Smith
+
+# --- 19.08.2026: Google News outlet suffix left on hyphenated mastheads -------------------
+# Chris: the spiked item still read "...once and for all - spiked-online.com". The capture
+# group was [^\-|]{2,45}, which excludes hyphens, so any outlet with one in its name could
+# never be stripped - spiked-online.com, e-flux, Yahoo-owned titles. Non-hyphenated outlets
+# stripped fine, which is why this survived: it looked like it worked.
+HEADLINE spiked-online.com | Burnham must rule out assisted dying – once and for all - spiked-online.com
+HEADLINE Crux | US Bishops launch pro-life campaign as pharmaceutical abortions on rise - Crux
+HEADLINE NBC 5 Dallas-Fort Worth | North Texas baby in surrogacy case undergoes open heart surgery, attorney says - NBC 5 Dallas-Fort Worth
+HEADLINE Austin American-Statesman | Texas is the third worst state for women’s equality, study says - Austin American-Statesman
+HEADLINE times-standard.com | Two horse's deaths at the Humboldt County Fair sparks outrage - times-standard.com
+# A masthead that legitimately starts with "The" must still strip - the stopword guard below
+# only fires when the article is followed by a LOWERCASE word, i.e. running prose.
+HEADLINE The Guardian | Ministers accused of burying the report on asylum hotel costs - The Guardian
+# The second bug, found while testing the first: a short "Section | Headline" prefix was read
+# as a suffix, leaving the headline as the single word "Opinion" and the outlet as the real
+# headline. A headline is longer than its own masthead, so require that.
+HEADLINE - | Opinion | Trump and Iran
+HEADLINE - | Opinion | Virginia is putting military chaplains in an impossible position
+# ...and a headline that merely contains a dash keeps it.
+HEADLINE - | Pope Leo XIV - the first year
+# Same family: a few feeds carry a trailing dash or pipe in the outlet name itself, which
+# rendered as "- The MoCo Show -" in the credit line (19.08.2026 sweep: The MoCo Show, WOUB
+# Public Media, Crux | Taking the Catholic Pulse).
+OUTLET The MoCo Show | The MoCo Show -
+OUTLET WOUB Public Media | WOUB Public Media -
+
+# === Chris's markup on the 20.08.2026 edition ==============================================
+# Five outlets printed under the wrong masthead. Same class as the 19.08 batch: the credit
+# line is the only place a reader sees the source, so a feed title or a bare domain leaking
+# through is a visible error every time.
+OUTLET EWTN | EWTN UK
+OUTLET UCA News | ucanews.com
+OUTLET The Telegraph | telegraph.co.uk
+OUTLET BBC | BBC
+OUTLET BBC | BBC UK
+OUTLET ABC | ABC News - Breaking News, Latest News and Vi
+# Two of those are bare domains, which Google Docs auto-links in the credit line - the same
+# fault "spiked-online.com" had. Renaming fixes the link as a side effect.
+# "telegraph.co.uk (£) should always be The Telegraph (£)": the paywall half is asserted
+# separately because tidy_outlet only renames.
+PAYWALLED The Telegraph | telegraph.co.uk
+# "the source should be EWTN not EWTN UK" - collapse every EWTN masthead, not just the one
+# he happened to see.
+OUTLET EWTN | EWTN Great Britain
+OUTLET EWTN | ewtnnews.com
+OUTLET EWTN | EWTN News Nightly
+
+# Five sources ruled out on 20.08.2026: "Never include this as a source" (Truth Nigeria),
+# "Remove this as a source" (24-7 Press Release Newswire, This Day, Zenit), "Never include
+# Evangelical Times as a source as they are always late with the news".
+# 24-7 Press Release Newswire has no feed - it arrives as a Google News redirect, so the
+# block has to be on the display name, not the URL.
+BLOCKED | Truth Nigeria
+BLOCKED | 24-7 Press Release Newswire
+BLOCKED | THISDAYLIVE
+BLOCKED | This Day
+BLOCKED | ZENIT
+BLOCKED | Evangelical Times
+
+# A Google News suffix on a DIRECT feed item, separated by an en dash: "This headline
+# shouldn't have EWTN Great Britain in it". It survived for two independent reasons -
+# strip_outlet_suffix ran only for Google News items, and its separator list was " - " and
+# " | " with no dash variants.
+HEADLINE EWTN Great Britain | Archbishop Moth urges UN to act against global persecution of believers – EWTN Great Britain
+# ...and the guards that must NOT strip, now that dashes are in play. Both are running prose
+# whose tail is longer than its head, which is the invariant doing the work.
+HEADLINE - | Assisted suicide – Next important action
+HEADLINE - | Pope Leo XIV — the first year
+
+# "This is a free speech issue rather than a religious freedom and persecution one" - a
+# Western state prosecuting or barring someone over religious speech is Free Speech, however
+# religious the speech was. Persecution is what happens where the state is not the forum.
+SECTION Free Speech & Civil Liberties | The Federalist | U.K. Bans Bishop, Lawmaker Convicted Of ‘Hate Speech’ For Agreeing With The Bible
+# ...and the same story WITH the publisher's own tags, which is how it actually reaches the
+# classifier. The headline alone was never in doubt - it scores 5 for Free Speech and 0 for
+# Religious Freedom - but The Federalist tags the piece "Religious Freedom" and "Christian
+# persecution", and a tag returned before the headline was even scored. A tag should break a
+# tie, not overrule a headline that is decisive and disagrees.
+SECTIONCAT Free Speech & Civil Liberties | The Federalist | Religious Freedom,Bible,censorship,Christian persecution,Christianity | U.K. Bans Bishop, Lawmaker Convicted Of ‘Hate Speech’ For Agreeing With The Bible
+# The guard on that: where the headline says nothing, the tag must still win outright. The
+# Critic tagged this Immigration and Chris agreed with the tag (19.08.2026).
+SECTIONCAT Immigration & Asylum | The Critic | Books,Book Review,Immigration,Free Speech | The intractable problems pulling modern Britain apart
+SECTION Free Speech & Civil Liberties | The Daily Wire | Politician Punished For Christian Beliefs Targeted Again
+# The guard on that widening: killings are still persecution, not a speech story.
+SECTION Religious Freedom & Persecution | International Christian Concern | Fulani Militias Kill 24 Christians in Governor Mutfwang’s County
+
+# Four Nigeria stories filed as United States on 20.08.2026, scattering the day's biggest
+# persecution cluster across the section - and eating the 25% US quota with African stories.
+# Two causes: "United States" is tested 4th in HEADLINE_SIGNALS and "Africa" 10th, so a US
+# actor token beats an African place name; and OUTLET_HOME lists these persecution desks in
+# BOTH the United States block and Africa/International, where a tie loses to dict order.
+# Same principle as the Rebel News case above: region must follow the story.
+REGION Africa | WORLD | - | U.S. condemns latest mass killing against Nigerian Christians
+REGION Africa | Sahara Reporters | - | US Congressman Urges Trump Administration To Keep Nigeria On Religious Freedom Blacklist After Plateau Massacre
+REGION Africa | International Christian Concern | - | Fulani Militias Kill 24 Christians in Governor Mutfwang’s County
+REGION Africa | Truth Nigeria | - | Climate Change Does Not Persecute Christians; People Do
+# The guards on that split. A US actor with no foreign place is still a US story, and a US
+# place name must not be demoted by the reordering.
+REGION United States | The Daily Signal | - | Obama Judge Blocks Trump Effort to Redirect Teen Pregnancy Funds Away From Planned Parenthood Affiliates
+REGION United States | The Columbus Dispatch | - | Ohio abruptly blocks transgender people from changing gender markers on IDs
+REGION United States | The Times of India | - | 'Impose sanctions against RSS': US religious freedom body opposes Mohan Bhagwat's New York visit
+
+# "This Cameroon post should be grouped with the other Cameroon post not underneath it."
+# Region alone cannot express that - Africa is one tier holding many countries - so the sort
+# needs a country below the tier. Asserted on the detector; the grouping itself is covered by
+# a smoke test in run_tests.py, because it is a property of a list, not of one item.
+COUNTRY Cameroon | Open Doors UK & Ireland | Two Christians kidnapped in Cameroon
+COUNTRY Cameroon | Bitter Winter | Cameroon Announces the Closure of 1,400 Revivalist Churches
+COUNTRY Nigeria | Christian Post | The world finally noticed Nigeria's persecuted Christians. Why hasn't anything changed?
+COUNTRY Pakistan | UCA News | Pakistan's top court clears convicts in 2014 lynching of Christian couple
+# Two substring/name collisions the US-actor split exposed on 20.08.2026. Neither is new -
+# both tokens were already there - but with "Republicans" and "DOJ" no longer winning first,
+# they became reachable. Same family as Woman/Oman and Michael Jordan.
+# "hanson" was meant to be Pauline Hanson; it matched Victor Davis Hanson.
+REGION United States | The Daily Signal | - | Victor Davis Hanson: Republicans Can’t Just Trash the Left—They Need a Plan to Win
+# A NATIONALITY is a description of a person, not a location. These crimes happened in the
+# United States; only the defendant is foreign.
+REGION United States | The Daily Signal | - | DOJ: Chinese National Cast Illegal Ballot, Then Accused Another of Voter Fraud
+REGION United States | The Daily Wire | - | 17 Iranian Hackers Charged In Massive U.S. University Cybertheft Scheme
+REGION United States | Reuters | - | US families, healthcare providers under strain after Trump crackdown on Haitian immigrants
+# ...and the guard: where the nationality is the WHOLE story and no US signal is present,
+# the nationality must still place it.
+REGION Asia | UCA News | - | Pakistani Christians face daily discrimination at work
+# Google News stacks its own " - <source>" on top of a suffix the publisher already put in
+# the title, so ONE strip leaves the inner one behind. Found 20.08.2026 by re-sweeping after
+# the dash fix and finding the EWTN suffix still there: the raw title is
+# "...believers – EWTN Great Britain - EWTN UK", the " - " pass matched the feed's stated
+# source exactly and returned, and the en-dash half was never examined.
+HEADCLEAN Archbishop Moth urges UN to act against global persecution of believers | Archbishop Moth urges UN to act against global persecution of believers – EWTN Great Britain - EWTN UK
+HEADCLEAN Cardinal Pizzaballa Reassures Christians in the West Bank as Tensions Rise | Cardinal Pizzaballa Reassures Christians in the West Bank as Tensions Rise | EWTN News Nightly | EWTN News
+# The outermost suffix is still what names the outlet, so that half is asserted too.
+HEADLINE EWTN UK | Archbishop Moth urges UN to act against global persecution of believers – EWTN Great Britain - EWTN UK
+# The guard on repeated stripping: a second pass must not eat running prose. A masthead is
+# capitalised or a domain; "live updates" is neither.
+HEADLINE BBC | Israel-Gaza war - live updates - BBC
+# Programme titles keep their date half - the comma guard already covers this, and it must
+# keep covering it once the strip runs more than once.
+HEADLINE - | EWTN News Nightly | Wednesday, August 19, 2026
+HEADLINE - | Holy Rosary from Lourdes – August 19, 2026
+
+# A metaphorical marriage is not a Marriage, Family & Education story. Chris, 20.08.2026:
+# the tag-override rule (see classify) correctly moved The Federalist's speech-ban piece, but
+# it also dragged this one out of Politics on the word "marriage" alone - the subject is two
+# Stormont politicians falling out, and the marriage is a figure of speech. Guarded the same
+# way as (?<!new )england, (?<!michael )jordan and (?<!davis )hanson rather than by lowering
+# the override threshold, which would have given back the Räsänen fix.
+SECTIONCAT Politics, Government & Society | Belfast News Letter | Politics,Northern Ireland | The 'Dear Jon' letter which brought an end to an awkward and ultimately short-lived political marriage
+SECTION Politics, Government & Society | Belfast News Letter | The 'Dear Jon' letter which brought an end to an awkward and ultimately short-lived political marriage
+# The guards: real marriage stories must be untouched, including the sham-marriage family
+# Chris ruled in scope on 13.08.2026.
+SECTION Marriage, Family & Education | The Times of India | Inter-caste marriage: Woman abducted by her parents from husband's home in Mehsana
+SECTION Marriage, Family & Education | ZENIT | Poland Says No to EU on Gay: President Vetoes Bill That Equates Same-Sex Unions With Marriage
+SECTION Marriage, Family & Education | Mail Online UK | Girl, 14, 'spends two years in prison and is tortured by Taliban after refusing to marry 70-year-old commander'
+
+# "Covert gender activism wags the care watchdog" (The Australian, 20.08.2026) reached NO
+# SECTION at all. The tier-6 pattern already covers "gender ideology" but not the other names
+# the same movement goes by, so a piece about it landed in the suppressed bucket and had to be
+# rescued by hand. Chris named this story as one he wanted.
+SECTION Gender, Identity & Sexuality | The Australian | Covert gender activism wags the care watchdog
+SECTION Gender, Identity & Sexuality | The Australian | The gender lobby's grip on the care watchdog
+SECTION Gender, Identity & Sexuality | The Spectator | Schools quietly adopt the gender agenda
+# The guards, and the reason this rule has to name the MOVEMENT rather than the word "gender".
+# Every one of these was sitting in NO SECTION MATCHED on 20.08.2026, correctly: a bare
+# "gender" is demographic, statistical or biological far more often than it is ideological.
+SECTION None | WHO13.com | Blank Park Zoo reveals gender of baby giraffe born Monday
+SECTION None | Chronicle of Philanthropy | Gender pay gap growing at largest nonprofits
+SECTION None | iHeart | Watch Parker McCollum Pause Performance To Help Fans With Gender Reveal
+SECTION None | StudyFinds | Erratic Work Hours Linked To Worse Health, But Pattern Differs By Gender
+SECTION None | Charles Sturt University | Mums change, dads stay the same: how gender roles influence 'risky' outdoor recreation
+SECTION None | APD Noticies | The dogs break the silence of 20 children of victims of gender-based violence in Reus
+
+# Chris, 20.08.2026: "the ADF release should be in religious freedom". It ran in Church &
+# Religion, because a religious-liberty CASE has no persecution vocabulary in its headline -
+# nobody is killed, jailed or attacked - so it scored 0 for Religious Freedom and won Church
+# on the bare word "Christian". Persecution and religious liberty are the same beat; only the
+# forum differs.
+SECTION Religious Freedom & Persecution | adfmedia.org | Christian employers free to conduct business consistent with their faith
+SECTION Religious Freedom & Persecution | Alliance Defending Freedom | Christian employers free to conduct business consistent with their faith
+SECTION Religious Freedom & Persecution | First Liberty Institute | College Student Denied Financial Aid for Choosing Religious Major
+SECTION Religious Freedom & Persecution | First Liberty Institute | Christian Physician Assistant's Victory is a Win for All Medical Professionals
+SECTION Religious Freedom & Persecution | First Liberty Institute | Does the First Amendment Protect Freedom From Religion?
+# The same case reported by a newsroom rather than the litigator must reach the same section,
+# or the rule is a source alias rather than a subject rule.
+SECTION Religious Freedom & Persecution | Baptist Press | U.S. circuit court upholds block on immigration arrests at certain houses of worship
+# The guards. These outlets litigate across several beats, so a source-based rule must never
+# outrank a headline that has clearly scored somewhere else.
+SECTION Gender, Identity & Sexuality | ADF International | Sports bodies move to protect female category following threat of legal action
+SECTION Marriage, Family & Education | Focus on the Family | ADF Calls on Colorado School District to Drop Explicit Sex Ed Curriculum
+# ...and an ordinary weak-Church story from a general Christian outlet must STAY in Church.
+# This is why only religious-liberty LITIGATORS are hinted, never the Christian press.
+SECTION Church & Religion | Christian Today | Over 80% of US pastors have considered leaving ministry
+SECTION Church & Religion | Vatican News | Pope at Audience: Sacred music is to glorify God and sanctify the faithful
+# Two regressions the litigator hint introduced on its first run, both caught by re-reading
+# the sweep rather than the fixture. A source hint fires when NOTHING scored, so it swept in
+# work from these outlets that has nothing to do with religious liberty.
+# A dated newsletter index is not an article at all.
+SECTION None | First Liberty Institute | First Liberty Insider: August 14th, 2026
+SECTION None | First Liberty Institute | First Liberty Insider: August 7th, 2026
+# ...and a litigator writing about court structure is not filing a religion story. The hint
+# must only help where the headline is ALREADY about religion but lacks liberty vocabulary.
+# Asserted as Politics further down, once the OTHER_SPLIT gap that left it unsectioned was
+# closed - Politics is not Religious Freedom, so that case guards this too.
+
+# The OTHER_SPLIT gap, found 20.08.2026 while narrowing the litigator hint. The Politics
+# pattern is entirely elections and office-holders - election, ballot, candidate, MP, cabinet,
+# minister, resign - with nothing for CONSTITUTIONAL or INSTITUTIONAL politics, so a piece on
+# whether Supreme Court term limits are lawful reached no section at all. OTHER_ALLOW already
+# admits it on "court"; it was other_section that had nowhere to put it.
+SECTION Politics, Government & Society | First Liberty Institute | Term Limits for Supreme Court Justices are Unconstitutional
+SECTION Politics, Government & Society | wng.org | Federal judge finds so-called ghost gun rule unconstitutional
+# The guards, and the reason this must name the CONSTITUTIONAL question rather than the word
+# "court": ordinary litigation is not politics, and Politics is a residual split that nothing
+# else may lose items to. All of these were unsectioned on 20.08.2026 and must stay that way.
+SECTION None | Gulf News | Netflix sued by real 'Demon Hunter' metal band over 'substantial confusion' with KPop Demon Hunters
+SECTION None | The Telegraph | ‘Missing’ British athletics coach serving prison sentence in Morocco
+SECTION None | The Herald (Scotland) | No prosecutions for Edinburgh business rates avoidance in three years
+SECTION None | Law Trend | Allahabad High Court Upholds Dismissal of CRPF Constable for Bigamy
+
+# Chris, 20.08.2026: "evangelical times should be dropped completely". The block was written
+# on the display name with a literal space, so the DOMAIN form escaped it entirely - and that
+# turned out to be true of every multi-word blocked outlet, not just this one. An outlet name
+# is a bare domain whenever the item reaches us without a stated source (outlet_from_url), so
+# this was a hole in six of the nine blocks, silently.
+BLOCKED | evangelical-times.org
+BLOCKED | Evangelical-Times
+BLOCKED | truthnigeria.com
+BLOCKED | anglicanmainstream.net
+BLOCKED | barnabasaid.org
+BLOCKED | 24-7pressrelease.com
+BLOCKED | leadershipnewspapers.com
+BLOCKED | newyorkdailynews.com
+# The guard: a DIFFERENT outlet that merely shares a word must not be caught. Evangelical
+# Focus is a live Spanish source and filed a France assisted-dying story on 20.08.2026.
+KEEP | Evangelical Focus | Health workers and pharmacies in France may opt out of the assisted dying process
+
+# Two Polish sources added 20.08.2026, because ZENIT was the only outlet in the sweep carrying
+# the Polish president's veto of the same-sex unions bill, and blocking ZENIT lost that story
+# outright (Chris asked for a replacement). Notes from Poland has its own feed, so its links
+# are direct; TVP World has no working feed and is reached by Google News site search.
+# Without an OUTLET_HOME entry both fall to Unplaced, which sorts last - behind New Zealand -
+# whenever the headline names no place, and Polish political surnames are not place names.
+REGION Europe | Notes From Poland | - | Morawiecki confirms breakaway opposition group will form new party
+REGION Europe | TVP World | - | Fire destroys historic church
+REGION Europe | Notes From Poland | https://notesfrompoland.com/2026/08/20/example | Opposition expels 40 lawmakers who formed breakaway caucus
+# The masthead styles itself "Notes from Poland"; the feed title capitalises the F.
+OUTLET Notes from Poland | Notes From Poland
+# "Ukrainian MPs appoint new defence minister" was filed UK, because \bMPs?\b is a UK PLACE
+# token and UK is tested first (found 20.08.2026 on TVP World's first sweep). Most parliaments
+# call their members MPs, so the token is ambiguous in exactly the way \bUS\b was: it names an
+# ACTOR, not a place. Moved to the second pass, so a named country wins and a bare "MPs" is
+# still British. Same principle as the Rebel News case: region follows the story.
+REGION Europe | TVP World | - | Ukrainian MPs appoint new defence minister as predecessor calls for wartime elections
+REGION Asia | The Times of India | - | Indian MPs demand debate on conversion law
+# The guards: a bare MPs/MSPs with no other country named is still the UK, and the
+# unambiguous UK institutions must not be affected at all.
+REGION UK | Premier Christian News | - | MPs urged to reject assisted dying bill at third reading
+REGION UK | The Herald (Scotland) | - | MSPs back new curriculum guidance
+REGION UK | BBC | - | Westminster braces for a difficult autumn
+# The Europe signal listed country names but only SOME of their adjectival forms: "ukraine"
+# was there, "ukrainian" was not, so no headline using the adjective alone ever reached Europe
+# (found 20.08.2026 while fixing the MPs collision - which is what made it visible, since the
+# MP token had been masking it by claiming those headlines for the UK). Eleven adjectives were
+# missing; five items in that day's sweep were misfiled, to Unplaced, Australia and the UK.
+REGION Europe | TVP World | - | Ukrainian MPs appoint new defence minister as predecessor calls for wartime elections
+REGION Europe | UA.NEWS | - | In Volyn, the rector of a church of the Ukrainian Orthodox Church was dismissed
+REGION Europe | The Australian | - | Ukrainian protesters back Fedorov’s election call but doubt vote can happen
+REGION Europe | Brussels Signal | - | Portuguese bishops publish new safeguarding rules
+REGION Europe | Euractiv | - | Romanian court rejects challenge to religious education classes
+# The guard: where the story's own location is named, that still wins over a nationality.
+# A Finnish MP barred from Britain is a UK story - the ban is a British act.
+REGION UK | Premier Christian News | - | Finnish Christian MP appeals UK entry ban after conviction over tweet
+
+# OTHER_SPLIT's Politics pattern had "voter" but not "vote", so TVP World's "Fedorov calls for
+# wartime vote" reached no section while the SAME STORY from The European Conservative
+# ("Wartime Elections Demanded in Ukraine") classified fine on the word "elections". Found
+# 20.08.2026 on the new Polish sources' first sweep. "vote" is the commonest word in English
+# for an election; its absence made routing depend on which synonym an outlet happened to use.
+SECTION Politics, Government & Society | TVP World | ‘Democracy cannot be held hostage’: Fedorov calls for wartime vote
+SECTION Politics, Government & Society | The Post (New Zealand) | Two big names considering running in Wellington City by-election
+# The guard: a vote ON a subject that has its own section stays in that section. OTHER_SPLIT
+# only runs when nothing else scored, so this holds by construction - assert it anyway.
+SECTION Life | Christian Concern | MPs to vote again on assisted suicide bill
+SECTION Marriage, Family & Education | ZENIT | Poland Says No to EU on Gay: President Vetoes Bill That Equates Same-Sex Unions With Marriage
+
+# --- Chris, 24.08.2026: markup of the TEST 20260824 draft -----------------------------------
+# Four sources he ruled out outright ("Drop as a source" / "Drop this source completely").
+BLOCKED | صوت الإمارات
+BLOCKED | Rediff
+BLOCKED | China Daily
+BLOCKED | AOL.com
+
+# "Family is in the title but the core of the argument is voting and how asian families are
+# voting as a family unit." -> Politics, not Marriage, Family & Education.
+SECTION Politics, Government & Society | Mail Online UK | As the elections watchdog is urged to investigate illegal 'family voting'... It saddens me to say it, but the only way we can safeguard our precious democracy is to have police officers at every polling station: MATT GOODWIN
+# NOT ENCODABLE, recorded so it is not silently forgotten. Chris on TVP World's "Swedish
+# police probe online networks after teenage girl killed in school sword attack": "possibly
+# better suited for migration as an immigrant likely conducted the attack." The routing turns
+# on who the attacker was, which is nowhere in the headline - no keyword rule can reach it,
+# and guessing "school attack -> Immigration" would misfile every school attack that is not.
+# This one stays a curator call; SKILL.md Step 3 now says so. He also noted "The TVP link is
+# likely enough. Breitbart offers nothing new on that article" - a clustering preference.
+# "This is more of a society section article"
+SECTION Politics, Government & Society | spiked | Islamism and the silence of the 'progressives'
+
+# Road-traffic tragedies carrying no family-law or gender angle are local incidents, not
+# Marriage, Family & Education: "only loosely about family and doesn't cross-section into our
+# other issues such as family law, gender ideology, etc., to warrant coverage here" (x4).
+SUPPRESS | The Guardian | Families release pictures of police officers killed in A66 crash in which five others died
+SUPPRESS | Mail Online UK | Teenage joyrider killed in A66 crash that claimed the lives of seven people including two armed officers posted TikTok videos of his high-speed police chases
+SUPPRESS | Gript | Mum of teen who died in M9 crash apologises to injured family
+SUPPRESS | Gript | Funerals of three teens who died in M9 crash take place
+
+# NOT ENCODABLE, with the measurements, so nobody burns another morning on it. Chris,
+# 24.08.2026, on EWTN's "Catholic organization gathers signatures to call on world leaders to
+# protect religious freedom": "This is linked to the same petition promoted further up with
+# Bishop Keenan in the title and should be linked." It is the same ACN petition. Four
+# mechanisms were built and measured against the 23.08.2026 sweep; all four failed:
+#   1. entity_index on headlines (current behaviour) - the two share only "religious" and
+#      "freedom", nowhere near enough to merge on without collapsing the whole section.
+#   2. entity_index reading feed summaries - made clustering WORSE, 213 links -> 210, because
+#      body text inflates document frequency past ENTITY_MAX_DF. Pair still unlinked. Reverted.
+#   3. entity_index reading FETCHED standfirsts - no shared entity exists. Catholic Herald:
+#      "Bishop John Keenan has urged people to support a petition", naming no organisation.
+#      EWTN: "The pontifical foundation Aid to the Church in Need has launched a petition".
+#      Shared entity tokens: NONE. Knowing Keenan backs the ACN petition is world knowledge.
+#   4. A soft advisory cross-reference on shared distinctive words. Their only shared words are
+#      freedom (DF 28 in the section), religious (37) and petition (2). Linking on one rare
+#      shared word catches the pair and fires on 1,096 of ~1,700 leads - two thirds of the
+#      sheet. Requiring two rare shared words is quiet (90 pairs) and never catches the pair.
+#      No threshold does both.
+# A petition-only special case would "work" and is exactly what the header of this file warns
+# against. Same category as the Swedish sword attack above: a curator call, not a rule.
+
+# --- Chris's markup of the TEST 20260825 draft, 25.08.2026 ----------------------------------
+# Four sources ruled out. "Remove as a source" against each.
+BLOCKED | Moneycontrol.com
+BLOCKED | BroBible
+BLOCKED | lgbtqnation.com
+BLOCKED | queerty.com
+
+# ICC's "UK Pastor Booked on Bizarre Charges": "This is a British pastor but the story is based
+# in India so should be grouped with Indian stories. It should also be in the religious freedom
+# section." Two separate corrections on one item - the region follows the story, not the
+# nationality in the headline, and a pastor charged under an anti-conversion law is persecution.
+SECTION Religious Freedom & Persecution | International Christian Concern | UK Pastor Booked on Bizarre Charges
+# ENCODED 25.08.2026: region_detail() now takes the article's opening, and the fixture carries
+# it after a "::text::" marker. The rule is narrow - the body is read ONLY when the headline's
+# entire geographic signal is a nationality attached to a person's role, which is what "UK
+# Pastor" is. A control sits below: "U.K. Bans Bishop" is a British ACTION, not a nationality,
+# so it stays UK even with British text attached.
+REGION Asia | International Christian Concern | https://persecution.org/2026/08/24/uk-pastor-booked-on-bizarre-charges | UK Pastor Booked on Bizarre Charges ::text:: Authorities charged a British Christian leader of Indian descent in Maharashtra, India, for allegedly attempting to illegally convert Hindus to Christianity under a law that has yet to come into effect.
+REGION UK | The Federalist | - | U.K. Bans Bishop, Lawmaker Convicted Of 'Hate Speech' For Agreeing With The Bible ::text:: A British court upheld the conviction under Finnish law after a long appeal.
+# The same headline with NO text must still be UK - 59% of candidates have no body at all and
+# the rule has to be identical for them.
+REGION UK | International Christian Concern | - | UK Pastor Booked on Bizarre Charges
+
+# SUPERSEDED, kept for the reasoning. "UK Pastor Booked on Bizarre
+# Charges" contains exactly one geographic token and it is "UK". India appears only in the
+# body ("...charged a British Christian leader of Indian descent in Maharashtra, India..."),
+# and region_detail() sees headline, outlet and url only. Stripping the person-nationality
+# would yield "unplaced", not Asia, so no headline rule reaches it.
+# THE FIX THAT WOULD WORK, deliberately not rushed in minutes before a live run: give
+# region_detail() an optional `text` argument and pass the feed summary or fetched opening,
+# which since 24.08.2026 exists for ~41% of leads. That is a signature change across every
+# call site and needs its own before/after check, so it is proposed rather than done.
+
+# "This is a migration issue first and foremost before a marriage one."
+SECTION Immigration & Asylum | GB News | Sudanese migrant allowed to stay in Britain and cannot be deported because she married her cousin
+
+# An advocacy body's own action page carries no named author, and printing the outlet twice
+# ("Christian Concern | Christian Concern") reads as a byline that isn't one. Chris: "Unless
+# there is a named author just say Christian Concern as the source."
+BYLINE hidden | Christian Concern | Christian Concern
+# ...but a real byline on the same outlet still shows - this is about the duplicate, not the
+# outlet. Steve Beegoo's comment piece ran correctly on the same day.
+BYLINE shown | Christian Concern | Steve Beegoo
+
+# The lead-text tiebreak (Chris, 25.08.2026: "add something else other than keyword weighting").
+# When the headline's top two sections are within LEAD_TIEBREAK_MARGIN, the article's OPENING
+# decides - a headline is written to intrigue, an opening to say what happened. It must win
+# DECISIVELY (LEAD_DECISIVE_BY) and can never invent a section the headline did not nominate.
+SECTION Life | New York Post | Outrage as school shows kids as young as 14 extremely graphic abortion, sex and transgender art ::text:: Parents are seeking answers after Sanger High School students, ages 14-18, were shown graphic abortion imagery and explicit content in a Reedley College course.
+# Without the opening the same headline stays where the keywords put it. 59% of candidates have
+# no text, so the two paths must not disagree by accident.
+SECTION Gender, Identity & Sexuality | New York Post | Outrage as school shows kids as young as 14 extremely graphic abortion, sex and transgender art
+# The boundary the tiebreak is FORBIDDEN to touch. Measured at first build: it moved three
+# religious-liberty stories into Church because a liberty case's opening is thick with
+# "church" and "Christian". LEAD_TIEBREAK_SKIP now excludes this pair outright.
+SECTION Religious Freedom & Persecution | Premier Christian News | Ten Commandments displays spark new religious freedom battle in US schools ::text:: A wave of lawsuits over classroom displays of the Ten Commandments is testing the boundary between church and state in American public schools, with Christian groups on both sides.
+
+# Comment-pairing, 25.08.2026. Chris asked twice for comment pieces to run beside the news they
+# argue about. THREE mechanisms were built and measured; all three failed, and the measurements
+# are here so nobody rebuilds them:
+#   1. Split each duplicate cluster into a report lead and a comment lead. Moved ZERO items: a
+#      column and the report it answers rarely share enough headline wording to cluster at all.
+#   2. Move a comment into the section of the report it comments on, on shared distinctive
+#      words. At threshold 3 it moved nothing; at 2 it moved four items and all four were wrong
+#      (an asylum-centre report into Church, a data-centre column into Marriage).
+#   3. A soft "cf." cross-reference (24.08.2026): either 26-65% of the sheet or it misses.
+# They fail for DIFFERENT reasons, which is why no threshold fixes both of his examples:
+#   ADF report vs National Review comment - overlap 4, ample; but the NR piece reads as
+#     "report" to textsignals, because its opening is written as reportage.
+#   Guardian report vs Daily Wire comment - correctly detected as comment; but overlap is 2
+#     ("gender", "mexico"), and 2 is demonstrably noise.
+# What IS fixable is the half that made pairing hard by hand: both comment pieces were filed in
+# a DIFFERENT SECTION from their own subject, so they sat 300 lines from the story they belong
+# beside. Those two are encoded below as ordinary classification corrections.
+SECTION Religious Freedom & Persecution | National Review | Virginia's 'Religious Test' for College Students Is Unconstitutional
+# NOT ENCODABLE. "Inside New Mexico's Off-Grid Gender Border Pipeline" contains no scoring
+# token at all: bare "gender" is deliberately excluded from the Gender table (the guards for a
+# zoo giraffe, a pay gap and a gender reveal all depend on that), and it reached Immigration
+# only on the bare word "border". Narrowing "border" was measured and is worse - it corrected
+# 4 loose placements and sent 6 items to no section, two of them real border stories. So this
+# headline stays in Immigration: a wrong section is visible in the sheet, an unclassified item
+# is not.

@@ -1,0 +1,18 @@
+# Manual bylines, for articles whose author cannot be fetched.
+#
+# authors.py reads the article page to recover a missing byline, but an item whose only URL
+# is an unresolved news.google.com redirect has no page to read. Telegraph, Times and WORLD
+# routinely arrive that way. When Chris supplies the author, it goes here and sticks.
+#
+# Format:  match | Author
+# 'match' is a case-insensitive substring tested against the URL and then the headline.
+# Prefer a distinctive phrase from the headline - Google redirect URLs are opaque.
+
+# Chris, 17.08.2026. Telegraph column; the item is a Google redirect that neither the
+# resolver nor a Bing site: search can convert, so there is no page to read the byline from.
+bizarre obsession with drag queens | Michael Deacon
+
+# Chris, 19.08.2026: "Statement articles usually have a listed author which should be
+# included." Statement is paywalled and its feed omits the byline, so authors.py has no page
+# to read. He supplied this one.
+London Takes Another Step Toward Total Surveillance | Peter Winnemöller

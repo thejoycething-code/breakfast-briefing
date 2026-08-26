@@ -1,0 +1,18 @@
+# Manual link corrections, for items whose only URL is wrong or unusable.
+#
+# The case this exists for: an aggregator republishes a paywalled piece, credits the ORIGINAL
+# publisher, and is the only route by which the story reaches the sweep. compose.py refuses to
+# print "- The Telegraph (£)" over a link to somebody else's site, so it drops the item - and
+# on 17.08.2026 that silently cost the top-ranked UK free-speech story of the day. The
+# resolver cannot rescue these on its own because it title-verifies, and aggregators rewrite
+# headlines: Anglican Mainstream ran the Telegraph piece as "Blasphemy law is back, says
+# ex-policeman fined for offensive posts" against the Telegraph's own "Retired police officer
+# convicted for sharing 'offensive' meme". No slug or title match can bridge that.
+#
+# Format:  match | real URL
+# 'match' is a case-insensitive substring tested against the headline, then the URL. Prefer a
+# distinctive phrase from the headline. Applied in compose.py BEFORE the repost-domain check,
+# so a corrected item keeps its place and its ranking.
+
+# Chris supplied the Telegraph original, 17.08.2026.
+blasphemy law is back | https://www.telegraph.co.uk/news/2026/08/15/retired-police-officer-convicted-for-sharing-offensive-meme/

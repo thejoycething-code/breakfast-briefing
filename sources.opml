@@ -1,0 +1,429 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<opml version="1.0">
+    <head>
+        <title>Chris subscriptions in feedly Cloud</title>
+    </head>
+    <body>
+        <outline text="Entertainment" title="Entertainment">
+            <outline type="rss" text="Polygon" title="Polygon" xmlUrl="http://www.polygon.com/rss/index.xml" htmlUrl="https://www.polygon.com"/>
+        </outline>
+        <outline text="Issues: Islam" title="Issues: Islam">
+            <outline type="rss" text="Islam | The Guardian" title="Islam | The Guardian" xmlUrl="http://www.guardian.co.uk/world/islam/rss" htmlUrl="https://www.theguardian.com/world/islam"/>
+            <outline type="rss" text="Muslim Council of Britain" title="Muslim Council of Britain" xmlUrl="https://mcb.org.uk/feed/" htmlUrl="https://mcb.org.uk"/>
+            <outline type="rss" text="5Pillars" title="5Pillars" xmlUrl="https://5pillarsuk.com/feed/" htmlUrl="https://5pillarsuk.com/"/>
+            <outline type="rss" text="The Geller Report" title="The Geller Report" xmlUrl="http://pamelageller.com/feed/" htmlUrl="https://gellerreport.com/"/>
+            <outline type="rss" text="OIC Watch" title="OIC Watch" xmlUrl="https://www.globalgovernancewatch.org/rss/cf/oic-watch" htmlUrl="https://www.globalgovernancewatch.org/rss/publications"/>
+            <outline type="rss" text="Islam | Latest news, analysis and comment | iNews" title="Islam | Latest news, analysis and comment | iNews" xmlUrl="https://inews.co.uk/topic/islam/feed" htmlUrl="https://inews.co.uk/topic/islam"/>
+        </outline>
+        <outline text="Uncategorized" title="Uncategorized"/>
+        <outline text="Daily: Media monitors" title="Daily: Media monitors">
+            <outline type="rss" text="Anglican Mainstream" title="Anglican Mainstream" xmlUrl="http://anglicanmainstream.org/feed/" htmlUrl="https://anglicanmainstream.org"/>
+            <outline type="rss" text="Iona Institute: News Roundup" title="Iona Institute: News Roundup" xmlUrl="https://ionainstitute.ie/news-roundup/feed/" htmlUrl="https://ionainstitute.ie"/>
+        </outline>
+        <outline text="Daily: Family Education Trust" title="Daily: Family Education Trust">
+            <outline type="rss" text="Family Education Trust / @FamEdTrust" title="Family Education Trust / @FamEdTrust" xmlUrl="https://nitter.cz/FamEdTrust/rss" htmlUrl="https://nitter.cz/FamEdTrust"/>
+        </outline>
+        <outline text="UN" title="UN">
+            <outline type="rss" text="UN News Centre - Human Rights" title="UN News Centre - Human Rights" xmlUrl="http://www.un.org/apps/news/rss/rss_humanrights.asp" htmlUrl="https://news.un.org/en/"/>
+            <outline type="rss" text="UN News Centre - Women, Children, Population" title="UN News Centre - Women, Children, Population" xmlUrl="http://www.un.org/apps/news/rss/rss_wcp.asp" htmlUrl="https://news.un.org/en/"/>
+            <outline type="rss" text="UN News Centre - Top Stories" title="UN News Centre - Top Stories" xmlUrl="http://www.un.org/apps/news/rss/rss_top.asp" htmlUrl="https://news.un.org/en/"/>
+            <outline type="rss" text="UN News Centre - Law, Crime Prevention" title="UN News Centre - Law, Crime Prevention" xmlUrl="http://www.un.org/apps/news/rss/rss_law.asp" htmlUrl="https://news.un.org/en/"/>
+            <outline type="rss" text="UN News Centre - Culture, Education" title="UN News Centre - Culture, Education" xmlUrl="http://www.un.org/apps/news/rss/rss_edculture.asp" htmlUrl="https://news.un.org/en/"/>
+            <outline type="rss" text="UN News Centre - UN Affairs, Secretary General" title="UN News Centre - UN Affairs, Secretary General" xmlUrl="http://www.un.org/apps/news/rss/rss_unaffairs.asp" htmlUrl="https://news.un.org/en/"/>
+        </outline>
+        <outline text="Comics" title="Comics">
+            <outline type="rss" text="The Oatmeal - Comics by Matthew Inman" title="The Oatmeal - Comics by Matthew Inman" xmlUrl="http://feeds.feedburner.com/oatmealfeed" htmlUrl="http://theoatmeal.com/"/>
+            <outline type="rss" text="Existential Comics" title="Existential Comics" xmlUrl="http://existentialcomics.com/rss.xml" htmlUrl="https://existentialcomics.com"/>
+            <outline type="rss" text="xkcd" title="xkcd" xmlUrl="http://xkcd.com/rss.xml" htmlUrl="https://xkcd.com/"/>
+            <outline type="rss" text="The Perry Bible Fellowship" title="The Perry Bible Fellowship" xmlUrl="http://pbfcomics.com/feed/feed.xml" htmlUrl="https://pbfcomics.com/"/>
+            <outline type="rss" text="Saturday Morning Breakfast Cereal" title="Saturday Morning Breakfast Cereal" xmlUrl="http://www.smbc-comics.com/rss.php" htmlUrl="https://www.smbc-comics.com/"/>
+        </outline>
+        <outline text="Media: UK Mainstream" title="Media: UK Mainstream">
+            <outline type="rss" text="Mail Online UK" title="Mail Online UK" xmlUrl="http://www.dailymail.co.uk/news/index.rss" htmlUrl="https://www.dailymail.com?ns_mchannel=rss&amp;ns_campaign=1490&amp;ito=1490"/>
+            <outline type="rss" text="The Independent" title="The Independent" xmlUrl="http://www.independent.co.uk/rss" htmlUrl="https://www.independent.co.uk/rss"/>
+            <outline type="rss" text="UK politics" title="UK politics" xmlUrl="http://www.ft.com/rss/world/uk/politics" htmlUrl="https://www.ft.com/stream/9c0f3107-a34f-4319-a6a6-3101ac88b50d"/>
+            <outline type="rss" text="Telegraph" title="Telegraph" xmlUrl="http://www.telegraph.co.uk/newsfeed/rss/news-uk_news.xml" htmlUrl="https://www.telegraph.co.uk/news/"/>
+            <outline type="rss" text="Latest News headlines, exclusives and opinion | The Sun" title="Latest News headlines, exclusives and opinion | The Sun" xmlUrl="http://www.thesun.co.uk/sol/homepage/news/rss/" htmlUrl="https://www.thesun.co.uk"/>
+            <outline type="rss" text="Guardian UK" title="Guardian UK" xmlUrl="http://www.guardian.co.uk/rssfeed/0,,1,00.xml" htmlUrl="https://www.theguardian.com/uk"/>
+            <outline type="rss" text="BBC UK" title="BBC UK" xmlUrl="http://newsrss.bbc.co.uk/rss/newsonline_world_edition/front_page/rss.xml" htmlUrl="https://www.bbc.co.uk/news"/>
+            <outline type="rss" text="Metro" title="Metro" xmlUrl="http://metro.co.uk/news/feed/" htmlUrl="https://metro.co.uk"/>
+            <outline type="rss" text="Telegraph" title="Telegraph" xmlUrl="http://www.telegraph.co.uk/rss" htmlUrl="http://www.telegraph.co.uk/"/>
+            <outline type="rss" text="UK News - The latest headlines from the UK | Sky News" title="UK News - The latest headlines from the UK | Sky News" xmlUrl="http://news.sky.com/sky-news/rss/uk-news/rss.xml" htmlUrl="https://news.sky.com/uk"/>
+            <outline type="rss" text="Daily Express :: News Feed" title="Daily Express :: News Feed" xmlUrl="http://feeds.feedburner.com/daily-express-news-showbiz" htmlUrl="https://www.express.co.uk"/>
+        </outline>
+        <outline text="Comment: WA Faculty" title="Comment: WA Faculty">
+            <outline type="rss" text="Ezra Institute Podcast for Cultural Reformation" title="Ezra Institute Podcast for Cultural Reformation" xmlUrl="http://feedpress.me/eicc-recently-added" htmlUrl="https://www.ezrainstitute.com/"/>
+            <outline type="rss" text="P. Andrew Sandlin" title="P. Andrew Sandlin" xmlUrl="http://docsandlin.com/feed/" htmlUrl="https://docsandlin.com"/>
+        </outline>
+        <outline text="Comment: Christian" title="Comment: Christian">
+            <outline type="rss" text="Fr Calvin Robinson" title="Fr Calvin Robinson" xmlUrl="https://calvinrobinson.substack.com/feed" htmlUrl="https://www.calvinrobinson.com"/>
+            <outline type="rss" text="Vassal of the King" title="Vassal of the King" xmlUrl="http://vassaloftheking.blogspot.com/feeds/posts/default?alt=rss" htmlUrl="https://vassaloftheking.blogspot.com/"/>
+            <outline type="rss" text="Reflections of an Anglican Theologian" title="Reflections of an Anglican Theologian" xmlUrl="http://mbarrattdavie.wordpress.com/feed/" htmlUrl="https://mbarrattdavie.wordpress.com"/>
+            <outline type="rss" text="Plasticmind" title="Plasticmind" xmlUrl="http://feeds.feedburner.com/plasticmind/" htmlUrl="https://plasticmind.com"/>
+            <outline type="rss" text="Gospel Centered Discipleship | Resources to Make, Mature, &amp; Multiply disciples of Jesus" title="Gospel Centered Discipleship | Resources to Make, Mature, &amp; Multiply disciples of Jesus" xmlUrl="http://www.gospelcentereddiscipleship.com/feed/" htmlUrl="https://gcdiscipleship.com/article-feed/"/>
+            <outline type="rss" text="Acts 29" title="Acts 29" xmlUrl="http://www.acts29.com/feed/" htmlUrl="https://www.acts29.com/home/"/>
+            <outline type="rss" text="Thoughts Theological" title="Thoughts Theological" xmlUrl="http://thoughtstheological.com/feed/" htmlUrl="https://www.thoughtstheological.com"/>
+            <outline type="rss" text="Moore to the Point" title="Moore to the Point" xmlUrl="http://www.russellmoore.com/feed/" htmlUrl="https://www.russellmoore.com"/>
+            <outline type="rss" text="Missiologically Thinking" title="Missiologically Thinking" xmlUrl="http://www.jdpayne.org/feed/" htmlUrl="https://www.jdpayne.org"/>
+            <outline type="rss" text="The Good Book Blog" title="The Good Book Blog" xmlUrl="http://feeds.feedburner.com/TheGoodBookUS" htmlUrl="http://www.thegoodbook.com/blog/"/>
+            <outline type="rss" text="Borrowed Light" title="Borrowed Light" xmlUrl="http://feeds.feedburner.com/mikeleake/blog" htmlUrl="https://www.mikeleake.net"/>
+            <outline type="rss" text="Melissa Kruger" title="Melissa Kruger" xmlUrl="http://www.thegospelcoalition.org/blogs/melissakruger/feed/" htmlUrl="https://www.thegospelcoalition.org/blogs/melissa-kruger/"/>
+            <outline type="rss" text="Knowable Word" title="Knowable Word" xmlUrl="http://knowableword.com/feed/" htmlUrl="https://follow.it/knowable-word"/>
+            <outline type="rss" text="Trevin Wax" title="Trevin Wax" xmlUrl="http://feeds.feedburner.com/wordpress/trevinwax" htmlUrl="https://www.thegospelcoalition.org/blogs/trevin-wax/"/>
+            <outline type="rss" text="Counseling One Another" title="Counseling One Another" xmlUrl="http://counselingoneanother.com/feed/" htmlUrl="https://counselingoneanother.com"/>
+            <outline type="rss" text="Ezra Institute Podcast for Cultural Reformation" title="Ezra Institute Podcast for Cultural Reformation" xmlUrl="http://feedpress.me/eicc-recently-added" htmlUrl="https://www.ezrainstitute.com/"/>
+            <outline type="rss" text="Christian Book Shop Talk" title="Christian Book Shop Talk" xmlUrl="http://bookshoptalk.wordpress.com/feed/" htmlUrl="https://bookshoptalk.wordpress.com"/>
+            <outline type="rss" text="Desiring God" title="Desiring God" xmlUrl="http://feeds.feedburner.com/DGBlog" htmlUrl="https://www.desiringgod.org/"/>
+            <outline type="rss" text="Your Mom Has A Blog" title="Your Mom Has A Blog" xmlUrl="http://yourmomhasablog.com/feed/" htmlUrl="https://yourmomhasablog.com"/>
+            <outline type="rss" text="Wretched with Todd Friel (uploads) on YouTube" title="Wretched with Todd Friel (uploads) on YouTube" xmlUrl="http://gdata.youtube.com/feeds/base/users/WretchedNetwork/uploads?alt=rss&amp;v=2&amp;orderby=published&amp;client=ytapi-youtube-profile" htmlUrl="https://www.youtube.com/playlist?list=UUdlxWNzGGPKzQLMXkkyZkUQ"/>
+            <outline type="rss" text="Gleanings" title="Gleanings" xmlUrl="http://feeds.christianitytoday.com/christianitytoday/ctliveblog" htmlUrl="https://www.christianitytoday.com/"/>
+            <outline type="rss" text="Brad Hambrick" title="Brad Hambrick" xmlUrl="http://feeds.feedburner.com/BradHambrick" htmlUrl="https://bradhambrick.com"/>
+            <outline type="rss" text="Carl Trueman" title="Carl Trueman" xmlUrl="http://www.firstthings.com/rss/author/carl-r-trueman" htmlUrl="https://www.firstthings.com/featured-author/carl-r-trueman"/>
+            <outline type="rss" text="Grace to You Blog" title="Grace to You Blog" xmlUrl="http://feeds.gty.org/gtyblog" htmlUrl="http://www.gty.org/Blog"/>
+            <outline type="rss" text="First Things RSS Feed - First Thoughts" title="First Things RSS Feed - First Thoughts" xmlUrl="http://www.firstthings.com/rss/blogs/firstthoughts" htmlUrl="https://www.firstthings.com/blogs/firstthoughts"/>
+            <outline type="rss" text="First Things RSS Feed - Web Exclusives | Daily Writings From Our Top Writers | First Things" title="First Things RSS Feed - Web Exclusives | Daily Writings From Our Top Writers | First Things" xmlUrl="http://www.firstthings.com/rss/web-exclusives" htmlUrl="https://www.firstthings.com/web-exclusives"/>
+            <outline type="rss" text="Bob Kelleman" title="Bob Kelleman" xmlUrl="http://www.rpmministries.org/feed/" htmlUrl="https://rpmministries.org/"/>
+            <outline type="rss" text="Andy Naselli" title="Andy Naselli" xmlUrl="http://feeds.feedburner.com/nasellitheology" htmlUrl="https://andynaselli.com"/>
+            <outline type="rss" text="The Bible Project" title="The Bible Project" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCVfwlh9XpX2Y_tQfjeln9QA" htmlUrl="https://www.youtube.com/channel/UCVfwlh9XpX2Y_tQfjeln9QA"/>
+            <outline type="rss" text="The Cripplegate" title="The Cripplegate" xmlUrl="http://thecripplegate.com/feed" htmlUrl="https://thecripplegate.com/"/>
+            <outline type="rss" text="Challies Dot Com" title="Challies Dot Com" xmlUrl="http://feeds.feedburner.com/challies/XhEt" htmlUrl="https://www.challies.com"/>
+            <outline type="rss" text="Sylvia Schroeder" title="Sylvia Schroeder" xmlUrl="http://sylviaschroeder.com/feed/" htmlUrl="https://sylviaschroeder.com/"/>
+            <outline type="rss" text="DASH/HOUSE" title="DASH/HOUSE" xmlUrl="http://feeds.dashhouse.com/dashhouse" htmlUrl="https://www.dashhouse.com/"/>
+            <outline type="rss" text="Prince on Preaching" title="Prince on Preaching" xmlUrl="http://www.davidprince.com/feed/" htmlUrl="https://www.davidprince.com/"/>
+            <outline type="rss" text="Unlocking the Bible" title="Unlocking the Bible" xmlUrl="http://www.unlockingthebible.com/feed/atom/" htmlUrl="https://openthebible.org/"/>
+            <outline type="rss" text="Tim Chester" title="Tim Chester" xmlUrl="https://timchester.wordpress.com/feed/" htmlUrl="https://timchester.wordpress.com"/>
+            <outline type="rss" text="HeadHeartHand" title="HeadHeartHand" xmlUrl="http://feeds.feedburner.com/headhearthandblog" htmlUrl="https://headhearthand.org"/>
+            <outline type="rss" text="Gospel Relevance" title="Gospel Relevance" xmlUrl="http://feeds.feedburner.com/GospelRelevance" htmlUrl="https://www.gospelrelevance.com/"/>
+            <outline type="rss" text="Truth For Life" title="Truth For Life" xmlUrl="http://feeds.feedburner.com/TruthForLifeBlog" htmlUrl="https://blog.truthforlife.org"/>
+            <outline type="rss" text="Denny Burk" title="Denny Burk" xmlUrl="http://www.dennyburk.com/?feed=atom" htmlUrl="https://www.dennyburk.com"/>
+            <outline type="rss" text="ParadoxUganda" title="ParadoxUganda" xmlUrl="http://paradoxuganda.blogspot.com/feeds/posts/default" htmlUrl="http://paradoxuganda.blogspot.com/"/>
+            <outline type="rss" text="Samuel D. James" title="Samuel D. James" xmlUrl="https://samueldjames.net/feed/" htmlUrl="https://samueldjames.net"/>
+            <outline type="rss" text="Vance Christie" title="Vance Christie" xmlUrl="http://www.vancechristie.com/feed/" htmlUrl="https://vancechristie.com/"/>
+            <outline type="rss" text="Fulcrum Anglican" title="Fulcrum Anglican" xmlUrl="http://www.fulcrum-anglican.org.uk/feed/" htmlUrl="https://www.fulcrum-anglican.org.uk"/>
+            <outline type="rss" text="9Marks" title="9Marks" xmlUrl="http://9marks.org/feed/?post_type=article,review,interview,message,answers,journals,media" htmlUrl="https://www.9marks.org/"/>
+            <outline type="rss" text="Justin Holcomb" title="Justin Holcomb" xmlUrl="http://justinholcomb.com/feed/" htmlUrl="https://justinholcomb.com"/>
+            <outline type="rss" text="Answers in Genesis" title="Answers in Genesis" xmlUrl="http://www.answersingenesis.org/dailycontent.xml" htmlUrl="https://answersingenesis.org/answers/article-archives/"/>
+            <outline type="rss" text="Josh Buice" title="Josh Buice" xmlUrl="http://www.deliveredbygrace.com/feed/" htmlUrl="https://g3min.org"/>
+            <outline type="rss" text="Credo Magazine" title="Credo Magazine" xmlUrl="http://www.credomag.com/feed/" htmlUrl="https://credomag.com"/>
+            <outline type="rss" text="Alpha and Omega Ministries" title="Alpha and Omega Ministries" xmlUrl="http://www.aomin.org/aoblog/index.php/feed/" htmlUrl="https://www.aomin.org/aoblog/"/>
+            <outline type="rss" text="Psephizo" title="Psephizo" xmlUrl="http://www.psephizo.com/feed/" htmlUrl="https://www.psephizo.com"/>
+            <outline type="rss" text="The Gospel Coalition" title="The Gospel Coalition" xmlUrl="http://feeds.feedburner.com/tgcblog" htmlUrl="https://www.thegospelcoalition.org/"/>
+            <outline type="rss" text="A Small Work" title="A Small Work" xmlUrl="https://asmallwork.wordpress.com/feed/" htmlUrl="https://asmallwork.wordpress.com"/>
+            <outline type="rss" text="CBMW" title="CBMW" xmlUrl="http://cbmw.org/feed/" htmlUrl="https://cbmw.org"/>
+            <outline type="rss" text="Kevin DeYoung Articles" title="Kevin DeYoung Articles" xmlUrl="https://kevindeyoung.org/rss.xml" htmlUrl="https://clearlyreformed.org"/>
+            <outline type="rss" text="Biblical Preaching" title="Biblical Preaching" xmlUrl="http://biblicalpreaching.net/feed/" htmlUrl="https://biblicalpreaching.net"/>
+            <outline type="rss" text="Boundless Line" title="Boundless Line" xmlUrl="http://feeds.feedburner.com/boundlessline/blog" htmlUrl="https://www.boundless.org/blog/"/>
+            <outline type="rss" text="Logos Bible Software" title="Logos Bible Software" xmlUrl="https://blog.logos.com/feed/" htmlUrl="https://www.logos.com/grow/"/>
+            <outline type="rss" text="P. Andrew Sandlin" title="P. Andrew Sandlin" xmlUrl="http://docsandlin.com/feed/" htmlUrl="https://docsandlin.com"/>
+            <outline type="rss" text="Soliloquium" title="Soliloquium" xmlUrl="http://gavinortlund.com/feed/" htmlUrl="https://truthunites.org/"/>
+            <outline type="rss" text="Veritas et Lux" title="Veritas et Lux" xmlUrl="http://baldreformer.wordpress.com/feed/" htmlUrl="https://davidsteele.blog"/>
+            <outline type="rss" text="Redeemed Reader" title="Redeemed Reader" xmlUrl="http://www.redeemedreader.com/feed/" htmlUrl="https://redeemedreader.com/"/>
+            <outline type="rss" text="kerux noemata" title="kerux noemata" xmlUrl="http://preacherthoughts.blogspot.com/feeds/posts/default?alt=rss" htmlUrl="http://preacherthoughts.blogspot.com/"/>
+            <outline type="rss" text="Crossway" title="Crossway" xmlUrl="http://www.crossway.org/blog/feed/" htmlUrl="https://www.crossway.org/articles/"/>
+            <outline type="rss" text="CredoHouse" title="CredoHouse" xmlUrl="http://credohouse.org/feed" htmlUrl="https://credohouse.org"/>
+            <outline type="rss" text="Cranach" title="Cranach" xmlUrl="http://www.patheos.com/blogs/geneveith/feed/" htmlUrl="https://www.patheos.com/blogs/geneveith/"/>
+            <outline type="rss" text="Canon Fodder" title="Canon Fodder" xmlUrl="http://feeds.feedburner.com/canon-fodder" htmlUrl="https://michaeljkruger.com/"/>
+            <outline type="rss" text="What You Think Matters" title="What You Think Matters" xmlUrl="http://thinktheology.co.uk/rss/blog-feed" htmlUrl="http://whatyouthinkmatters.org/"/>
+            <outline type="rss" text="EerdWord" title="EerdWord" xmlUrl="http://eerdword.com/feed/" htmlUrl="https://eerdword.com/"/>
+            <outline type="rss" text="enCourage" title="enCourage" xmlUrl="http://encourage.pcacdm.org/feed/" htmlUrl="https://women.pcacdm.org"/>
+            <outline type="rss" text="Rebecca Writes" title="Rebecca Writes" xmlUrl="http://www.rebecca-writes.com/rebeccawrites/atom.xml" htmlUrl="http://rebecca-writes.com/rebeccawrites/"/>
+            <outline type="rss" text="First Things RSS Feed - Web Exclusives | Daily Writings From Our Top Writers | First Things" title="First Things RSS Feed - Web Exclusives | Daily Writings From Our Top Writers | First Things" xmlUrl="https://www.firstthings.com/rss/web-exclusives" htmlUrl="https://www.firstthings.com/web-exclusives"/>
+            <outline type="rss" text="The Conservative Woman" title="The Conservative Woman" xmlUrl="http://conservativewoman.co.uk/feed/" htmlUrl="https://www.conservativewoman.co.uk"/>
+            <outline type="rss" text="Joel Beeke" title="Joel Beeke" xmlUrl="http://www.joelbeeke.org/feed/" htmlUrl="https://joelbeeke.org/"/>
+            <outline type="rss" text="Denny Burk" title="Denny Burk" xmlUrl="http://feeds.feedburner.com/DennyBurk" htmlUrl="https://www.dennyburk.com"/>
+            <outline type="rss" text="Randy Alcorn's Blog" title="Randy Alcorn's Blog" xmlUrl="http://www.epm.org/feeds/blog/" htmlUrl="http://epm.org/"/>
+            <outline type="rss" text="Reformation21" title="Reformation21" xmlUrl="http://feeds.feedburner.com/Reformation21" htmlUrl="https://www.reformation21.org/frontpage"/>
+            <outline type="rss" text="davidould.net" title="davidould.net" xmlUrl="http://feeds.feedburner.com/davidould" htmlUrl="https://davidould.net"/>
+            <outline type="rss" text="Justin Taylor" title="Justin Taylor" xmlUrl="http://thegospelcoalition.org/blogs/justintaylor/feed/" htmlUrl="https://www.thegospelcoalition.org/blogs/justin-taylor/"/>
+            <outline type="rss" text="My Song In The Night" title="My Song In The Night" xmlUrl="http://feeds.feedburner.com/MySongInTheNight" htmlUrl="https://mysonginthenight.com"/>
+            <outline type="rss" text="P&amp;R Publishers" title="P&amp;R Publishers" xmlUrl="http://prpbooks.com/blog/feed/" htmlUrl="https://www.prpbooks.com/blog"/>
+            <outline type="rss" text="Gentle Reformation" title="Gentle Reformation" xmlUrl="http://gentlereformation.com/feed/" htmlUrl="https://gentlereformation.com/"/>
+            <outline type="rss" text="Evangelical Magazine" title="Evangelical Magazine" xmlUrl="https://www.evangelicalmagazine.com/article/feed/" htmlUrl="https://www.evangelicalmagazine.com"/>
+            <outline type="rss" text="Blog &amp; Mablog" title="Blog &amp; Mablog" xmlUrl="http://dougwils.com/feed" htmlUrl="https://dougwils.com"/>
+            <outline type="rss" text="Blogging Theologically" title="Blogging Theologically" xmlUrl="http://feeds.feedburner.com/BloggingTheologically" htmlUrl="https://aaronarmstrong.co/"/>
+            <outline type="rss" text="Timothy Paul Jones" title="Timothy Paul Jones" xmlUrl="http://www.timothypauljones.com/feed/" htmlUrl="https://www.timothypauljones.com/"/>
+            <outline type="rss" text="John Stevens" title="John Stevens" xmlUrl="http://feeds.feedburner.com/John-Stevens" htmlUrl="http://www.john-stevens.blog/"/>
+            <outline type="rss" text="J.D. Great" title="J.D. Great" xmlUrl="http://www.jdgreear.com/feed" htmlUrl="https://jdgreear.com"/>
+            <outline type="rss" text="Albert Mohler's" title="Albert Mohler's" xmlUrl="http://www.albertmohler.com/rss/blog.php" htmlUrl="https://albertmohler.com/category/articles/"/>
+            <outline type="rss" text="For The Church" title="For The Church" xmlUrl="http://feedpress.me/forthechurch" htmlUrl="https://ftc.co"/>
+            <outline type="rss" text="Challies" title="Challies" xmlUrl="http://www.challies.com/feed" htmlUrl="https://www.challies.com"/>
+            <outline type="rss" text="AlbertMohler.com" title="AlbertMohler.com" xmlUrl="http://www.albertmohler.com/feed/" htmlUrl="https://albertmohler.com/"/>
+            <outline type="rss" text="THE BLOG OF DAVID ROBERTSON" title="THE BLOG OF DAVID ROBERTSON" xmlUrl="http://theweeflea.wordpress.com/feed/" htmlUrl="https://theweeflea.com"/>
+        </outline>
+        <outline text="Media: Christian" title="Media: Christian">
+            <outline type="rss" text="RELEVANT" title="RELEVANT" xmlUrl="http://www.relevantmagazine.com/rss/relevantmagazine.xml" htmlUrl="https://relevantmagazine.com"/>
+            <outline type="rss" text="Aleteia — Catholic Spirituality, Lifestyle, World News, and Culture" title="Aleteia — Catholic Spirituality, Lifestyle, World News, and Culture" xmlUrl="http://aleteia.org/feed/" htmlUrl="https://aleteia.org"/>
+            <outline type="rss" text="Christian Today | RSS" title="Christian Today | RSS" xmlUrl="http://www.christiantoday.com/rss/feed.xml" htmlUrl="https://www.christiantoday.com/"/>
+            <outline type="rss" text="Crux Now" title="Crux Now" xmlUrl="http://www.cruxnow.com/feed/" htmlUrl="https://cruxnow.com/"/>
+            <outline type="rss" text="Crisis Magazine" title="Crisis Magazine" xmlUrl="https://crisismagazine.com/feed" htmlUrl="https://crisismagazine.com"/>
+            <outline type="rss" text="Christianity Today" title="Christianity Today" xmlUrl="http://christianitytoday.com/lyris/rss/ctmag.xml" htmlUrl="http://ChristianityToday.com/"/>
+            <outline type="rss" text="Anglican Ink © 2026" title="Anglican Ink © 2026" xmlUrl="http://anglican.ink/feed/" htmlUrl="https://anglican.ink"/>
+            <outline type="rss" text="CNE" title="CNE" xmlUrl="https://feedly.com/web/604c024b-41ee-4ef4-954f-c63a532676ef" htmlUrl="https://cne.news/latest-news"/>
+            <outline type="rss" text="Communications press releases - 2023" title="Communications press releases - 2023" xmlUrl="https://www.churchofengland.org/listing-page-rss/2452/feed.xml" htmlUrl="https://www.churchofengland.org/"/>
+        </outline>
+        <outline text="Council of Europe" title="Council of Europe">
+            <outline type="rss" text="Parliamentary Assembly of the Council of Europe (PACE): Parliamentary Assembly" title="Parliamentary Assembly of the Council of Europe (PACE): Parliamentary Assembly" xmlUrl="http://www.assembly.coe.int/rss/rss.aspx?cat=2&amp;size=20&amp;title=Parliamentary+Assembly+of+the+Council+of+Europe+(PACE)%3a+Parliamentary+Assembly&amp;rssdesc=&amp;lang=en-gb" htmlUrl="http://assembly.coe.int/rss/rss.aspx?cat=2&amp;size=20&amp;title=Parliamentary+Assembly+of+the+Council+of+Europe+(PACE):+Parliamentary+Assembly&amp;rssdesc=&amp;lang=en-gb"/>
+            <outline type="rss" text="Curia RSS" title="Curia RSS" xmlUrl="http://curia.europa.eu/jcms/rss.jsp?lang=en&amp;secondLang=fr" htmlUrl="https://curia.europa.eu"/>
+            <outline type="rss" text="European Ombudsman" title="European Ombudsman" xmlUrl="http://www.ombudsman.europa.eu/rss/rss.xml" htmlUrl="https://www.ombudsman.europa.eu/rest/rss"/>
+            <outline type="rss" text="FRA: European Union Agency for Fundamental Rights" title="FRA: European Union Agency for Fundamental Rights" xmlUrl="http://fra.europa.eu/en/publications-and-resources/publications.rss.xml" htmlUrl="https://fra.europa.eu/en"/>
+            <outline type="rss" text="All themes" title="All themes" xmlUrl="http://www.assembly.coe.int/rss/rss.aspx?cat=all&amp;size=20&amp;lang=en-gb&amp;title=All+themes&amp;rssdesc=" htmlUrl="http://assembly.coe.int/rss/rss.aspx?cat=all&amp;size=20&amp;lang=en-gb&amp;title=All+themes&amp;rssdesc="/>
+        </outline>
+        <outline text="Issues: Life" title="Issues: Life">
+            <outline type="rss" text="News" title="News" xmlUrl="http://www.lifesitenews.com/rss/global" htmlUrl="https://www.lifesitenews.com"/>
+            <outline type="rss" text="LifeNews.com" title="LifeNews.com" xmlUrl="http://feeds.feedburner.com/lifenews/newsfeed" htmlUrl="https://www.lifenews.com/"/>
+            <outline type="rss" text="CMF Blogs" title="CMF Blogs" xmlUrl="https://cmfblog.org.uk/feed/" htmlUrl="https://cmfblog.org.uk"/>
+            <outline type="rss" text="Practical Ethics" title="Practical Ethics" xmlUrl="http://blog.practicalethics.ox.ac.uk/feed/" htmlUrl="https://blog.uehiro.ox.ac.uk"/>
+            <outline type="rss" text="BioEdge" title="BioEdge" xmlUrl="http://www.bioedge.org/index.php/rss" htmlUrl="https://bioedge.org/"/>
+            <outline type="rss" text="Secular Pro" title="Secular Pro" xmlUrl="http://blog.secularprolife.org/feeds/posts/default" htmlUrl="https://secularprolife.org/welcome/"/>
+            <outline type="rss" text="www.carenotkilling.org.uk - Latest Content" title="www.carenotkilling.org.uk - Latest Content" xmlUrl="https://www.carenotkilling.org.uk/rss/articles/" htmlUrl="http://www.carenotkilling.org.uk/rss/latest/"/>
+            <outline type="rss" text="Live Action News" title="Live Action News" xmlUrl="http://liveactionnews.org/?feed=rss2" htmlUrl="https://www.liveaction.org/news/"/>
+            <outline type="rss" text="Ipas" title="Ipas" xmlUrl="https://www.ipas.org/feed/" htmlUrl="https://www.ipas.org/"/>
+            <outline type="rss" text="Right To Life UK" title="Right To Life UK" xmlUrl="https://righttolife.org.uk/feed" htmlUrl="https://righttolife.org.uk"/>
+            <outline type="rss" text="Euthanasia Prevention Coalition" title="Euthanasia Prevention Coalition" xmlUrl="http://alexschadenberg.blogspot.com/feeds/posts/default" htmlUrl="https://alexschadenberg.blogspot.com/"/>
+        </outline>
+        <outline text="Issues: Religious Freedom" title="Issues: Religious Freedom">
+            <outline type="rss" text="World Watch Monitor" title="World Watch Monitor" xmlUrl="https://www.worldwatchmonitor.org/feed/" htmlUrl="https://www.worldwatchmonitor.org/"/>
+            <outline type="rss" text="religious freedom" title="religious freedom" xmlUrl="https://news.google.com/news/rss/search/section/q/religious%20freedom/religious%20freedom?ned=us" htmlUrl="https://news.google.com/search?hl=en-US&amp;gl=US&amp;ceid=US:en&amp;q=religious+freedom"/>
+            <outline type="rss" text="International Christian Concern" title="International Christian Concern" xmlUrl="http://www.persecution.org/feed/atom/" htmlUrl="https://persecution.org"/>
+            <outline type="rss" text="&quot;religious minority&quot;" title="&quot;religious minority&quot;" xmlUrl="https://news.google.com/rss/search?hl=en-US&amp;gl=US&amp;q=%22religious+minority%22&amp;ceid=US:en" htmlUrl="https://news.google.com/search?hl=en-US&amp;gl=US&amp;q=%22religious+minority%22&amp;ceid=US:en"/>
+            <outline type="rss" text="Forum 18 News Service" title="Forum 18 News Service" xmlUrl="http://www.forum18.org/syndication/forum18.xml" htmlUrl="https://www.forum18.org/"/>
+            <outline type="rss" text="Morningstar News" title="Morningstar News" xmlUrl="http://morningstarnews.org/feed/" htmlUrl="https://morningstarnews.org"/>
+            <outline type="rss" text="&quot;article 18&quot;" title="&quot;article 18&quot;" xmlUrl="https://news.google.com/rss/search?hl=en-US&amp;gl=US&amp;q=%22article+18%22&amp;ceid=US:en" htmlUrl="https://news.google.com/search?hl=en-US&amp;gl=US&amp;q=%22article+18%22&amp;ceid=US:en"/>
+            <outline type="rss" text="FoRB in Full" title="FoRB in Full" xmlUrl="https://forbinfull.org/feed/" htmlUrl="https://forbinfull.org"/>
+            <outline type="rss" text="ChinaAid" title="ChinaAid" xmlUrl="http://www.chinaaid.org/feeds/posts/default" htmlUrl="https://chinaaid.org/"/>
+            <outline type="rss" text="christian persecution" title="christian persecution" xmlUrl="https://news.google.com/news/rss/search/section/q/christian%20persecution/christian%20persecution?ned=us" htmlUrl="https://news.google.com/search?hl=en-US&amp;gl=US&amp;ceid=US:en&amp;q=christian+persecution"/>
+            <outline type="rss" text="Providence" title="Providence" xmlUrl="https://providencemag.com/feed/" htmlUrl="https://providencemag.com"/>
+            <outline type="rss" text="&quot;freedom of religion or belief&quot;" title="&quot;freedom of religion or belief&quot;" xmlUrl="https://news.google.com/rss/search?hl=en-US&amp;gl=US&amp;q=%22freedom+of+religion+or+belief%22&amp;ceid=US:en" htmlUrl="https://news.google.com/search?hl=en-US&amp;gl=US&amp;q=%22freedom+of+religion+or+belief%22&amp;ceid=US:en"/>
+        </outline>
+        <outline text="Issues: Life keywords" title="Issues: Life keywords">
+            <outline type="rss" text="&quot;disability abortion&quot;" title="&quot;disability abortion&quot;" xmlUrl="https://news.google.com/rss/search?q=%22disability+abortion%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en" htmlUrl="https://news.google.com/search?q=%22disability+abortion%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en"/>
+            <outline type="rss" text="&quot;Marie Stopes International&quot;" title="&quot;Marie Stopes International&quot;" xmlUrl="https://news.google.com/rss/search?q=%22Marie+Stopes+International%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en" htmlUrl="https://news.google.com/search?q=%22Marie+Stopes+International%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en"/>
+            <outline type="rss" text="&quot;BPAS&quot;" title="&quot;BPAS&quot;" xmlUrl="https://news.google.com/rss/search?q=%22BPAS%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en" htmlUrl="https://news.google.com/search?q=%22BPAS%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en"/>
+            <outline type="rss" text="AI Abortion" title="AI Abortion" xmlUrl="https://feedly.com/f/alert/1c0904d6-9cf7-4297-81d3-aabaff0e81d1"/>
+            <outline type="rss" text="&quot;Conscientious Objection&quot;" title="&quot;Conscientious Objection&quot;" xmlUrl="https://news.google.com/rss/search?q=%22Conscientious+Objection%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en" htmlUrl="https://news.google.com/search?q=%22Conscientious+Objection%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en"/>
+            <outline type="rss" text="&quot;Marie Stopes&quot;" title="&quot;Marie Stopes&quot;" xmlUrl="https://news.google.com/rss/search?q=%22Marie+Stopes%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en" htmlUrl="https://news.google.com/search?q=%22Marie+Stopes%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en"/>
+            <outline type="rss" text="&quot;gendercide&quot;" title="&quot;gendercide&quot;" xmlUrl="https://news.google.com/rss/search?q=%22gendercide%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en" htmlUrl="https://news.google.com/search?q=%22gendercide%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en"/>
+            <outline type="rss" text="&quot;gender abortion&quot;" title="&quot;gender abortion&quot;" xmlUrl="https://news.google.com/rss/search?q=%22gender+abortion%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en" htmlUrl="https://news.google.com/search?q=%22gender+abortion%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en"/>
+            <outline type="rss" text="&quot;Both Lives Matter&quot;" title="&quot;Both Lives Matter&quot;" xmlUrl="https://news.google.com/rss/search?q=%22Both+Lives+Matter%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en" htmlUrl="https://news.google.com/search?q=%22Both+Lives+Matter%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en"/>
+            <outline type="rss" text="&quot;assisted dying&quot;" title="&quot;assisted dying&quot;" xmlUrl="https://news.google.com/news/rss/search/section/q/%22assisted%20dying%22/%22assisted%20dying%22?ned=us" htmlUrl="https://news.google.com/search?hl=en-US&amp;gl=US&amp;ceid=US:en&amp;q=%22assisted+dying%22"/>
+            <outline type="rss" text="&quot;British Pregnancy Advisory Service&quot;" title="&quot;British Pregnancy Advisory Service&quot;" xmlUrl="https://news.google.com/rss/search?q=%22British+Pregnancy+Advisory+Service%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en" htmlUrl="https://news.google.com/search?q=%22British+Pregnancy+Advisory+Service%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en"/>
+            <outline type="rss" text="&quot;don't screen us out&quot;" title="&quot;don't screen us out&quot;" xmlUrl="https://news.google.com/rss/search?q=%22don't+screen+us+out%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en" htmlUrl="https://news.google.com/search?q=%22don%27t+screen+us+out%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en"/>
+            <outline type="rss" text="&quot;sex selective abortion&quot;" title="&quot;sex selective abortion&quot;" xmlUrl="https://news.google.com/rss/search?q=%22sex+selective+abortion%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en" htmlUrl="https://news.google.com/search?q=%22sex+selective+abortion%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en"/>
+            <outline type="rss" text="&quot;dignity in dying&quot;" title="&quot;dignity in dying&quot;" xmlUrl="https://news.google.com/rss/search?q=%22dignity+in+dying%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en" htmlUrl="https://news.google.com/search?q=%22dignity+in+dying%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en"/>
+            <outline type="rss" text="&quot;assisted suicide&quot;" title="&quot;assisted suicide&quot;" xmlUrl="https://news.google.com/rss/search?q=%22assisted+suicide%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en" htmlUrl="https://news.google.com/search?q=%22assisted+suicide%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en"/>
+            <outline type="rss" text="&quot;Alina Dulgheriu&quot;" title="&quot;Alina Dulgheriu&quot;" xmlUrl="https://news.google.com/rss/search?q=%22Alina+Dulgheriu%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en" htmlUrl="https://news.google.com/search?q=%22Alina+Dulgheriu%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en"/>
+            <outline type="rss" text="abortion" title="abortion" xmlUrl="http://news.google.com/news?hl=en&amp;gl=us&amp;q=abortion&amp;um=1&amp;ie=UTF-8&amp;output=rss" htmlUrl="https://news.google.com/search?hl=en-US&amp;gl=US&amp;ceid=US:en&amp;q=abortion"/>
+            <outline type="rss" text="&quot;euthanasia&quot;" title="&quot;euthanasia&quot;" xmlUrl="https://news.google.com/rss/search?q=%22euthanasia%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en" htmlUrl="https://news.google.com/search?q=%22euthanasia%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en"/>
+            <outline type="rss" text="&quot;International Planned Parenthood Federation&quot;" title="&quot;International Planned Parenthood Federation&quot;" xmlUrl="https://news.google.com/rss/search?hl=en-US&amp;gl=US&amp;q=%22International+Planned+Parenthood+Federation%22&amp;ceid=US:en" htmlUrl="https://news.google.com/search?hl=en-US&amp;gl=US&amp;q=%22International+Planned+Parenthood+Federation%22&amp;ceid=US:en"/>
+            <outline type="rss" text="&quot;abortion&quot;" title="&quot;abortion&quot;" xmlUrl="https://news.google.com/rss/search?q=%22abortion%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en" htmlUrl="https://news.google.com/search?q=%22abortion%22&amp;hl=en-US&amp;gl=US&amp;ceid=US:en"/>
+        </outline>
+        <outline text="Advocacy: Non-Christian" title="Advocacy: Non-Christian">
+            <outline type="rss" text="Sex Matters" title="Sex Matters" xmlUrl="https://sex-matters.org/feed/" htmlUrl="https://sex-matters.org/"/>
+            <outline type="rss" text="Don't Screen Us Out" title="Don't Screen Us Out" xmlUrl="http://dontscreenusout.org/feed/" htmlUrl="https://dontscreenusout.org"/>
+            <outline type="rss" text="NSS" title="NSS" xmlUrl="http://feeds.feedburner.com/nssnews/" htmlUrl="https://www.secularism.org.uk"/>
+            <outline type="rss" text="Conservatives For Women" title="Conservatives For Women" xmlUrl="https://www.conservativesforwomen.org//feed/rss2" htmlUrl="https://www.conservativesforwomen.org"/>
+            <outline type="rss" text="Transgender Trend" title="Transgender Trend" xmlUrl="http://www.transgendertrend.com/feed/" htmlUrl="https://www.transgendertrend.com/"/>
+            <outline type="rss" text="Humanists UK (BHA)" title="Humanists UK (BHA)" xmlUrl="http://www.humanism.org.uk/news/rss" htmlUrl="https://humanists.uk"/>
+            <outline type="rss" text="PinkNews" title="PinkNews" xmlUrl="http://feeds.feedburner.com/Pinknews" htmlUrl="https://www.thepinknews.com/"/>
+            <outline type="rss" text="Free Speech Union — News &amp; Publications" title="Free Speech Union — News &amp; Publications" xmlUrl="https://freespeechunion.org/feed/" htmlUrl="https://freespeechunion.org"/>
+        </outline>
+        <outline text="Media: Alternative" title="Media: Alternative">
+            <outline type="rss" text="Tortoise" title="Tortoise" xmlUrl="https://www.tortoisemedia.com/feed/" htmlUrl="https://www.tortoisemedia.com"/>
+            <outline type="rss" text="The Conversation – Articles (UK)" title="The Conversation – Articles (UK)" xmlUrl="https://theconversation.com/uk/articles.atom" htmlUrl="https://theconversation.com"/>
+            <outline type="rss" text="The Federalist" title="The Federalist" xmlUrl="http://thefederalist.com/feed/" htmlUrl="https://thefederalist.com/"/>
+            <outline type="rss" text="TheArticle" title="TheArticle" xmlUrl="https://www.thearticle.com/feed/" htmlUrl="https://www.thearticle.com/"/>
+            <outline type="rss" text="Byline Times" title="Byline Times" xmlUrl="https://bylinetimes.com/feed/" htmlUrl="https://bylinetimes.com/"/>
+            <outline type="rss" text="Public Discourse" title="Public Discourse" xmlUrl="http://www.thepublicdiscourse.com/feed/" htmlUrl="https://www.thepublicdiscourse.com/"/>
+            <outline type="rss" text="The Daily Wire - Breaking News, Videos &amp; Podcasts" title="The Daily Wire - Breaking News, Videos &amp; Podcasts" xmlUrl="http://www.dailywire.com/rss.xml" htmlUrl="https://www.dailywire.com"/>
+            <outline type="rss" text="Canary" title="Canary" xmlUrl="http://www.thecanary.co/feed/" htmlUrl="https://www.thecanary.co/"/>
+        </outline>
+        <outline text="Tech" title="Tech">
+            <outline type="rss" text="TechCrunch" title="TechCrunch" xmlUrl="http://feeds.feedburner.com/Techcrunch" htmlUrl="https://techcrunch.com/"/>
+            <outline type="rss" text="Engadget" title="Engadget" xmlUrl="http://www.engadget.com/rss-full.xml" htmlUrl="http://www.engadget.com"/>
+            <outline type="rss" text="MIT Technology Review" title="MIT Technology Review" xmlUrl="http://www.technologyreview.com/rss/rss.aspx" htmlUrl="https://www.technologyreview.com"/>
+            <outline type="rss" text="The Hustle" title="The Hustle" xmlUrl="http://thehustle.co/feed/" htmlUrl="https://thehustle.co/"/>
+            <outline type="rss" text="Wired" title="Wired" xmlUrl="http://feeds.wired.com/wired/index" htmlUrl="https://www.wired.com"/>
+            <outline type="rss" text="Fast Company" title="Fast Company" xmlUrl="http://www.fastcompany.com/rss.xml" htmlUrl="https://www.fastcompany.com"/>
+            <outline type="rss" text="Android Police" title="Android Police" xmlUrl="http://www.androidpolice.com/feed/" htmlUrl="https://www.androidpolice.com"/>
+            <outline type="rss" text="The Verge" title="The Verge" xmlUrl="http://www.theverge.com/rss/full.xml" htmlUrl="https://www.theverge.com"/>
+            <outline type="rss" text="Technology Intelligence" title="Technology Intelligence" xmlUrl="http://www.telegraph.co.uk/technology/rss" htmlUrl="https://www.telegraph.co.uk/technology/"/>
+        </outline>
+        <outline text="Issues: Education" title="Issues: Education">
+            <outline type="rss" text="Ofsted - Activity on GOV.UK" title="Ofsted - Activity on GOV.UK" xmlUrl="https://www.gov.uk/government/organisations/ofsted.atom" htmlUrl="https://www.gov.uk/government/organisations/ofsted"/>
+            <outline type="rss" text="Schools Week" title="Schools Week" xmlUrl="http://schoolsweek.co.uk/feed/" htmlUrl="https://schoolsweek.co.uk"/>
+            <outline type="rss" text="CofE school" title="CofE school" xmlUrl="https://news.google.com/rss/search?hl=en-US&amp;gl=US&amp;q=CofE+school&amp;ceid=US:en" htmlUrl="https://news.google.com/search?hl=en-US&amp;gl=US&amp;q=CofE+school&amp;ceid=US:en"/>
+            <outline type="rss" text="Parent Power" title="Parent Power" xmlUrl="https://parentpower.family/feed/" htmlUrl="https://parentpower.family/"/>
+            <outline type="rss" text="The HE Byte" title="The HE Byte" xmlUrl="https://he-byte.uk/feed/" htmlUrl="https://he-byte.uk"/>
+            <outline type="rss" text="News and communications from Ofsted" title="News and communications from Ofsted" xmlUrl="http://www.ofsted.gov.uk/news/rss/" htmlUrl="https://www.gov.uk"/>
+            <outline type="rss" text="sex education" title="sex education" xmlUrl="https://news.google.com/news/rss/search/section/q/sex%20education/sex%20education?ned=us" htmlUrl="https://news.google.com/search?hl=en-US&amp;gl=US&amp;ceid=US:en&amp;q=sex+education"/>
+            <outline type="rss" text="Ofsted: education" title="Ofsted: education" xmlUrl="https://educationinspection.blog.gov.uk/feed/atom/" htmlUrl="https://educationinspection.blog.gov.uk"/>
+        </outline>
+        <outline text="Hansard: Issues" title="Hansard: Issues">
+            <outline type="rss" text="Assisted Dying - TWFY" title="Assisted Dying - TWFY" xmlUrl="https://www.theyworkforyou.com/search/rss/?s=assisted+dying" htmlUrl="https://www.theyworkforyou.com/search/?s=assisted+dying"/>
+            <outline type="rss" text="Muslim - TWFY" title="Muslim - TWFY" xmlUrl="https://www.theyworkforyou.com/search/rss/?s=muslim" htmlUrl="https://www.theyworkforyou.com/search/?s=muslim"/>
+            <outline type="rss" text="Church of England - TWFY" title="Church of England - TWFY" xmlUrl="https://www.theyworkforyou.com/search/rss/?s=church+of+england" htmlUrl="https://www.theyworkforyou.com/search/?s=church+of+england"/>
+            <outline type="rss" text="Bioethics - TWFY" title="Bioethics - TWFY" xmlUrl="https://www.theyworkforyou.com/search/rss/?s=bioethics" htmlUrl="https://www.theyworkforyou.com/search/?s=bioethics"/>
+            <outline type="rss" text="Surrogacy - TWFY" title="Surrogacy - TWFY" xmlUrl="https://www.theyworkforyou.com/search/rss/?s=surrogacy" htmlUrl="https://www.theyworkforyou.com/search/?s=surrogacy"/>
+            <outline type="rss" text="Christians - TWFY" title="Christians - TWFY" xmlUrl="https://www.theyworkforyou.com/search/rss/?s=christians" htmlUrl="https://www.theyworkforyou.com/search/?s=christians"/>
+            <outline type="rss" text="Abortion - TWFY" title="Abortion - TWFY" xmlUrl="http://www.theyworkforyou.com/search/rss/?s=abortion" htmlUrl="https://www.theyworkforyou.com/search/?s=abortion"/>
+            <outline type="rss" text="Homosexuality - TWFY" title="Homosexuality - TWFY" xmlUrl="https://www.theyworkforyou.com/search/rss/?s=homosexuality" htmlUrl="https://www.theyworkforyou.com/search/?s=homosexuality"/>
+            <outline type="rss" text="Buffer Zones - TWFY" title="Buffer Zones - TWFY" xmlUrl="https://www.theyworkforyou.com/search/rss/?s=buffer+zones" htmlUrl="https://www.theyworkforyou.com/search/?s=buffer+zones"/>
+            <outline type="rss" text="Gender Recognition - TWFY" title="Gender Recognition - TWFY" xmlUrl="https://www.theyworkforyou.com/search/rss/?s=gender+recognition" htmlUrl="https://www.theyworkforyou.com/search/?s=gender+recognition"/>
+            <outline type="rss" text="Transgender - TWFY" title="Transgender - TWFY" xmlUrl="https://www.theyworkforyou.com/search/rss/?s=transgender" htmlUrl="https://www.theyworkforyou.com/search/?s=transgender"/>
+            <outline type="rss" text="Islamophobia - TWFY" title="Islamophobia - TWFY" xmlUrl="https://www.theyworkforyou.com/search/rss/?s=islamophobia" htmlUrl="https://www.theyworkforyou.com/search/?s=islamophobia"/>
+            <outline type="rss" text="Islam - TWFY" title="Islam - TWFY" xmlUrl="https://www.theyworkforyou.com/search/rss/?s=islam" htmlUrl="https://www.theyworkforyou.com/search/?s=islam"/>
+            <outline type="rss" text="Conversion Therapy - TWFY" title="Conversion Therapy - TWFY" xmlUrl="https://www.theyworkforyou.com/search/rss/?s=conversion+therapy" htmlUrl="https://www.theyworkforyou.com/search/?s=conversion+therapy"/>
+            <outline type="rss" text="Gender Identity - TWFY" title="Gender Identity - TWFY" xmlUrl="https://www.theyworkforyou.com/search/rss/?s=gender+identity" htmlUrl="https://www.theyworkforyou.com/search/?s=gender+identity"/>
+            <outline type="rss" text="Assisted Suicide - TWFY" title="Assisted Suicide - TWFY" xmlUrl="https://www.theyworkforyou.com/search/rss/?s=assisted+suicide" htmlUrl="https://www.theyworkforyou.com/search/?s=assisted+suicide"/>
+            <outline type="rss" text="Sex Education - TWFY" title="Sex Education - TWFY" xmlUrl="https://www.theyworkforyou.com/search/rss/?s=sex+education" htmlUrl="https://www.theyworkforyou.com/search/?s=sex+education"/>
+            <outline type="rss" text="LGBT - TWFY" title="LGBT - TWFY" xmlUrl="https://www.theyworkforyou.com/search/rss/?s=LGBT" htmlUrl="https://www.theyworkforyou.com/search/?s=LGBT"/>
+            <outline type="rss" text="Marriage - TWFY" title="Marriage - TWFY" xmlUrl="https://www.theyworkforyou.com/search/rss/?s=marriage" htmlUrl="https://www.theyworkforyou.com/search/?s=marriage"/>
+            <outline type="rss" text="Divorce - TWFY" title="Divorce - TWFY" xmlUrl="http://www.theyworkforyou.com/search/rss/?s=divorce" htmlUrl="https://www.theyworkforyou.com/search/?s=divorce"/>
+        </outline>
+        <outline text="Supreme Court" title="Supreme Court">
+            <outline type="rss" text="The UK Supreme Court | Latest judgments" title="The UK Supreme Court | Latest judgments" xmlUrl="http://supremecourt.uk/rss/latest-judgments.xml" htmlUrl="http://www.supremecourt.uk/news/latest-judgments.html"/>
+        </outline>
+        <outline text="Issues: Gender &amp; Identity" title="Issues: Gender &amp; Identity">
+            <outline type="rss" text="Sex Matters" title="Sex Matters" xmlUrl="https://sex-matters.org/feed/" htmlUrl="https://sex-matters.org/"/>
+            <outline type="rss" text="LGBTQ Global" title="LGBTQ Global" xmlUrl="https://lgbtmarriage.substack.com/feed" htmlUrl="https://lgbtmarriage.substack.com"/>
+            <outline type="rss" text="Reduxx" title="Reduxx" xmlUrl="https://reduxx.info/feed/" htmlUrl="https://reduxx.info/"/>
+        </outline>
+        <outline text="Polls and statistics" title="Polls and statistics">
+            <outline type="rss" text="Lord Ashcroft Polls" title="Lord Ashcroft Polls" xmlUrl="http://lordashcroftpolls.com/feed/" htmlUrl="https://lordashcroftpolls.com/"/>
+            <outline type="rss" text="YouGov" title="YouGov" xmlUrl="http://yougov.co.uk/news/feeds/latest/" htmlUrl="https://yougov.com/en-gb/rss"/>
+            <outline type="rss" text="Pew Research Center" title="Pew Research Center" xmlUrl="http://people-press.org/rss.xml" htmlUrl="https://www.pewresearch.org"/>
+            <outline type="rss" text="Research and statistics" title="Research and statistics" xmlUrl="https://www.gov.uk/government/statistics.atom?publication_filter_option=statistics" htmlUrl="https://www.gov.uk"/>
+        </outline>
+        <outline text="Satire &amp; Humour" title="Satire &amp; Humour">
+            <outline type="rss" text="Sad and Useless Humor" title="Sad and Useless Humor" xmlUrl="http://www.sadanduseless.com/feed/" htmlUrl="https://www.sadanduseless.com"/>
+            <outline type="rss" text="FAIL Blog" title="FAIL Blog" xmlUrl="http://feeds.feedburner.com/failblog" htmlUrl="https://failblog.cheezburger.com/"/>
+            <outline type="rss" text="Babylon Bee" title="Babylon Bee" xmlUrl="http://babylonbee.com/feed/" htmlUrl="https://babylonbee.com"/>
+            <outline type="rss" text="Private Eye" title="Private Eye" xmlUrl="http://www.private-eye.co.uk/rss/rss.php" htmlUrl="https://www.private-eye.co.uk"/>
+        </outline>
+        <outline text="Think Tanks: General &amp; Policy" title="Think Tanks: General &amp; Policy">
+            <outline type="rss" text="Chatham House: Publications" title="Chatham House: Publications" xmlUrl="http://www.chathamhouse.org/path/publications.xml" htmlUrl="https://www.chathamhouse.org/"/>
+            <outline type="rss" text="RSS feed" title="RSS feed" xmlUrl="https://www.jrf.org.uk/rss.xml" htmlUrl="https://www.jrf.org.uk/"/>
+            <outline type="rss" text="Fabian Society" title="Fabian Society" xmlUrl="http://www.fabians.org.uk/feed/" htmlUrl="https://fabians.org.uk"/>
+            <outline type="rss" text="Resolution Foundation" title="Resolution Foundation" xmlUrl="http://www.resolutionfoundation.org/feed/" htmlUrl="https://www.resolutionfoundation.org/"/>
+            <outline type="rss" text="Chatham House: Social Movements" title="Chatham House: Social Movements" xmlUrl="https://www.chathamhouse.org/path/111/feed.xml" htmlUrl="https://www.chathamhouse.org/"/>
+            <outline type="rss" text="Quillette" title="Quillette" xmlUrl="https://quillette.com/feed/" htmlUrl="https://quillette.com/"/>
+            <outline type="rss" text="Chatham House: What's New" title="Chatham House: What's New" xmlUrl="http://www.chathamhouse.org/path/whatsnew.xml" htmlUrl="https://www.chathamhouse.org/"/>
+        </outline>
+        <outline text="Media: UK Periodicals" title="Media: UK Periodicals">
+            <outline type="rss" text="The New Yorker: Everything" title="The New Yorker: Everything" xmlUrl="http://www.newyorker.com/services/rss/feeds/everything.xml" htmlUrl="https://www.newyorker.com/culture"/>
+            <outline type="rss" text="First Things RSS Feed - Web Exclusives | Daily Writings From Our Top Writers | First Things" title="First Things RSS Feed - Web Exclusives | Daily Writings From Our Top Writers | First Things" xmlUrl="http://www.firstthings.com/rss/onthesquare.php" htmlUrl="https://www.firstthings.com/web-exclusives"/>
+            <outline type="rss" text="The Critic Magazine" title="The Critic Magazine" xmlUrl="https://thecritic.co.uk/feed/" htmlUrl="https://thecritic.co.uk"/>
+            <outline type="rss" text="New Statesman" title="New Statesman" xmlUrl="https://www.newstatesman.com/feed" htmlUrl="https://www.newstatesman.com/"/>
+            <outline type="rss" text="Catholic Herald" title="Catholic Herald" xmlUrl="http://www.catholicherald.co.uk/feed.xml" htmlUrl="https://thecatholicherald.com/"/>
+            <outline type="rss" text="The Economist - UK" title="The Economist - UK" xmlUrl="http://www.economist.com/rss/britain_rss.xml" htmlUrl="https://www.economist.com/britain"/>
+            <outline type="rss" text="CapX" title="CapX" xmlUrl="https://capx.co/feed/" htmlUrl="https://capx.co/"/>
+        </outline>
+        <outline text="Media: UK Politics" title="Media: UK Politics">
+            <outline type="rss" text="London Playbook – Newsletters – POLITICO" title="London Playbook – Newsletters – POLITICO" xmlUrl="https://www.politico.eu/newsletter/london-playbook/feed/" htmlUrl="https://www.politico.eu"/>
+            <outline type="rss" text="Guido Fawkes" title="Guido Fawkes" xmlUrl="http://feeds2.feedburner.com/guidofawkes" htmlUrl="https://order-order.com/"/>
+            <outline type="rss" text="Left Foot Forward: Leading the UK's progressive debate" title="Left Foot Forward: Leading the UK's progressive debate" xmlUrl="http://www.leftfootforward.org/feed/" htmlUrl="https://leftfootforward.org/"/>
+            <outline type="rss" text="Parliament News" title="Parliament News" xmlUrl="https://parliamentnews.co.uk/feed" htmlUrl="https://parliamentnews.co.uk"/>
+            <outline type="rss" text="Conservative Home" title="Conservative Home" xmlUrl="http://www.conservativehome.com/feed" htmlUrl="https://conservativehome.com/"/>
+            <outline type="rss" text="LabourList" title="LabourList" xmlUrl="http://feeds.feedburner.com/LabourListLatestPosts" htmlUrl="https://labourlist.org/"/>
+            <outline type="rss" text="Vox Political" title="Vox Political" xmlUrl="http://voxpoliticalonline.com/feed/" htmlUrl="https://voxpoliticalonline.com/"/>
+            <outline type="rss" text="POLITICO" title="POLITICO" xmlUrl="https://www.politico.eu/feed/" htmlUrl="https://www.politico.eu"/>
+            <outline type="rss" text="Liberal Democrat Voice" title="Liberal Democrat Voice" xmlUrl="http://www.libdemvoice.org/feed" htmlUrl="https://www.libdemvoice.org"/>
+            <outline type="rss" text="Politics Home - News RSS Feed" title="Politics Home - News RSS Feed" xmlUrl="https://www.politicshome.com/news/rss" htmlUrl="https://www.politicshome.com/news/rss"/>
+        </outline>
+        <outline text="Northern Ireland Assembly" title="Northern Ireland Assembly">
+            <outline type="rss" text="NI Assembly Questions" title="NI Assembly Questions" xmlUrl="http://data.niassembly.gov.uk/questions_rss.aspx" htmlUrl="http://aims.niassembly.gov.uk/"/>
+        </outline>
+        <outline text="Govt: News &amp; Research" title="Govt: News &amp; Research">
+            <outline type="rss" text="Research Briefings" title="Research Briefings" xmlUrl="http://researchbriefings.parliament.uk/rssfeed/Lords%20In%20Focus" htmlUrl="https://lordslibrary.parliament.uk/type/research-briefing/"/>
+            <outline type="rss" text="Bills from current Parliamentary Session" title="Bills from current Parliamentary Session" xmlUrl="http://services.parliament.uk/bills/AllBills.rss" htmlUrl="https://bills.parliament.uk/"/>
+            <outline type="rss" text="News and communications" title="News and communications" xmlUrl="https://www.gov.uk/government/announcements.atom" htmlUrl="https://www.gov.uk"/>
+        </outline>
+        <outline text="Daily: People" title="Daily: People"/>
+        <outline text="Issues: Marriage, family, gender and sexuality" title="Issues: Marriage, family, gender and sexuality">
+            <outline type="rss" text="Stonewall" title="Stonewall" xmlUrl="https://news.google.com/rss/search?hl=en-US&amp;gl=US&amp;q=Stonewall&amp;ceid=US:en" htmlUrl="https://news.google.com/search?hl=en-US&amp;gl=US&amp;q=Stonewall&amp;ceid=US:en"/>
+            <outline type="rss" text="Institute for Family Studies Blog" title="Institute for Family Studies Blog" xmlUrl="https://ifstudies.org/blog/rss" htmlUrl="https://ifstudies.org/blog"/>
+            <outline type="rss" text="polyamory" title="polyamory" xmlUrl="https://news.google.com/news/rss/search/section/q/polyamory/polyamory?ned=us" htmlUrl="https://news.google.com/search?hl=en-US&amp;gl=US&amp;ceid=US:en&amp;q=polyamory"/>
+            <outline type="rss" text="FRC.org - Washington Update" title="FRC.org - Washington Update" xmlUrl="http://www.frc.org/rss/rss_WU.xml" htmlUrl="http://www.frc.org/"/>
+            <outline type="rss" text="LGB Alliance" title="LGB Alliance" xmlUrl="https://news.google.com/rss/search?hl=en-US&amp;gl=US&amp;q=LGB+Alliance&amp;ceid=US:en" htmlUrl="https://news.google.com/search?hl=en-US&amp;gl=US&amp;q=LGB+Alliance&amp;ceid=US:en"/>
+            <outline type="rss" text="gender" title="gender" xmlUrl="https://news.google.com/news/rss/search/section/q/gender/gender?ned=us" htmlUrl="https://news.google.com/search?hl=en-US&amp;gl=US&amp;ceid=US:en&amp;q=gender"/>
+            <outline type="rss" text="birth certificates" title="birth certificates" xmlUrl="https://news.google.com/rss/search?hl=en-US&amp;gl=US&amp;q=birth+certificates&amp;ceid=US:en" htmlUrl="https://news.google.com/search?hl=en-US&amp;gl=US&amp;q=birth+certificates&amp;ceid=US:en"/>
+            <outline type="rss" text="transgender" title="transgender" xmlUrl="https://news.google.com/news/rss/search/section/q/transgender/transgender?ned=us" htmlUrl="https://news.google.com/search?hl=en-US&amp;gl=US&amp;ceid=US:en&amp;q=transgender"/>
+            <outline type="rss" text="gay sex" title="gay sex" xmlUrl="https://news.google.com/news/rss/search/section/q/gay%20sex/gay%20sex?ned=us" htmlUrl="https://news.google.com/search?hl=en-US&amp;gl=US&amp;ceid=US:en&amp;q=gay+sex"/>
+            <outline type="rss" text="gender identity" title="gender identity" xmlUrl="https://news.google.com/news/rss/search/section/q/gender%20identity/gender%20identity?ned=us" htmlUrl="https://news.google.com/search?hl=en-US&amp;gl=US&amp;ceid=US:en&amp;q=gender+identity"/>
+            <outline type="rss" text="polyandry" title="polyandry" xmlUrl="https://news.google.com/rss/search?hl=en-US&amp;gl=US&amp;q=polyandry&amp;ceid=US:en" htmlUrl="https://news.google.com/search?hl=en-US&amp;gl=US&amp;q=polyandry&amp;ceid=US:en"/>
+            <outline type="rss" text="same-sex marriage" title="same-sex marriage" xmlUrl="https://news.google.com/rss/search?hl=en-US&amp;gl=US&amp;q=same-sex+marriage&amp;ceid=US:en" htmlUrl="https://news.google.com/search?hl=en-US&amp;gl=US&amp;q=same-sex+marriage&amp;ceid=US:en"/>
+        </outline>
+        <outline text="AI" title="AI">
+            <outline type="rss" text="NAUGHTYBLOG.st" title="NAUGHTYBLOG.st" xmlUrl="https://www.naughtyblog.org/feed/" htmlUrl="https://www.naughtyblog.st/"/>
+        </outline>
+        <outline text="Advocacy: Christian" title="Advocacy: Christian">
+            <outline type="rss" text="&quot;&quot;Andrea Williams&quot; OR &quot;Andrea Minichiello Williams&quot;&quot; - Google News" title="&quot;&quot;Andrea Williams&quot; OR &quot;Andrea Minichiello Williams&quot;&quot; - Google News" xmlUrl="https://news.google.com/news?hl=en&amp;gl=us&amp;q=%22Andrea+Williams%22+OR+%22Andrea+Minichiello+Williams%22&amp;um=1&amp;ie=UTF-8&amp;output=rss" htmlUrl="https://news.google.com/search?hl=en-US&amp;gl=US&amp;ceid=US:en&amp;q=%22Andrea+Williams%22+OR+%22Andrea+Minichiello+Williams%22"/>
+            <outline type="rss" text="ADF International" title="ADF International" xmlUrl="https://adf.uk/feed/" htmlUrl="https://adfinternational.org/"/>
+            <outline type="rss" text="ADF International" title="ADF International" xmlUrl="https://adfinternational.org/feed/" htmlUrl="https://adfinternational.org/"/>
+            <outline type="rss" text="Christian Institute" title="Christian Institute" xmlUrl="http://feeds.feedburner.com/christianinstitute" htmlUrl="https://www.christian.org.uk/news"/>
+            <outline type="rss" text="CMF" title="CMF" xmlUrl="http://feeds.feedburner.com/Cmforguk-WhatsNew" htmlUrl="http://www.cmf.org.uk/whats_new/"/>
+            <outline type="rss" text="Religion Media Centre" title="Religion Media Centre" xmlUrl="https://religionmediacentre.org.uk/feed/" htmlUrl="https://religionmediacentre.org.uk/"/>
+            <outline type="rss" text="&quot;&quot;Christian Concern&quot; -&quot;International Christian Concern&quot;&quot; - Google News" title="&quot;&quot;Christian Concern&quot; -&quot;International Christian Concern&quot;&quot; - Google News" xmlUrl="https://news.google.com/news?hl=en&amp;gl=us&amp;q=%22Christian+Concern%22+-%22International+Christian+Concern%22&amp;um=1&amp;ie=UTF-8&amp;output=rss" htmlUrl="https://news.google.com/search?hl=en-US&amp;gl=US&amp;ceid=US:en&amp;q=%22Christian+Concern%22+-%22International+Christian+Concern%22"/>
+            <outline type="rss" text="CMF Blogs" title="CMF Blogs" xmlUrl="http://www.cmfblog.org.uk/feed/" htmlUrl="https://cmfblog.org.uk"/>
+            <outline type="rss" text="Christian Concern" title="Christian Concern" xmlUrl="https://christianconcern.com/feed/" htmlUrl="https://christianconcern.com/"/>
+            <outline type="rss" text="AI Feed Groups" title="AI Feed Groups" xmlUrl="https://feedly.com/f/alert/327f40f1-5c2e-4763-862a-68a471270f7a"/>
+            <outline type="rss" text="&quot;&quot;Christian Legal Centre&quot;&quot; - Google News" title="&quot;&quot;Christian Legal Centre&quot;&quot; - Google News" xmlUrl="https://news.google.com/news?hl=en&amp;gl=us&amp;q=%22Christian+Legal+Centre%22&amp;um=1&amp;ie=UTF-8&amp;output=rss" htmlUrl="https://news.google.com/search?hl=en-US&amp;gl=US&amp;ceid=US:en&amp;q=%22Christian+Legal+Centre%22"/>
+        </outline>
+        <outline text="Of Interest" title="Of Interest">
+            <outline type="rss" text="Information Is Beautiful" title="Information Is Beautiful" xmlUrl="http://feeds.feedburner.com/InformationIsBeautiful" htmlUrl="https://informationisbeautiful.net"/>
+        </outline>
+        <outline text="Think Tanks: Christian" title="Think Tanks: Christian">
+            <outline type="rss" text="Gatestone Institute" title="Gatestone Institute" xmlUrl="http://www.gatestoneinstitute.org/rss.xml" htmlUrl="https://www.gatestoneinstitute.org"/>
+            <outline type="rss" text="Blog | LICC" title="Blog | LICC" xmlUrl="http://www.licc.org.uk/resources/feed/" htmlUrl="https://licc.org.uk/resources/"/>
+        </outline>
+        <outline text="Daily: CitizenGo" title="Daily: CitizenGo"/>
+        <outline text="OSCE: Organization for Security and Co-operation in Europe" title="OSCE: Organization for Security and Co-operation in Europe">
+            <outline type="rss" text="OSCE Latest News" title="OSCE Latest News" xmlUrl="http://feeds.osce.org/OSCELatestNews" htmlUrl="http://www.osce.org/rss/latest-stories/en"/>
+        </outline>
+        <outline text="Email Newsletters" title="Email Newsletters">
+            <outline type="rss" text="LGB Christians" title="LGB Christians" xmlUrl="https://feedly.com/email/b78phmjntzb33m3qc2bt"/>
+            <outline type="rss" text="CBR UK" title="CBR UK" xmlUrl="https://feedly.com/email/v0vddxq47nrxcxf1c866"/>
+            <outline type="rss" text="Family Education Trust" title="Family Education Trust" xmlUrl="https://feedly.com/email/9awket17mf7gky7ihnka"/>
+            <outline type="rss" text="NSS Monitoring" title="NSS Monitoring" xmlUrl="https://feedly.com/email/f18qucng8yrso2qfx54z"/>
+            <outline type="rss" text="SPUC" title="SPUC" xmlUrl="https://feedly.com/email/ayfdq5wofvne3d8bvcem"/>
+        </outline>
+        <outline text="Issues: Church &amp; Society" title="Issues: Church &amp; Society"/>
+        <outline text="Govt: Policy &amp; Publications" title="Govt: Policy &amp; Publications">
+            <outline type="rss" text="Search" title="Search" xmlUrl="https://www.gov.uk/government/publications.atom" htmlUrl="https://www.gov.uk"/>
+            <outline type="rss" text="News and communications from Ministry of Defence (MOD)" title="News and communications from Ministry of Defence (MOD)" xmlUrl="http://www.mod.uk/DefenceInternet/DefenceNews/InDepth/rss.aspx?feed=top5indepthoperationsinafghanistan" htmlUrl="https://www.gov.uk"/>
+        </outline>
+        <outline text="Social media" title="Social media">
+            <outline type="rss" text="The Latest News from Facebook for Business" title="The Latest News from Facebook for Business" xmlUrl="https://www.facebook.com/business/news/rss/" htmlUrl="https://www.facebook.com/business/news/"/>
+        </outline>
+        <outline text="Comment: Secular" title="Comment: Secular">
+            <outline type="rss" text="Alastair Campbell" title="Alastair Campbell" xmlUrl="http://www.alastaircampbell.org/feed/" htmlUrl="https://alastaircampbell.org/"/>
+            <outline type="rss" text="The European Conservative" title="The European Conservative" xmlUrl="https://europeanconservative.com/feed/" htmlUrl="https://europeanconservative.com"/>
+            <outline type="rss" text="Peter Hitchens" title="Peter Hitchens" xmlUrl="http://hitchensblog.mailonsunday.co.uk/rss.xml" htmlUrl="https://hitchensblog.mailonsunday.co.uk/"/>
+            <outline type="rss" text="Statement - RSS" title="Statement - RSS" xmlUrl="https://statement.com/feed/" htmlUrl="https://statement.com/feed"/>
+            <outline type="rss" text="Iain Dale" title="Iain Dale" xmlUrl="http://iaindale.blogspot.com/feeds/posts/default" htmlUrl="https://www.iaindale.com/"/>
+        </outline>
+        <outline text="Welsh Assembly" title="Welsh Assembly">
+            <outline type="rss" text="Assembly | Cynulliad - Active consultations" title="Assembly | Cynulliad - Active consultations" xmlUrl="http://www.senedd.assembly.wales/mgRss.aspx?f=76" htmlUrl="https://business.senedd.wales/mgConsultationlistdisplay.aspx"/>
+        </outline>
+        <outline text="European Union" title="European Union"/>
+        <outline text="Productivity" title="Productivity">
+            <outline type="rss" text="Wonder Tools" title="Wonder Tools" xmlUrl="https://wondertools.substack.com/feed/" htmlUrl="https://wondertools.substack.com"/>
+        </outline>
+        <outline text="Media: US and World" title="Media: US and World">
+            <outline type="rss" text="news.com.au — Australia’s leading news site" title="news.com.au — Australia’s leading news site" xmlUrl="http://www.news.com.au/feed/" htmlUrl="https://www.news.com.au"/>
+            <outline type="rss" text="Breitbart News" title="Breitbart News" xmlUrl="http://feeds.feedburner.com/breitbart" htmlUrl="https://feeds.feedburner.com/breitbart"/>
+            <outline type="rss" text="New York Times - International" title="New York Times - International" xmlUrl="http://www.nytimes.com/services/xml/rss/nyt/InternationalHome.xml" htmlUrl="https://www.nytimes.com"/>
+            <outline type="rss" text="NPR Topics: News" title="NPR Topics: News" xmlUrl="http://www.npr.org/rss/rss.php?id=1001" htmlUrl="https://www.npr.org/templates/story/story.php?storyId=1001"/>
+            <outline type="rss" text="CNN" title="CNN" xmlUrl="http://rss.cnn.com/rss/cnn_topstories.rss" htmlUrl="https://www.cnn.com/index.html"/>
+            <outline type="rss" text="South China Morning Post" title="South China Morning Post" xmlUrl="http://www.newslookup.com/rss/asia/china/scmp.rss" htmlUrl="http://www.scmp.com/"/>
+            <outline type="rss" text="The Atlantic" title="The Atlantic" xmlUrl="http://feeds.feedburner.com/TheAtlantic" htmlUrl="https://www.theatlantic.com/"/>
+            <outline type="rss" text="The Straits Times Politics News" title="The Straits Times Politics News" xmlUrl="http://www.straitstimes.com/news/politics/rss.xml" htmlUrl="https://www.straitstimes.com/"/>
+            <outline type="rss" text="Time - World" title="Time - World" xmlUrl="http://feeds2.feedburner.com/time/world" htmlUrl="https://time.com/"/>
+            <outline type="rss" text="Sputnik News - World News, Breaking News &amp; Top Storie" title="Sputnik News - World News, Breaking News &amp; Top Storie" xmlUrl="http://en.rian.ru/export/rss2/index.xml" htmlUrl="https://sputnikglobe.com"/>
+            <outline type="rss" text="Associated Press" title="Associated Press" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UC52X5wxOL_s5yw0dQk7NtgA" htmlUrl="https://www.youtube.com/channel/UC52X5wxOL_s5yw0dQk7NtgA"/>
+        </outline>
+        <outline type="rss" text="Unnamed Newsletter" title="Unnamed Newsletter" xmlUrl="https://feedly.com/email/c7p4qbjwltrfsx65xm6c"/>
+        <outline type="rss" text="Academy of Ideas" title="Academy of Ideas" xmlUrl="https://www.academyofideas.uk/feed" htmlUrl="https://www.academyofideas.uk"/>
+    </body>
+</opml>
