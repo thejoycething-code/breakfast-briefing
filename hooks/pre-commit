@@ -10,33 +10,29 @@
 #
 # It does two things, in this order:
 #
-#   1. ./sync_docs.sh  - pulls ~/.claude's SKILL.md and memory/ into the repo, then stages
-#      them. This hook MUTATES the commit: if either had changed, the commit now contains
-#      that change too. That is the point - a stale backup you believe in is the failure
-#      sync_docs.sh exists to prevent - but it is never silent. Anything newly staged is
-#      printed below, so a commit's scope is always visible before it is written.
+#   1. ./sync_docs.sh check - reports whether the repo's copies of ~/.claude's SKILL.md and
+#      memory/ have drifted, and BLOCKS the commit if they have. It changes nothing: no file
+#      is written, nothing is staged.
 #
-#      If you would rather be blocked than have your commit widened, change the call to
-#      `./sync_docs.sh check` and drop the `git add`: it then fails and tells you to sync
-#      by hand, and the commit stays exactly as you scoped it.
+#      This hook does NOT widen your commit (Chris, 26.08.2026: "make it check instead of
+#      pulling, don't widen my commits"). It briefly did pull-and-stage, which kept the
+#      backup fresh for free but meant any commit could silently acquire unrelated SKILL.md
+#      or memory churn - and memory/ is rewritten by Claude across sessions, so that churn
+#      arrives without you having touched anything. A commit now contains exactly what you
+#      staged; if the copies are stale you are told, and you run ./sync_docs.sh yourself.
 #
 #   2. python3 run_tests.py - 0.84s, and it is the only thing standing between a pattern
 #      edit and a silently wrong briefing at 6am. A failing fixture blocks the commit.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
-echo "pre-commit: syncing SKILL.md and memory/"
-./sync_docs.sh >/dev/null
-
-# Stage only the two synced paths - never `git add -A`, which would sweep in whatever else
-# happens to be dirty in the working tree and quietly commit it.
-git add -- task/SKILL.md memory/
-STAGED="$(git diff --cached --name-only -- task/SKILL.md memory/)"
-if [ -n "$STAGED" ]; then
-    # Distinguish "was already staged by you" from "this hook just added it", so the widening
-    # is attributable. Anything in the second list is scope this hook introduced.
-    echo "pre-commit: staged from sync:"
-    echo "$STAGED" | sed 's/^/  /'
+echo "pre-commit: sync_docs.sh check"
+if ! ./sync_docs.sh check > /tmp/precommit-sync.log 2>&1; then
+    sed 's/^/  /' /tmp/precommit-sync.log
+    echo "pre-commit: SKILL.md or memory/ has drifted - commit aborted." >&2
+    echo "            Run ./sync_docs.sh, then commit the result as its own change." >&2
+    echo "            Or --no-verify if this commit is deliberately unrelated." >&2
+    exit 1
 fi
 
 echo "pre-commit: run_tests.py"
