@@ -29,9 +29,27 @@ Citizengo Scotland (`1074077644943243`), Citizengo Australia (`2031437807454163`
 the work is concentrated — one System User in `citizenGO` unlocks 11 pages at
 once, and two portfolios cover 16 of the 22 owned pages.
 
-**How to apply:** **13 of the 35 pages belong to no portfolio at all** — Scotland,
-Ireland, México, Österreich, Schweiz, België, VotaValores, Sanchez No, España
-unida siempre, Yo educo a mis hijos, Orgulloso de ser Cristiano, Vivir en Familia,
-Derecho a la vida. They are admin'd personally, so a System User **cannot** be
-assigned to them; they must first be claimed into a portfolio. Don't send anyone
-hunting for a setting that isn't there.
+**CORRECTED 26 Aug 2026.** The first version derived businesses from ad accounts and
+found only 12. `ads_catalog_get_businesses` returns **18**. Five pages previously
+recorded as belonging to no portfolio in fact do:
+
+| Page | Portfolio | Business ID |
+| --- | --- | --- |
+| Citizen GO Ireland | Citizen GO Ireland | `302772972450120` |
+| Citizengo México | Citizengo Mexico | `1658962955406804` |
+| España unida siempre | Hay España Unida | `239254857752290` |
+| Orgulloso de ser Cristiano | Hazte orgulloso cristiano | `218317092309988` |
+| Derecho a la vida | Haz Derecho a la vida | `407058837243133` |
+
+Own no pages: Citizengo Deutsch `1037948362543889`, HazteOir Ads `1280562753954919`.
+
+So **27 of 35 pages sit in a portfolio**, not 22, and only **8** are personally
+admin'd: Yo educo a mis hijos, Sanchez No, Vivir en Familia, CitizenGO Österreich,
+VotaValores, Citizen GO Schweiz, Citizen GO België, Citizen GO Scotland.
+
+**How to apply:** enumerate businesses with `ads_catalog_get_businesses`, never by
+inferring them from ad accounts — that misses portfolios with no active ad account.
+Also note `923306969035797` now reports as **Citizengo UK**, though the ad-accounts
+endpoint called it Joyce.Digital; confirm which before treating it as personal.
+**Redes HO is an ad account with no owning business, not a portfolio** — a System
+User cannot live there.

@@ -38,12 +38,32 @@ largest card any member can have is seven votes, so the threshold would be
 dead code. Don't re-propose it unless the tracked-division count grows a
 lot.
 
-**Undeployed as of 2026-08-26.** Several rounds of work are committed and
-pushed but the live site still serves the Monday publish #14 build: the
-"Also on the record" receipts, the shareable-quote rewrite, real service
-history, the per-party whip rule, the "Various" heading fix and the
-passage cards. A `Monday publish` with dry_run ticked deploys them;
-otherwise Monday's scheduled run does. Don't assume the public page
-matches the repo.
+**DEPLOYED 2026-08-26**, twice: Monday publish #15 (run 32955323692) and
+again as run 32976100327, both with dry_run so no Slack post and no new
+edition row. Live now: the receipts, shareable quotes, real service
+history, the per-party whip rule, the "Various" fix, the passage cards, and
+the profile hero (post line, majority, committee pills, contact as the
+right-hand column with icon links).
+
+**Verify a deploy from the run's own committed page, not by curling the
+URL.** The partner site returns HTTP 401 to an unauthenticated fetch --
+that is Vercel deployment protection working. And there is still NO GitHub
+Pages config on this repo and nothing in monday-publish that deploys
+`docs/`, so how the public passwordless page is served remains unknown --
+ask before assuming it updated. `docs/` is committed and byte-identical to
+the partner build.
+
+**Reference data lives in member-profiles.yml (Wednesdays), never in
+sunday-pull.** Its steps are guarded `if: env.SKIP != '1'`, which does not
+run after a failure, so an enrichment step ahead of the weekly gather would
+block the gather outright; and its 60-minute budget already covers a cold
+pull measured at 40m05s. tools/pull_service.py and tools/pull_profiles.py
+both run there. Tests pin this.
+
+**`gh` is authenticated locally**, so `python3 tools/db_state.py --push`
+works from the laptop without a PAT -- db_state falls through to the gh
+branch when token() returns None. Useful when a workflow publishes a store
+but its sidecar commit fails: the pull guard then refuses the divergence,
+and a local push rewrites a matching sidecar.
 
 Related: [[parl-monitor-build]], [[api-spend-approval]].
