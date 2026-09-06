@@ -53,6 +53,23 @@ Pages config on this repo and nothing in monday-publish that deploys
 ask before assuming it updated. `docs/` is committed and byte-identical to
 the partner build.
 
+**`live` marks what is deployed, and as of 2026-08-27 evening main == live
+(83cd6cb).** The divergence caused by deploying from a branch was resolved by
+merging `live` into main and then fast-forwarding `live` to main, which is
+the strategy Christopher chose.
+
+**THE TRAP, if you ever deploy from a non-default ref again.** The run
+publishes a new store and commits its sidecar TO THAT REF, leaving the other
+branch's sidecar pointing at the previous asset. `db_state.py --pull` refuses
+a mismatch and returns 1, so the FIRST step of any publish from the stale
+branch fails. Deploy from main by default; if you must use `--ref`, merge
+that ref back into main immediately afterwards. Keep `live` fast-forwarded to
+main for the same reason.
+
+That is only ONE of the ways the asset and the sidecar come apart, and not
+the common one -- see [[parl-monitor-store-divergence]] for the three routes
+and the guards that now close them.
+
 **Reference data lives in member-profiles.yml (Wednesdays), never in
 sunday-pull.** Its steps are guarded `if: env.SKIP != '1'`, which does not
 run after a failure, so an enrichment step ahead of the weekly gather would

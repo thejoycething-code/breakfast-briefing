@@ -23,3 +23,14 @@ there a ★ primary source has no automatic claim on a slot.
 advocacy org's own campaign update. Immigration and Islam in Britain are core beats for this
 channel, not edge cases. Open on the live legislative fight, close on the sharpest single story
 — the list is not ranked by scale or corroboration count.
+
+**Amended 31.08.2026, two changes.** First, where several of the day's stories belong to one
+running fight, that slot takes a lead link with the others nested under it as sub-items — the
+assisted suicide Bill is the standing example: the national-press lead on top, then the GOV.UK
+letter, SPUC's and Right To Life's releases and the related free-speech story beneath. This is
+the one place the two rules above stop competing: the newsroom piece still leads, and the
+primary source still gets linked. Second, **do not re-run a story this list has already
+carried.** The five is a far narrower window than the Doc, so a repeat is much more visible —
+Päivi Räsänen's visa/travel-ban story was put up again after several outings and Chris cut it.
+The Doc's tolerance for a running story recurring does not carry over here.
+See [[briefing-slack-links-copied]] for the rule that these five links are pasted, never typed.

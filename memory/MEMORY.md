@@ -17,10 +17,35 @@
 - [Briefing: text for judgement only](briefing-text-for-judgement-only.md) — sheet carries feed/page text for the judge; regex over body text rewards commentary
 - [Briefing: ranking eval corpus](briefing-rank-eval-corpus.md) — archive_day banks daily labels; concordance measures agreement not correctness, testcases has veto
 - [Briefing: clustering has two purposes](briefing-clustering-two-purposes.md) — corroborate is global, same_story is per-section; entity links are token-level with a 3-word floor
-- [Meta organic reports](meta-organic-reports.md) — FB/IG pipeline LIVE; nightly CI into the Clacton Supabase project; reach + organic split survive via breakdowns
+- [Meta organic reports](meta-organic-reports.md) — FB/IG pipeline LIVE; 36 pages, 2,700 posts, MCP deployed; own Supabase project since 29 Aug 2026
 - [Meta System User setup](meta-system-user-setup.md) — four ordered steps; app-role and Pages assignment fail silently and differently
 - [Meta page-portfolio map](meta-page-portfolio-map.md) — which portfolio owns which Page; 13 pages belong to none
+- [Meta MCP security posture](meta-mcp-security-posture.md) — why a service key is OK now; self-minted role JWTs are rejected by the gateway
+- [Meta: silent failure pattern](meta-silent-failure-pattern.md) — five bugs that reported success while doing nothing, and the guard each has now
 - [Store is a release asset](parl-monitor-store-artifact.md) — db left git at 92MB; phase 2 pending, local sync needs a PAT
 - [parl-monitor repo access](parl-monitor-repo-access.md) — private under thejoycething-code; never add the work account
 - [Briefing: the Slack top-five](briefing-slack-five.md) — UK-only, national press over advocacy releases; a different judgement from the Doc
 - [Briefing: run the tail as a script](briefing-finish-edition-tail.md) — finish_edition.sh, --allow-reclass unconditional, bash 3.2 empty-array trap
+- [Commit authorship](parl-monitor-commit-authorship.md) — read the Co-Authored-By trailer, not the author line; 127 Fable 5 vs 56 Opus 5
+- [Store divergence](parl-monitor-store-divergence.md) — asset vs sidecar: three ways they come apart, and how to heal one by hand
+- [Senedd WAF](parl-monitor-senedd-waf.md) — business.senedd.wales is 403 to everything; which Welsh hosts still answer
+- [Briefing: Slack links get copied too](briefing-slack-links-copied.md) — the never-author-links rule covers Step 10; four fabricated URLs shipped on 31.08
+- [Briefing: decoder truncated every query string](briefing-gnews-decode-truncation.md) — \uXXXX ate every "="; fixing it alone would have published index pages as articles
+- [Briefing: relaying is not primary](briefing-relay-not-primary.md) — a ★ source citing a newsroom was suppressing six national reports; issuing vs relaying
+- [Briefing: a repeat is judged on the story](briefing-repeat-test-is-the-story.md) — same actors/event = dedupe; verify repeat claims against the archive first
+- [Briefing: OUTCOME missed the persecution verbs](briefing-outcome-persecution-verbs.md) — martyred/destroys scored 0; ABOVE is not for subject matter; flat concordance can be correct
+- [Lords inversion incident](parl-monitor-lords-inversion.md) — a division's question comes from motion notes, never its title; check a known partisan's side
+- [parl-monitor Drive publish](parl-monitor-drive-publish.md) — CI secret reset path, adopt-existing recovery, Drive contains is token-prefix
+- [Vercel env pull placeholders](vercel-env-pull-placeholders.md) — Secret-type vars come back as "[SENSITIVE]"; validate via the runtime REJECTED log line, never a piped check
+- [CSP form-action strands the OAuth redirect](csp-form-action-blocks-oauth-redirect.md) — Chromium enforces form-action on the post-submit 302; verify consent-page header changes with a real click-through
+- [Devolved vote identity](parl-monitor-devolved-identity.md) — Wales has two id spaces; the name bridge is src/devolved.py, used by both scorer and page
+- [run_monday log relay](parl-monitor-log-relay.md) — first line only, indented lines binned, caveats need a trigger word
+- [Briefing: suppressed rescues carry no repeat flag](briefing-suppressed-rescues-lack-ran-flags.md) — the one block you must pick from is the one block with no [ran] history
+- [Everyone who voted is listed](parl-monitor-everyone-who-voted.md) — sitting or former, labelled; seats belong to whoever holds them now
+- [Store guard and coverage watch](parl-monitor-store-guard.md) — I clobbered a CI harvest; the push now refuses unknown lineage and a daily watch catches green-run-over-stale-data
+- [Taxonomy v1.6 areas](taxonomy-v16-areas.md) — area 12 added; five places know the area count and three used to hardcode it
+- [5CA sign-off surfaces](parl-monitor-5ca-surfaces.md) — stance files place, votes files publish verdicts; devolved 5CAs wired and data/5ca pruned
+- [Welsh LCM verdicts](parl-monitor-welsh-verdicts.md) — CWS LCM signed against, Crime & Policing struck; not_ours honoured in three places; abortion reserved in Wales
+- [Devolved judge placement](parl-monitor-devolved-judge.md) — runs in Monday publish with an 8-min budget; secrets.yaml fallback means unsetting the env var is not a dry run
+- [Devolved editions decision](parl-monitor-devolved-editions-decision.md) — sections not standalone; heading renamed; revisit mid-Oct on volume
+- [PQ full text](parl-monitor-pq-full-text.md) — search endpoint truncates at ~255 chars, no answer; detail endpoint archived since 6 Sept; retag PQs only at ≥95% coverage

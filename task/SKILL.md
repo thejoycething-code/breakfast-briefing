@@ -47,7 +47,25 @@ story the ranker will judge on its headline alone.
 
 Stories a previous briefing already published are **kept and flagged**
 `[ran MM-DD]`, not dropped — a running story can legitimately appear on consecutive days, so a
-repeat is your choice to make (Chris, 13.08.2026). The sweep does NOT mark anything itself, and
+repeat is your choice to make (Chris, 13.08.2026).
+
+**The test is the STORY, not the outlet or the headline** (Chris, 31.08.2026). Same actors,
+same document, same event means the same story and it should be deduped, however different
+the outlet and wording. Checked against the archive that day: all three stories he first
+queried had genuinely run — Morning Star News on the Pakistani Christian girl was the same 11
+lawmakers and the same 20 August letter Hindustan Times ran on 28.08; EWTN's DOJ/faith-leaders
+piece was the same 27 August meeting PR Newswire ran on 28.08; Newsweek's Florida story was
+the same dispute Ars Technica ran on 27.08. A specialist outlet being the better citation is
+an argument for picking it FIRST TIME, not for running the story twice.
+
+**Where the flag is genuinely wrong is the opposite direction — it clusters different stories
+together.** It is computed on headline word overlap, so on 31.08.2026 it filed a Vietnamese
+pastor's 7-year sentence as the same story as an Indonesian pastor's. That is the case to
+override: check whether the actors and the event really match before dropping, and drop when
+they do. A same-outlet, same-headline flag (City Journal's WPATH piece, Iona's Tánaiste piece,
+both 31.08) needs no thought at all.
+
+The sweep does NOT mark anything itself, and
 neither does compose.py any more; marking happens in Step 7, after the doc verifies. Do not pass
 --mark.
 
@@ -70,9 +88,10 @@ Identity & Sexuality" are part of the key.** Both were written here without them
 as misfiled ("classifier says Marriage, Family & Education"), so 49 of the 55 lines looked
 like transposed indexes when the only fault was one missing comma in the section name.
 
-Three caps apply and are enforced by compose.py, so do not hand-trim to hit them:
+Four caps apply and are enforced by compose.py, so do not hand-trim to hit them:
 **Politics, Government & Society is capped at 40** (Chris, 15.08.2026), **Church & Religion at
-30** (Chris, 23.08.2026), and **US stories may not exceed 30% of any section** — the figure
+30** (Chris, 23.08.2026), **Immigration & Asylum at 30** (Chris, 27.08.2026, after an edition
+ran 45 of them), and **US stories may not exceed 30% of any section** — the figure
 here read 25% until 24.08.2026, which was wrong: US_SHARE has been 0.30 since 18.08.2026.
 Exempt from the US share: an item whose importance clears US_EXEMPT_AT, and **anything you
 tiered 1 or 2**. Only tier-3 filler competes for the US quota. Added 24.08.2026 after Chris
@@ -280,8 +299,10 @@ inside Life, which is exactly what a single pass over everything prevents.
 read, but it is no longer the default path.
 
 There is no overall volume cap. A typical edition runs 120-200 items. Do not trim to a
-number. The only caps are per-section: Politics, Government & Society at 40, and the 25%
-US share — both applied by compose.py, so leave them to it.
+number. The only caps are per-section: Politics, Government & Society at 40, Church &
+Religion at 30, Immigration & Asylum at 30, and the 30% US share — all applied by compose.py,
+so leave them to it. These four are the whole of SECTION_CAPS plus US_SHARE; if compose.py
+reports a cap this list does not name, the list has drifted and is what needs fixing.
 
 **Provenance: cite the body that published the document, not whoever reported it.** When a
 court, a UN body, a government department or an advocacy organisation issues something, the
@@ -391,7 +412,17 @@ stories and the upload then produced a doc with two dead links. Had the publish 
 those 249 stories would have been burned — never offered again — for a doc that did not exist.
 Marking is the last step of a successful publish, not a side effect of rendering HTML.
 
-**Links are never authored, only copied.** compose.py resolves what it can and prints
+**Links are never authored, only copied — and that includes the Step 10 Slack post.**
+Nothing downstream checks the Slack message: compose.py resolves and title-verifies, and
+publish.sh --verify diffs the Doc byte-exact, but the five links in Slack are composed by
+hand afterwards and `URLs N/N verified` says nothing about them. On 31.08.2026 four of five
+were typed from memory and were fabricated — an invented BBC article ID, an invented domain
+for Decision Magazine, and two wrong path segments — and a correction had to be posted to
+the channel. Build that list by looking each index up in /tmp/today.json and pasting the
+`url` field verbatim. Never reconstruct a URL from an outlet and a headline slug, however
+obvious the pattern looks.
+
+compose.py resolves what it can and prints
 `KEEP AS-IS` beside every Google News redirect it could not convert. Keep those redirects.
 An ugly `↗` link is always better than a wrong one, and `expected_urls.txt` is the record:
 anything in the published doc that is not in that file was invented.
@@ -563,17 +594,19 @@ Last, and only if Step 7 actually marked against a verified doc:
   cd ~/Downloads/breakfast-briefing && ./state_sync.sh push
   cd ~/Downloads/breakfast-briefing && ./upload-archive-to-drive.sh
 
-Forty files in the first: the eight state files (seen, cut, source_health, resolved,
+Forty-two files in the first: the eight state files (seen, cut, source_health, resolved,
 authors, ledes, and — added 25.08.2026 — openings and previews, the two article-text caches,
 each worth about ten minutes of refetching), the seven that are judgements (testcases.txt,
 exclusions.txt, bylines.txt, link_fixes.txt, extra_feeds.txt, sources.opml and — added
 25.08.2026 — **tiers.json**, the accumulated record of what was decided about every story
 read, which cannot be rebuilt from anything and whose loss would silently make every story
-look unjudged again) and **every .py and .sh in the directory** — 25 of them as of 26.08.2026,
+look unjudged again) and **every .py and .sh in the directory** — 27 of them as of 28.08.2026,
 not the ten this line used to name. The list was completed to "everything" on 20.08.2026 for a
 reason state_sync.sh's own header gives: enumerating the rest ends the drift, because a script
 added later is then the exception that stands out rather than one more quiet gap. Count the
-`pushed` lines against 40 if you want to check it ran whole. The judgement files are the only irreplaceable things here —
+`pushed` lines against 42 if you want to check it ran whole — and expect that number to keep
+creeping as scripts are added, so a count one or two ABOVE it is the list working, not a fault;
+only a count below it is worth stopping for. The judgement files are the only irreplaceable things here —
 weeks of accumulated corrections — and before 19.08.2026 they existed nowhere but ~/Downloads.
 That the scripts are in there is not decoration: on 20.08.2026 a `cp` that followed a symlink
 overwrote five of them with an older copy, and this push was the only thing that got them back.
@@ -609,6 +642,12 @@ has a fixed shape:
 
 - one line saying the briefing is out, that it is automated, and linking the Doc
 - **the top five stories**, each as a headline link with the outlet after it
+- where several of the day's stories belong to **one running fight**, give that slot a lead
+  link and nest the others under it as indented sub-items (Chris, 31.08.2026). The assisted
+  suicide Bill is the standing example: the national-press lead on top, then the primary
+  document, the advocacy bodies' releases and any related story beneath it. This is the one
+  place the Doc's provenance rule and this list's national-press-first rule stop competing —
+  the newsroom piece leads, and the primary source still gets linked.
 - one closing line inviting people to open the Doc for the rest
 
 Pick the five for a **GB campaigns audience**, not by the sheet's global ranking. The Doc is
@@ -638,6 +677,13 @@ and added is the shape to copy:
 
 Keep his ordering sense too: the list is not ranked by scale, it opens on the live legislative
 fight and closes on the sharpest single story.
+
+**Do not re-run a story Chris has already had in this list.** The Slack five is a much
+narrower window than the Doc, so a repeat is far more visible: on 31.08.2026 Päivi Räsänen's
+visa/travel-ban story was put up again after running several times, and Chris cut it. The
+Doc's rule that a running story may legitimately run again does NOT carry over here — check
+the last several editions' five before picking, and prefer a genuinely new development over
+the next instalment of one the channel has already seen.
 
 Say "automated" plainly in the first line. It sets the right expectation about what the list is
 and is not: nobody sub-edited it, and the ranking is a machine's reading order plus one pass of
