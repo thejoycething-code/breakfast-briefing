@@ -16,3 +16,20 @@
 
 # Chris supplied the Telegraph original, 17.08.2026.
 blasphemy law is back | https://www.telegraph.co.uk/news/2026/08/15/retired-police-officer-convicted-for-sharing-offensive-meme/
+
+# Chris, 31.08.2026: the two links the \uXXXX decoder truncation actually got into a published
+# edition. Both were cut at a decorative query parameter rather than a record locator, so the
+# page still resolved and neither briefing carried a dead link - see
+# briefing-gnews-decode-truncation. Pinned anyway, because the truncated forms are what
+# seen.json recorded as published. Both canonical URLs title-verify.
+#
+# MATCHED ON THE URL, NOT THE HEADLINE, and that is the point worth keeping. Written as a
+# headline phrase first, both entries were wrong: the sweep also carries these exact stories
+# from OTHER outlets - Reuters on the Bolivia marriage, Dawn on the India laws, headlines
+# identical to the word - so a headline match rewrote Reuters' and Dawn's items to
+# devdiscourse.com and straitstimes.com. That is a newsroom credited over another site's link,
+# which is a worse defect than the truncation being fixed and precisely what expected_urls.txt
+# exists to catch. A wire story republished under one headline is the normal case, not the
+# exception, so prefer a URL fragment whenever the headline is not unique to one publisher.
+devdiscourse.com/article/international/3968222 | https://www.devdiscourse.com/article/international/3968222-landmark-bolivia-same-sex-marriage-could-pave-way-for-more-couples-activists-say
+straitstimes.com/asia/south-asia/christians-in-india-fear-that-tighter-laws-target-them | https://www.straitstimes.com/asia/south-asia/christians-in-india-fear-that-tighter-laws-target-them

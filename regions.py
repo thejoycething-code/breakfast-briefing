@@ -44,6 +44,10 @@ HEADLINE_SIGNALS = [
      r"|\blabour\b|\btory\b|\btories\b|conservative party|reform uk|\blib dem"
      r"|starmer|badenoch|farage|\bSNP\b|sturgeon|swinney|flynn|\bscots\b"
      r"|rayner|burnham|streeting|\bNHS\b|ofsted|\bEHRC\b|ofcom|\bCPS\b|home office"
+     # Chris, 27.08.2026: a Guido story about HMRC hiring American consultants was filed
+     # under the United States, because "US" was the only geographic token the headline
+     # offered - HMRC was not in this list at all. The peers alongside it were missing too.
+     r"|\bHMRC\b|\bDWP\b|\bDVLA\b|\bHMCTS\b|\bHMPO\b|valuation office agency"
      r"|crown court|high court of justice|london|manchester|birmingham|liverpool"
      r"|glasgow|edinburgh|cardiff|belfast|yorkshire|county durham"
      r"|church of england|\bC of E\b|\bCofE\b|canterbury|lambeth|york minster"),
@@ -175,6 +179,36 @@ NATIONALITY_OF_PERSON = re.compile(
     r"|footballer|athlete|student|man|woman|couple|family|mother|father|teenager|pensioner)"
     r"s?\b", re.I)
 
+# A nationality attached to a THING a domestic body brought in - consultants, kit, software.
+# Same job as NATIONALITY_OF_PERSON above, one step out from people: it tells you where the
+# thing came from and nothing about where the story happened. Chris, 27.08.2026, on Guido's
+# "HMRC Recruited US Big Brother Experts for Tax Snooping Plans": "While US is in the
+# headline, this is a UK story. Shouldn't you be scanning text to confirm such news" - the
+# actor is HMRC, and "US" only qualifies the consultancy it hired. Kept as narrow as its
+# sibling: the noun list is bought-in expertise and equipment, not any noun at all, because
+# "US troops" or "US sanctions" ARE the story wherever they land.
+NATIONALITY_OF_THING = re.compile(
+    r"\b(british|uk|english|scottish|welsh|irish|american|us|canadian|australian"
+    r"|chinese|indian|russian|israeli|french|german|italian|spanish|dutch|japanese|korean)"
+    # Up to two words may sit between the nationality and the noun it qualifies: the case
+    # this was written for reads "US Big Brother Experts". Bounded, because an unbounded gap
+    # would let "US" bind to a noun in the next clause and relocate the story wrongly.
+    r"[- ](?:[A-Za-z]+[- ]){0,2}"
+    r"(expert|experts|consultant|consultants|consultancy|contractor|contractors"
+    r"|firm|firms|adviser|advisers|advisor|advisors|specialist|specialists|software"
+    r"|technology|tech|kit|equipment|hardware|supplier|suppliers|vendor|vendors"
+    r"|model|models|system|systems|provider|providers|agency|agencies)\b", re.I)
+
+# Cities that exist in more than one of our tiers. A bare one of these is not evidence of
+# region on its own - Chris, 27.08.2026, on FOX 2 Detroit's "Birmingham parents split over
+# schools' bell-to-bell cellphone ban": "While Birmingham is a city in the UK, this is
+# clearly a US story and should be in that section." Every name here has a well-known US
+# namesake, so when it is the headline's ONLY signal the outlet gets to overrule it.
+AMBIGUOUS_CITY = re.compile(
+    r"\b(birmingham|boston|manchester|cambridge|oxford|richmond|bristol|plymouth|reading"
+    r"|hull|lincoln|preston|warwick|windsor|newport|halifax|rochester|exeter|durham"
+    r"|worcester|gloucester|bath|dover|salem|athens|london(?!derry))\b", re.I)
+
 ACTOR_SIGNALS = [
     # A bare "MPs" is British only when no other country is named; see the UK block above.
     # Ordered before the US so a UK-shaped headline is not claimed by a US actor token.
@@ -184,6 +218,13 @@ ACTOR_SIGNALS = [
                 r"|congress|senate|house republicans|supreme court|scotus|trump|biden|\bGOP\b"
                 r"|democrat|republican|medicaid|medicare|\bDOJ\b|\bFDA\b|\bCMS\b"
                 r"|\bHHS\b|\bICE\b|\bMAGA\b"
+                # Chris, 27.08.2026: "New Mexico should be further up in this section as we
+                # group by country." Law360's "Diocese Says Religious Freedom Fair Defense To
+                # DHS Taking" had no place token, no readable page and no DHS here either, so
+                # it came out Unplaced and sank to the bottom of Religious Freedom. These are
+                # the federal agencies that were missing next to the ones already listed.
+                r"|\bDHS\b|\bFBI\b|\bIRS\b|\bFEMA\b|\bEPA\b|\bCDC\b|\bATF\b"
+                r"|\bUSCIS\b|\bDEA\b|\bNIH\b|\bpentagon\b|\bDoD\b"
                 r"|jp ?morgan|goldman sachs|wall street|polymarket|nasdaq|\bSEC\b", re.I)),
 ]
 
@@ -255,7 +296,12 @@ OUTLET_HOME = {
     "Australia": [
         "the australian", "sydney morning herald", "abc news (australia", "news.com.au",
         "courier mail", "spectator australia", "the age", "afr", "stuff", "the post",
-     "catholic weekly", "australian christian lobby", "citynews",],
+     "catholic weekly", "australian christian lobby", "citynews",
+        # Chris, 27.08.2026: "This should be grouped with Australian stories". NT is the
+        # Northern Territory. Longer than the UK list's bare "independent", which was
+        # matching inside "NT Independent" and calling it British - longest-match-wins is
+        # what makes the correction a one-line addition rather than a guard on "independent".
+        "nt independent", "nt news",],
     "Asia": [
         "times of india", "theprint", "uca news", "asianews", "korea joongang",
         "japan times", "scmp", "south china", "turkish minute",
@@ -302,7 +348,18 @@ DOMAIN_HOME = {
     "UK": ["telegraph.co.uk", "thetimes.co.uk", "dailymail.co.uk", "theguardian.com",
            "bbc.co.uk", "gbnews.com", "spectator.co.uk", "thecritic.co.uk", "unherd.com",
            "spiked-online.com", "scotsman.com", "independent.co.uk", "express.co.uk",
-           "dailysceptic.org", "thecanary.co", "statement.com", "nation.cymru"],
+           "dailysceptic.org", "thecanary.co", "statement.com", "nation.cymru",
+           # Chris, 28.08.2026: "This is a UK story" - the National Secular Society on Barnet
+           # Council, filed Unplaced because nothing in the headline is geographic and the
+           # standfirst's only marker is a London borough no rule names.
+           #
+           # The generic TLDs rather than secularism.org.uk alone, because adding mastheads
+           # one at a time is the drift this map keeps losing to: the same sweep had Norfolk
+           # Police on attitude.co.uk and three Premier Woman Alive pieces sitting Unplaced
+           # for exactly the same reason. A British domain is a sound DEFAULT and nothing
+           # more - domain_home is only consulted once the headline and the text have found
+           # nothing, so a UK outlet reporting Nigeria still files under Africa.
+           ".co.uk", ".org.uk"],
     "Australia": ["dailytelegraph.com.au", "theaustralian.com.au", "smh.com.au",
                   "abc.net.au", "news.com.au", "spectator.com.au", "heraldsun.com.au",
                   "couriermail.com.au", "acl.org.au"],
@@ -363,26 +420,72 @@ def region_detail(headline, outlet="", url="", text=""):
         place_text = PERSON_NATIONALITY.sub(" ", text)
     # Does the headline's geography come only from a person's nationality? Compare the
     # headline with that nationality removed: if the signal disappears, it was the person.
-    stripped = NATIONALITY_OF_PERSON.sub(" ", PERSON_NATIONALITY.sub(" ", text))
+    # Strip the three "this is a label on someone or something, not a location" shapes before
+    # asking whether any real geography survives. NATIONALITY_OF_THING joined the pair on
+    # 27.08.2026; the test below is unchanged in form, which is the point - one more way for
+    # a headline's geography to turn out to be borrowed rather than its own.
+    stripped = NATIONALITY_OF_THING.sub(
+        " ", NATIONALITY_OF_PERSON.sub(" ", PERSON_NATIONALITY.sub(" ", text)))
     for tier, rx in HEADLINE_SIGNALS:
         if rx.search(place_text):
-            person_only = not any(r.search(stripped) for _, r in HEADLINE_SIGNALS)
-            if person_only and text_body:
+            borrowed_only = not any(r.search(stripped) for _, r in HEADLINE_SIGNALS)
+            if borrowed_only and text_body:
                 for btier, brx in HEADLINE_SIGNALS:
-                    body_places = NATIONALITY_OF_PERSON.sub(
-                        " ", PERSON_NATIONALITY.sub(" ", text_body))
+                    body_places = NATIONALITY_OF_THING.sub(
+                        " ", NATIONALITY_OF_PERSON.sub(
+                            " ", PERSON_NATIONALITY.sub(" ", text_body)))
+                    if btier != tier and brx.search(body_places):
+                        return btier, "text"
+            # No body to appeal to, or the body agreed: the outlet still gets a say when the
+            # ONLY thing the headline offered was a city that exists in two countries. The
+            # outlet is hard evidence and an ambiguous city name is not, so a local US
+            # station reporting on its own Birmingham outranks the headline's UK reading.
+            # Guarded on the signal being ambiguous AND alone - a headline that also says
+            # "England" keeps its tier however American the masthead.
+            without_city = AMBIGUOUS_CITY.sub(" ", stripped)
+            if (AMBIGUOUS_CITY.search(place_text)
+                    and not any(r.search(without_city) for _, r in HEADLINE_SIGNALS)):
+                by_outlet = _outlet_tier(outlet, url)
+                if by_outlet and by_outlet != tier:
+                    return by_outlet, "outlet"
+            return tier, "headline"
+    # Only now: a headline whose sole geographic signal is a US actor is a US story.
+    #
+    # This fallback used to be unconditional, and that was the deeper half of Chris's
+    # 27.08.2026 note. A bare "US" is an ACTOR signal, not a HEADLINE_SIGNALS place, so a
+    # headline whose only token was "US" never reached the borrowed-nationality test above -
+    # it fell straight through to here and was filed as American without the article ever
+    # being read. "HMRC Recruited US Big Brother Experts" is fixed above by HMRC now being a
+    # UK token, but "Taxman recruited US consultants" would still have been wrong. So the
+    # same two questions get asked here: was that token merely a label on a person or a
+    # bought-in thing, and if so does the body name somewhere real?
+    for tier, rx in ACTOR_SIGNALS:
+        if rx.search(text):
+            if text_body and not rx.search(stripped):
+                body_places = NATIONALITY_OF_THING.sub(
+                    " ", NATIONALITY_OF_PERSON.sub(
+                        " ", PERSON_NATIONALITY.sub(" ", text_body)))
+                for btier, brx in HEADLINE_SIGNALS:
                     if btier != tier and brx.search(body_places):
                         return btier, "text"
             return tier, "headline"
-    # Only now: a headline whose sole geographic signal is a US actor is a US story.
-    for tier, rx in ACTOR_SIGNALS:
-        if rx.search(text):
-            return tier, "headline"
+    by_outlet = _outlet_tier(outlet, url)
+    if by_outlet:
+        return by_outlet, "outlet"
+    return "Unplaced", "none"
+
+
+def _outlet_tier(outlet="", url=""):
+    """Tier from the publisher alone - domain first, then the masthead. None if neither knows.
+
+    Pulled out of region_detail on 27.08.2026 so the ambiguous-city rule above can ask the
+    same question mid-way through without duplicating the lookup or reordering it.
+    """
     # A Google News redirect carries no publisher host, so this simply returns None there
     # and the outlet-name map still does the work.
     by_domain = domain_home(url)
     if by_domain:
-        return by_domain, "outlet"
+        return by_domain
     home = (outlet or "").lower()
     # Longest match wins, not first tier. Iterating tiers in order made "spectator" (UK)
     # beat "spectator australia", and "new zealand" sitting in the old combined Australia
@@ -392,9 +495,7 @@ def region_detail(headline, outlet="", url="", text=""):
         for name in names:
             if name and name in home and len(name) > len(best):
                 best, best_tier = name, tier
-    if best_tier:
-        return best_tier, "outlet"
-    return "Unplaced", "none"
+    return best_tier
 
 
 def region(headline, outlet="", url="", text=""):

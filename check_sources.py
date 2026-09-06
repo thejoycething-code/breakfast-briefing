@@ -48,12 +48,33 @@ def probe(feed):
         txt = raw.decode("utf-8", "replace")
     except Exception:  # noqa: BLE001
         return name, url, mode, False, 0, "undecodable"
+    if mode.startswith("wpjson"):
+        # A WordPress REST collection. Counting <item> on JSON reports every one as dead.
+        try:
+            n = len(fetch_feeds.parse_wpjson(raw, name))
+        except Exception as exc:  # noqa: BLE001
+            return name, url, mode, False, 0, "wpjson: %s" % str(exc)[:24]
+        return name, url, mode, n > 0, n, "" if n else "0 items"
     if mode.startswith("scrape"):
         # Scrape sources are HTML index pages, not feeds. Counting <item> on one reports
         # every single one as dead - the first run of this check called The Spectator broken
-        # on a day it had supplied eight stories. Count article-shaped links instead.
-        n = len(set(re.findall(r'href="(/[^"#?]{12,}|https?://[^"#?]{20,})"', txt)))
-        return name, url, mode, n >= 5, n, "" if n >= 5 else "%d links on page" % n
+        # on a day it had supplied eight stories.
+        #
+        # Counting article-shaped LINKS was the first fix and was wrong in the other
+        # direction, which is how ADF International went eight editions contributing nothing
+        # while this check called it healthy every morning (found 01.09.2026). Its newsroom
+        # serves 773KB and 260 article links, so the link count said 260 and ok=True - but
+        # the listing is JS-rendered with no <article> blocks and no datestamps, so
+        # scrape_index extracted ZERO and the sweep got nothing. A proxy for "the page has
+        # content" is not a measure of "the source contributes".
+        #
+        # So ask the extractor the sweep actually uses. By construction this can no longer
+        # disagree with what the sweep sees, which is the only property that matters here.
+        try:
+            n = len(fetch_feeds.scrape_index(url))
+        except Exception as exc:  # noqa: BLE001
+            return name, url, mode, False, 0, "scrape: %s" % str(exc)[:24]
+        return name, url, mode, n > 0, n, "" if n else "page fetches but yields 0 items"
     n = txt.count("<item") + txt.count("<entry")
     # A feed that parses but serves nothing is its own failure mode: the URL still 200s, so
     # nothing looks wrong, but the source has silently stopped contributing.

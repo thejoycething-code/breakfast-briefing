@@ -71,7 +71,17 @@ STATE_FILES="seen.json cut.json source_health.json resolved.json authors.json le
 # These are human-written and LOCAL is authoritative, so pull only bootstraps a machine that
 # has none - see the pull block. Pushing them is a backup and always safe.
 JUDGEMENT_FILES="testcases.txt exclusions.txt bylines.txt link_fixes.txt extra_feeds.txt \
-                 sources.opml tiers.json"
+                 sources.opml tiers.json rank_eval_log.txt repeat_eval_log.txt"
+
+# rank_eval_log.txt and repeat_eval_log.txt added 31.08.2026: neither had ever been backed up
+# by any of the three lists. The second was found by the test written to stop the first
+# recurring - shortlist.py:1764 cites repeat_eval_log.txt by name ("see repeat_eval_log.txt
+# for what each change moved"), so the code depended on a file nothing preserved.
+# It is the accumulated before/after measurement of every scoring change ever made - the only
+# thing that stops the next one being argued from a remembered example, which is the whole
+# reason rank_eval.py exists. It cannot be rebuilt: replaying it would need every historical
+# version of importance(). The gap was invisible to the fixture because
+# test_all_scripts_backed_up only walks .py and .sh, so a missing .txt raised nothing.
 
 # The classifier itself, added 19.08.2026 at Chris's request. testcases.txt was already
 # backed up, but the patterns those assertions constrain were not - so a lost disk would
@@ -108,7 +118,7 @@ JUDGEMENT_FILES="testcases.txt exclusions.txt bylines.txt link_fixes.txt extra_f
 # NOT here, deliberately: ~/.config/breakfast-briefing/oauth.json and sa.json. See the note
 # above - a credential does not go in the box it opens.
 CODE_FILES="shortlist.py run_tests.py regions.py compose.py fetch_feeds.py resolve.py \
-            tiers.py record_tiers.py finish_edition.sh \
+            tiers.py record_tiers.py finish_edition.sh history.py repeat_eval.py \
 upload-archive-to-drive.sh upload-dir-to-drive.sh state_sync.sh gdrive_auth.sh \
 archive_day.py audit_feeds.py authors.py check_sources.py discover_feeds.py \
 mark_published.py publish.sh rank_eval.py slice_shortlist.py \

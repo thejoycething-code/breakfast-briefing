@@ -16,3 +16,6 @@ bizarre obsession with drag queens | Michael Deacon
 # included." Statement is paywalled and its feed omits the byline, so authors.py has no page
 # to read. He supplied this one.
 London Takes Another Step Toward Total Surveillance | Peter Winnemöller
+# Chris, 27.08.2026: "This should be grouped with Australian stories and include Richard
+# Trudgen as the author." The NT Independent page returns nothing to authors.py.
+Opinion: Euthanasia – the unheard side of the story|Richard Trudgen

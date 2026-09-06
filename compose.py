@@ -21,14 +21,31 @@ import json
 import os
 import re
 import sys
+import urllib.parse
+import xml.etree.ElementTree as ET
 
 HERE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Files this script rewrites IN FULL on every run, so state_sync.sh deliberately does not back
+# them up. Declared HERE, beside the code that writes them, rather than in run_tests.py: the
+# test reads this tuple, so it cannot be silenced by editing the test, and whoever adds a third
+# derived output sees the requirement at the moment they add it.
+#
+# It is a DECLARATION, not an inference, and that is a real limit worth stating. The obvious
+# static test - "written but never read back" - is FALSE for both of these: mark_published.py
+# reads expected_urls.txt and composed.json to refuse marking picks a cap removed, and
+# archive_day.py reads composed.json into the edition archive. What actually makes them derived
+# is that one command recreates them whole from inputs that ARE backed up, and no static pass
+# can see that. So the honest guarantee is narrow: the claim lives next to the writer, and it
+# cannot be added anywhere else.
+DERIVED_OUTPUTS = ("expected_urls.txt", "composed.json")
 sys.path.insert(0, HERE_DIR)
 import fetch_feeds  # reuse url_key / load_seen / save_seen so dedup stays consistent
 import regions      # shared UK-first ordering
 import resolve      # Google News redirect -> publisher URL
 import authors      # missing byline -> read it off the article page
 import shortlist    # section classifier, used to validate the picks before rendering
+import textsignals  # report-vs-comment, read off the article opening, for the byline gate
 
 ORDER = [
     "Religious Freedom & Persecution",
@@ -52,9 +69,16 @@ ORDER = [
 # the section on a test run of the 24.08 edition, 31% of a 232-item briefing, which is a
 # digest of the Vatican with a briefing attached rather than the reverse.
 # NOTE this also tightens the US share in the section: us_allowance() returns share x cap
-# when a cap exists, so Church & Religion now allows at most int(30 x 0.25) = 7 US items,
-# where an uncapped section allowed a third of its non-US count.
-SECTION_CAPS = {"Politics, Government & Society": 40, "Church & Religion": 30}
+# when a cap exists, so a 30-item section allows at most int(30 x 0.30) = 9 US items, where
+# an uncapped section allows floor(share x non_us / (1 - share)) - three-sevenths of its
+# non-US count at the current share. Both figures move with US_SHARE in shortlist.py: this
+# sentence read "int(30 x 0.25) = 7" and "a third" until 03.09.2026, having been written at
+# the old 0.25 and left behind when US_SHARE rose to 0.30 on 18.08.2026. If you change
+# US_SHARE, this comment is one of the things that goes stale.
+# Chris set Politics at 40 (15.08.2026), Church at 30 (23.08.2026) and Immigration at 30
+# (27.08.2026, after an edition that ran 45 of them).
+SECTION_CAPS = {"Politics, Government & Society": 40, "Church & Religion": 30,
+                "Immigration & Asylum": 30}
 
 # Domains that republish other outlets' work. Their feeds credit the ORIGINAL publisher, so
 # the item arrives as "The Telegraph" and sails past the outlet block in shortlist.py, but its
@@ -100,6 +124,12 @@ OUTLET_FIXES = {
     "spiked-online.com": "spiked",
     # Shorter credit names, per Chris 16.08.2026.
     "Breitbart News": "Breitbart",
+    # OUTLET_HOSTS cannot reach this one: Breitbart's OPML feed is served from feedburner, so
+    # the source lists know no host that belongs to it. Today's edition printed three items as
+    # "Breitbart" and a fourth as "breitbart.com" (03.09.2026). A literal is the right tool
+    # when the source list genuinely has no host to resolve against - that, and renaming a
+    # masthead we simply want to read differently, is what is left for this map to do.
+    "breitbart.com": "Breitbart",
     # The OPML calls it "NSS", which reads as an unexplained acronym in the credit line.
     "NSS": "National Secular Society",
     # The feed titles itself in Arabic; the organisation's own English name is this.
@@ -168,6 +198,21 @@ OUTLET_FIXES = {
     "ABC News - Breaking News, Latest News and Videos": "ABC",
     # The masthead styles itself "Notes from Poland"; the feed title capitalises the F.
     "Notes From Poland": "Notes from Poland",
+    # --- Chris, 27.08.2026 -------------------------------------------------------------
+    # "Ensure this is always labelled as Swiss Info".
+    "SWI swissinfo.ch": "Swiss Info",
+    "swissinfo.ch": "Swiss Info",
+    # "This source should just be FIRE." Its masthead carries the expansion after a pipe of
+    # its own, and the 44-char truncation at fetch time cuts it mid-phrase - so, like ABC
+    # above, map the stored cut-off form as well as the full one. The truncated key has no
+    # trailing space: tidy_outlet normalises pipe spacing and strips before the lookup.
+    "FIRE | Foundation for Individual Rights and": "FIRE",
+    "FIRE | Foundation for Individual Rights and Expression": "FIRE",
+    # "This source should be named NY Post", said against two separate items in one edition.
+    "New York Post": "NY Post",
+    # "This source should read Premier Christianity and have a paywalled (£) with it." The
+    # (£) is PAYWALLED_OUTLETS' job and is added there, keyed on the RENAMED form.
+    "Premier Christianity Magazine": "Premier Christianity",
 }
 # Author fields that are really feed plumbing, not a byline.
 SKIP_AUTHORS = {
@@ -189,6 +234,9 @@ PAYWALLED_OUTLETS = re.compile(
     r"|spectator|the critic|unherd|spiked|the catholic herald|catholic herald"
     r"|church times|the economist|new statesman|the australian|financial times"
     r"|the wall street journal|the washington post|the atlantic"
+    # Chris, 27.08.2026: "have a paywalled (£) with it". Keyed on the RENAMED form, which is
+    # what tidy_outlet has produced by the time credit() tests this.
+    r"|premier christianity"
     r"|the scotsman|scotsman)$", re.I)   # Chris, 17.08.2026
 
 
@@ -232,7 +280,28 @@ COMMENTARY_OUTLETS = re.compile(
     # author which should be included." Statement was missing from this list, so its bylines
     # were discarded at the credit line even when authors.py had recovered them - a manual
     # bylines.txt entry would not have printed either. Verified before and after.
-    r"|\bstatement\b", re.I)
+    r"|\bstatement\b"
+    # 28.08.2026, the same fault as Statement: RealClear is an opinion syndicator - every
+    # item it files is a reprinted column - and its byline arrives as "<Author>, <original
+    # venue>" ("Sheri Berman, Persuasion"). Missing from this list, the whole compound was
+    # dropped at the credit line, so six essays ran as a bare "- RealClearPolicy" with no
+    # author and no sign of where they first appeared. Matched on the family, not the one
+    # title, because RCI and RealClearPolitics file the same shape.
+    r"|realclear", re.I)
+# Section names that mean "this is a column". Anchored, so "culture-war" and "news-analysis"
+# do not match on a substring - the Brussels Signal report whose section is "culture-war" is
+# the case that has to keep failing this.
+# "commentary" is spelled out because the anchored "comment" alternative does NOT reach it -
+# the string ends "ary", so `comments?$` fails on the most obvious section name of all.
+#
+# "analysis" is deliberately absent, and that is a knowing inconsistency with COMMENTARY_URL,
+# which does treat /analysis/ as commentary. A URL PATH is an editor filing under a section; a
+# category name is often just a desk, and "news-analysis" would match on the suffix. No page
+# in the 28.08 picks declared it, so there is no evidence to widen on - add it when a real
+# miss says to.
+SECTION_IS_COMMENT = re.compile(
+    r"(opinion|comment|commentar(?:y|ies)|editorial|op-?ed|column"
+    r"|viewpoint|perspective)s?$", re.I)
 COMMENTARY_URL = re.compile(
     r"/(opinion|comment|commentisfree|columnists?|blogs?|analysis|editorial|essays?"
     r"|perspectives?|viewpoint|leader)s?/", re.I)
@@ -241,7 +310,119 @@ COMMENTARY_URL = re.compile(
 def is_commentary(item):
     if COMMENTARY_URL.search(item.get("url") or ""):
         return True
-    return bool(COMMENTARY_OUTLETS.search(item.get("outlet") or ""))
+    if COMMENTARY_OUTLETS.search(item.get("outlet") or ""):
+        return True
+    # The article's own opening, when we have one. Chris, 28.08.2026: Brussels Signal's "From
+    # Pakistan to Nigeria" is a comment piece and should have carried Konstantinos Bogdanos's
+    # name. The masthead cannot join COMMENTARY_OUTLETS — the same sweep has its prisons and
+    # Berlin police reports, both straight news — so the decision has to come off the body.
+    #
+    # Threshold is comment_score >= 1, NOT textsignals' own kind == "comment". Its tie-break
+    # sends a draw to "report" deliberately, because there the signal feeds RANKING and
+    # demoting real news is the expensive error. This is a BYLINE gate — is_commentary is
+    # read in exactly two places, here and by authors.enrich, and nowhere near the ranker —
+    # and the costs invert: a byline on a report is a blemish, a missing byline on a column
+    # is the correction Chris keeps having to make. Same signal, different threshold.
+    # The article's OWN section, read off the page by authors.py while it was open for the
+    # byline. Chris, 28.08.2026: Brussels Signal's "From Pakistan to Nigeria" is a comment
+    # piece and should have carried Konstantinos Bogdanos's name, but the masthead cannot join
+    # COMMENTARY_OUTLETS - the same sweep has its prisons and Berlin police reports, both
+    # straight news - so the decision has to be per-article.
+    #
+    # Structured markup, not page text. Both text routes were measured and rejected the same
+    # day: textsignals' comment_score turns this on for 23% of picked items because it matches
+    # rhetorical voice, and matching a section label in the scrubbed opening picked up GB
+    # News's NAV MENU five times out of nine. `category-opinion` in a body class is the
+    # article describing itself.
+    #
+    # A missing marker means unknown, never "news": most sites publish none, and this returns
+    # False for them exactly as before.
+    return bool(SECTION_IS_COMMENT.match((item.get("_page_section") or "").strip()))
+
+
+# Mastheads for outlets we already track, keyed by the host they publish on. Built from the
+# two files that define the sweep, so an outlet gets its proper name from the fact that it is
+# a source at all, not from someone having typed its domain into OUTLET_FIXES.
+#
+# Why this exists (Chris, 03.09.2026: "I shouldn't have to keep asking for the source names to
+# remain as I asked them"): OUTLET_FIXES is keyed on the literal string, so one outlet needs a
+# separate entry per spelling it can arrive under. Christian Today had been fixed as
+# "Christian Today | RSS" - its OPML title - and still printed as "www.christiantoday.com",
+# because that item came through the "India life & family" Google News keyword feed and Google
+# reported the source as the hostname. Any gnews feed can do that to any outlet, so the map was
+# always going to keep losing the race; six of its entries are already bare domains added one
+# report at a time. Resolving by host fixes the whole class instead of the next instance.
+#
+# OUTLET_FIXES still wins: it is the hand-written answer, and it is what renames a masthead we
+# do not like the look of. This only supplies a name where the alias chain left a bare host.
+def _load_outlet_hosts():
+    hosts = {}
+
+    # Hosts that carry many outlets' feeds. Whoever the OPML happened to list first would
+    # otherwise own the host and lend its masthead to every other outlet behind it - 35 of
+    # the OPML's feeds are on feedburner alone.
+    SHARED = ("feedburner.com", "feedproxy.google.com", "rss.app", "substack.com",
+              "feeds.captivate.fm", "news.google.com", "bing.com")
+
+    def add(host, name):
+        host = (host or "").strip().lower()
+        # gnews/bing entries carry the Google edition as "domain@CC" (tvpworld.com@pl).
+        host = host.split("@", 1)[0]
+        host = re.sub(r"^www\.", "", host)
+        name = (name or "").strip()
+        if host in SHARED or any(host.endswith("." + d) or host == d for d in SHARED):
+            return
+        # A source list that already records the outlet as its own domain teaches us nothing
+        # and would make tidy_outlet look like it had resolved something.
+        if name.lower().rstrip("/") in (host, "www." + host):
+            return
+        # First writer wins, so sources.opml (read first) beats a later extra_feeds line for
+        # the same host, and neither can be displaced by a Google News fallback entry.
+        if host and name and host not in hosts:
+            hosts[host] = name
+
+    try:
+        body = ET.parse(os.path.join(HERE_DIR, "sources.opml")).getroot().find("body")
+        for node in body.iter("outline"):
+            if node.get("type") != "rss":
+                continue
+            name = (node.get("title") or node.get("text") or "").strip()
+            for attr in ("htmlUrl", "xmlUrl"):
+                add(urllib.parse.urlsplit(node.get(attr) or "").netloc, name)
+    except Exception:
+        pass
+
+    try:
+        with open(os.path.join(HERE_DIR, "extra_feeds.txt")) as fh:
+            for line in fh:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                parts = [p.strip() for p in line.split("|")]
+                # mode | category | outlet | url. "block" and "disable" lines are shorter and
+                # name no outlet; skip anything that is not a feed definition.
+                if len(parts) < 4 or parts[0] in ("block", "disable", "scrape"):
+                    continue
+                url = parts[3]
+                # gnews/bing entries carry a bare domain or a "kw:...@CC" search, not a URL.
+                host = (urllib.parse.urlsplit(url).netloc if url.startswith("http")
+                        else (url if "." in url and " " not in url else ""))
+                # kw: searches are a query, not a domain, and name no single outlet.
+                if url.startswith("kw:"):
+                    host = ""
+                add(host, parts[2])
+    except Exception:
+        pass
+    return hosts
+
+
+OUTLET_HOSTS = _load_outlet_hosts()
+
+# A name is host-shaped if it is a single bare domain: no spaces, at least one dot, and a
+# plausible TLD. Deliberately strict - "spiked-online.com" matches, "Christian Today" does
+# not, and neither does "ABC News & Headlines - Australian Broadcasting" or any masthead
+# carrying a dot mid-sentence.
+HOST_SHAPED = re.compile(r"^(?:https?://)?(?:www\.)?[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$", re.I)
 
 
 def tidy_outlet(name):
@@ -251,22 +432,94 @@ def tidy_outlet(name):
     "CBN News" -> "CBN" on 16.08.2026. A single lookup stopped at the intermediate name, so
     the edition still read "CBN News" and "Daily Mail" after the rename. Follow the chain.
     """
+    # Normalise the separator before the lookup. A masthead that carries a pipe of its own
+    # arrives with inconsistent spacing depending on whether the feed or the 44-char
+    # truncation produced it, and an alias map keyed on one spelling misses the other
+    # (Chris, 27.08.2026: FIRE).
+    name = re.sub(r"\s*\|\s*", " | ", (name or "").strip())
     seen = set()
     while name in OUTLET_FIXES and name not in seen:
         seen.add(name)
         name = OUTLET_FIXES[name]
     name = re.sub(r"\s*[|:-]\s*(RSS|News Feed|Feed)\s*$", "", name).strip()
+    # Still a bare host? Then no alias covered this spelling. Ask the source lists what this
+    # outlet is actually called, and re-run the chain on the answer: sources.opml titles carry
+    # their own noise ("Christian Today | RSS"), so the masthead it returns needs the same
+    # tidying as one that arrived directly.
+    if HOST_SHAPED.match(name):
+        canon = OUTLET_HOSTS.get(re.sub(r"^(?:https?://)?(?:www\.)?", "", name.lower()))
+        if canon and canon != name:
+            return tidy_outlet(canon)
     # A few feeds leave a dangling separator in the masthead itself, which rendered as
     # "- The MoCo Show -" in the credit line (19.08.2026: The MoCo Show, WOUB Public Media).
     return re.sub(r"\s*[|\-–—:]\s*$", "", name).strip()
 
 
+# Sites that republish another outlet's story under their own domain. The feed sets the
+# outlet field to the masthead being quoted while the link points here, so the credit named
+# a paper for a page it did not publish (28.08.2026: "Number of foreign criminals on
+# Britain's streets..." shipped credited to the Mail, linking to dailysceptic.org).
+#
+# Keyed by HOST, because the host is the only thing that separates the repost from the
+# original — which is why this cannot live in OUTLET_FIXES. tidy_outlet is handed the name
+# alone and would have to rename every Mail and Telegraph story to catch these two.
+REPUBLISHER_HOSTS = {
+    "dailysceptic.org": "The Daily Sceptic",
+    # Chris, 28.08.2026, asked which policy applies and chose this one. Read link_fixes.txt's
+    # header before changing it: that file and REPOST_DOMAINS encode the OPPOSITE answer for
+    # Anglican Mainstream - swap in the original publisher's URL, or drop the item - and the
+    # two look like a contradiction until you see the distinction. Anglican Mainstream reposts
+    # a piece verbatim, so the Telegraph really is the publisher and its link is the right one.
+    # The Sceptic writes its own commentary post around a quote, so the page is genuinely
+    # theirs and the credit follows the host. Different shapes, different remedies; neither is
+    # the general rule.
+    #
+    # realclearpolicy.com was briefly listed here on 28.08.2026 and removed the same day. It
+    # never fired: RCP items already arrive named correctly, because RCP's aggregation is the
+    # mirror image of the Sceptic's — the feed names RCP while the ORIGINAL venue rides in
+    # the byline ("Sheri Berman, Persuasion"). That belongs to COMMENTARY_OUTLETS, which now
+    # carries `realclear` so the compound prints. Recorded so the entry is not re-added: a
+    # host mapped to the name it already has is not a safeguard, it is a claim that this map
+    # handles RCP, which it does not.
+}
+
+
+def publisher_of(url):
+    """The outlet that actually served this page, when the host identifies one.
+
+    Deliberately a lookup and not a general host->masthead derivation: a Google News
+    redirect, an AMP mirror and a wire syndication partner all have hosts that are not the
+    publisher either, and guessing from the domain would mis-credit far more than it fixed.
+    """
+    m = re.match(r"https?://(?:www\.)?([^/:?#]+)", (url or "").strip(), re.I)
+    return REPUBLISHER_HOSTS.get(m.group(1).lower()) if m else None
+
+
+def outlet_of(item):
+    """The masthead to credit AND to group by: the feed's name, corrected by the link.
+
+    One function for both so they cannot drift apart. When the correction lived only in
+    credit(), spread_outlets went on keying the diversity buckets off the raw feed field —
+    so two Daily Sceptic reposts printed as the Sceptic but still spent the Mail's and the
+    Telegraph's slots in the per-outlet cap, and were dealt apart as if they were different
+    papers. That is the column-of-one-name effect the spread exists to prevent, arriving
+    through the back door (28.08.2026).
+    """
+    return publisher_of(item.get("url")) or tidy_outlet(item.get("outlet") or "")
+
+
 def credit(item):
     """'- Outlet (£) · Author' — the grey line beneath a headline. The leading dash
     matches the hand-made briefings; Chris asked for it on 12.08.2026."""
-    name = tidy_outlet(item["outlet"] or "")
+    name = outlet_of(item)
+    paywalled = item.get("paywalled")
+    if name != tidy_outlet(item.get("outlet") or ""):
+        # The feed's paywall flag described the outlet we just replaced. The Telegraph is
+        # paywalled; a free repost of one of its stories is not, and inheriting the flag
+        # would print a "(£)" against a page anyone can read.
+        paywalled = False
     out = "- " + name
-    if item.get("paywalled") or PAYWALLED_OUTLETS.match(name.strip()):
+    if paywalled or PAYWALLED_OUTLETS.match(name.strip()):
         out += " (£)"
     author = (item.get("author") or "").strip()
     if "@" in author or author.startswith("http"):
@@ -311,7 +564,7 @@ def spread_outlets(nums, items):
     for tier in order:
         buckets, seq = {}, []
         for n in blocks[tier]:
-            key = tidy_outlet(items[n]["outlet"] or "").lower()
+            key = outlet_of(items[n]).lower()
             if key not in buckets:
                 buckets[key] = []
                 seq.append(key)
@@ -787,6 +1040,49 @@ def main():
             "publishing; if a miss is deliberate, say so in the final message.\n" % len(missed))
         for o, hs in sorted(missed.items(), key=lambda kv: -len(kv[1])):
             sys.stderr.write("  %-30s %d unpicked | %s\n" % (o, len(hs), hs[0]))
+        sys.stderr.write("\n")
+
+    # REPEAT - a story that already ran, under a URL the [ran] flag could not recognise.
+    # Chris, 27.08.2026, on two items in the 20260827 edition: "This was in yesterday's
+    # briefing. Why has it not been deduplicated?" One had carried a [ran] flag that was read
+    # past; the other had none at all, because Right To Life had republished it at a new slug.
+    # Like COVERAGE this is a REPORT, not a gate: Chris's standing rule from 13.08.2026 is
+    # that a running story may legitimately appear on consecutive days and the repeat is a
+    # judgement. But it must never again be possible to publish one without being told.
+    import history as _history
+    stamp = _history.edition_date(data)
+    past = _history.load_history(before=stamp)
+    editions = _history.editions_loaded(before=stamp)
+    # Same union index as the sheet builds, over the published set plus the recent editions.
+    past_ents = shortlist.union_entity_index(items, past)
+    again = []
+    for sec in ORDER:
+        for n in composed_out.get(sec, []):
+            it = dict(items[n])
+            it["_section"] = sec
+            hit = shortlist.ran_before(it, past, ents=past_ents)
+            exact = it.get("seen_on")
+            if hit or exact:
+                again.append((n, it, hit, exact))
+    if not editions:
+        sys.stderr.write(
+            "\nREPEAT CHECK INACTIVE - no readable edition found in archive/, so nothing was\n"
+            "compared against. Restore the archive before trusting that this edition is free\n"
+            "of repeats.\n\n")
+    elif again:
+        sys.stderr.write(
+            "\nREPEAT - %d published item(s) also appeared in the last %d edition(s).\n"
+            "Not a gate: a running story can legitimately run again. But confirm each one was\n"
+            "a choice, and say so in the final message.\n" % (len(again), len(editions)))
+        for n, it, hit, exact in again:
+            if hit:
+                sys.stderr.write(
+                    '  %-5s SAME STORY ran %s | %s\n           was: "%s" (%s)\n'
+                    % (n, hit["date"][4:6] + "-" + hit["date"][6:],
+                       it["headline"][:64], hit["headline"][:64], hit["outlet"]))
+            else:
+                sys.stderr.write("  %-5s same URL ran %s | %s\n"
+                                 % (n, exact[5:10], it["headline"][:64]))
         sys.stderr.write("\n")
 
     sys.stderr.write("composed %d items across %d sections%s\n"

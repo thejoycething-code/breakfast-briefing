@@ -23,10 +23,33 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+
+# Drop any cached bytecode for this directory BEFORE importing anything from it.
+#
+# This is not housekeeping, it is a correctness guard on the fixture itself. CPython
+# invalidates a .pyc on (mtime, size), and this Mac's python sets sys.pycache_prefix to
+# ~/Library/Caches/com.apple.python - so the cache lives OUTSIDE the project and a
+# `find . -name __pycache__` finds nothing to suggest it exists.
+#
+# On 01.09.2026 an edit and a test run landed in the same second. shortlist.py and its .pyc
+# then carried identical mtimes, python reused the stale bytecode, and run_tests measured a
+# version of the code that was no longer on disk. It was caught only because a new assertion
+# happened to compare two functions whose call order had been swapped: the source said one
+# thing and dis() said the other. Everything mutation-tested in that session had to be
+# re-run. A test suite that can silently grade the wrong build is worse than no test suite,
+# so the cache goes before the imports.
+sys.dont_write_bytecode = True
+_cache_root = sys.pycache_prefix
+if _cache_root:
+    import shutil
+    shutil.rmtree(os.path.join(_cache_root, HERE.lstrip(os.sep)), ignore_errors=True)
+shutil = None  # noqa: F811  - not needed again; keep the namespace tidy
+
 import shortlist   # noqa: E402
 import regions     # noqa: E402
 import compose     # noqa: E402
 import fetch_feeds # noqa: E402
+import resolve     # noqa: E402
 
 CASES = os.path.join(HERE, "testcases.txt")
 
@@ -120,13 +143,35 @@ def run(verbose=False):
                 # BYLINE shown|hidden | <outlet> | <author> [| <url>]
                 # Not a full-credit comparison: the credit line itself contains "|", which is
                 # this file's field separator, so an expected line could never be written.
+                # A 4th field is the article's own opening. Added 28.08.2026 with the text
+                # signal: whether a byline shows can now turn on the body, so a case about
+                # that has to be able to carry one.
                 outlet, author = parts[0], (parts[1] if len(parts) > 1 else "")
                 url = parts[2] if len(parts) > 2 else ""
-                line_out = compose.credit({"outlet": outlet, "author": author, "url": url})
+                opening = "|".join(parts[3:]).strip() if len(parts) > 3 else ""
+                # "::section:: opinion" sets the PAGE's own section marker instead, which is
+                # what authors.py now reads off the article while it is there for the byline.
+                section = ""
+                if opening.startswith("::section::"):
+                    section = opening[len("::section::"):].strip()
+                    opening = ""
+                line_out = compose.credit({"outlet": outlet, "author": author, "url": url,
+                                           "_opening": opening, "_page_section": section})
                 shown = ("| " + author) in line_out
                 got = "shown" if shown else "hidden"
                 ok = (got == expected.lower())
                 detail = "%s -> %s" % (outlet[:24], line_out)
+            elif kind == "KEYWORD":
+                # KEYWORD <keep|drop> | <headline>
+                # The FETCH-TIME gate, which no other assertion reaches: SECTION and SUPPRESS
+                # both run on items that already got past it. A headline the filter rejects
+                # never enters the sweep at all, so its absence cannot be diagnosed later -
+                # which is how the Stars and Stripes lawsuit went missing with nothing to show
+                # for it (28.08.2026). Applies to filter/gnewsf/bingf/scrapesrcf sources.
+                raw = "|".join(parts).strip()
+                got = "keep" if fetch_feeds.KEYWORD_RE.search(raw) else "drop"
+                ok = (got == expected.lower())
+                detail = "%s -> %s" % (raw[:54], got)
             elif kind == "BLOCKED":
                 raw = parts[0]
                 # A neutral headline, so only the outlet can be doing the blocking.
@@ -191,10 +236,106 @@ def run(verbose=False):
                 want = None if expected in ("None", "-") else expected
                 ok = (got == want)
                 detail = "%s +%d tag(s) -> %s" % (headline[:40], len(cats), got)
-            elif kind == "OUTLET":
-                got = compose.tidy_outlet(parts[0])
+            elif kind == "DEVELOPMENT":
+                # DEVELOPMENT <yes|no> | <headline A> ::vs:: <headline B>
+                # Tests is_development_of directly. Added 27.08.2026 with the noun/verb fix:
+                # the collision was found THROUGH ran_before, but it belongs to this function,
+                # and a case written at the ran_before level would still pass if the bug moved.
+                joined = "|".join(parts)
+                ha, _, hb = joined.partition("::vs::")
+                got = "yes" if shortlist.is_development_of(
+                    {"headline": ha.strip()}, {"headline": hb.strip()}) else "no"
                 ok = (got == expected)
-                detail = "%s -> %s" % (parts[0][:34], got)
+                detail = "%s -> %s" % (ha.strip()[:46], got)
+            elif kind in ("RANBEFORE", "NOTRANBEFORE"):
+                # RANBEFORE | <headline today> ::was:: <headline in a recent edition>
+                # Same section assumed on both sides: that is the case the strict path is
+                # for, and asserting the cross-section rejection separately would only be
+                # re-testing same_story's guard.
+                joined = "|".join(parts)
+                today_h, _, past_h = joined.partition("::was::")
+                flags = {}
+                if "::entity::" in past_h:
+                    past_h = past_h.replace("::entity::", "")
+                    flags["ENTITY"] = True
+                today_h, past_h = today_h.strip(), past_h.strip()
+                # ENTITY on the kind line turns the entity arm on for that case, by
+                # building an index over the pair. Two documents is a degenerate corpus, so
+                # this asserts the ARM fires, not that a real DF gate would keep the token -
+                # repeat_eval.py is what measures the gate over a real corpus.
+                hist = [{"date": "20260825", "section": "Life",
+                         "headline": past_h, "outlet": "x", "key": ""}]
+                ents = (shortlist.entity_index(
+                            [{"headline": today_h}, {"headline": past_h}])
+                        if flags.get("ENTITY") else None)
+                hit = shortlist.ran_before(
+                    {"headline": today_h, "_section": "Life"}, hist, ents=ents)
+                got = "RANBEFORE" if hit else "NOTRANBEFORE"
+                ok = (got == kind)
+                detail = "%s -> %s" % (today_h[:46], got)
+            elif kind == "OUTLET":
+                # Join, do not take parts[0]. A masthead can contain a pipe of its own -
+                # FIRE reaches us as "FIRE | Foundation for Individual Rights and " - and
+                # splitting on it tested the string "FIRE", which tidy_outlet returns
+                # unchanged. The case passed while the bug it was written for was live
+                # (Chris, 27.08.2026: "This source should just be FIRE").
+                raw = "|".join(parts)
+                got = compose.tidy_outlet(raw)
+                ok = (got == expected)
+                detail = "%s -> %s" % (raw[:34], got)
+            elif kind == "CREDIT":
+                # CREDIT <shown outlet> | <raw outlet> | <url> [| paywalled]
+                # Who the credit line NAMES, and whether it earns its (£), given the feed's
+                # outlet field and the link TOGETHER. OUTLET cannot express this: tidy_outlet
+                # is handed the name alone and never sees the URL, so it cannot tell a
+                # masthead from a site reposting it. credit() receives the whole item.
+                # The two are asserted as one string because they are one fault: a repost
+                # inherits both the wrong name and the quoted paper's paywall flag, and a fix
+                # that corrected only the name would print "The Daily Sceptic (£)".
+                # The optional trailing "paywalled" sets that inherited flag.
+                outlet = parts[0]
+                url = parts[1] if len(parts) > 1 else ""
+                flag = len(parts) > 2 and parts[2].strip().lower() == "paywalled"
+                line_out = compose.credit(
+                    {"outlet": outlet, "author": "", "url": url, "paywalled": flag})
+                got = line_out[2:].split(" | ")[0].strip()
+                ok = (got == expected)
+                detail = "%s + %s -> %s" % (outlet[:16], url[:34], got)
+            elif kind == "SPREAD":
+                # SPREAD <same|apart> | <outlet> ::at:: <url> | <outlet> ::at:: <url>
+                # Do these two land in the SAME per-outlet bucket in spread_outlets?
+                # Asserted through spread_outlets itself, not through the key function it
+                # happens to call: the 28.08.2026 fault was precisely that credit() and
+                # spread_outlets resolved the masthead by two different routes, so a case
+                # pinned to the shared helper would pass again the moment one of them
+                # stopped using it. A third, unrelated outlet is added because with only
+                # two items the round-robin cannot distinguish one bucket from two -
+                # grouped deals 0,2,1 and separate deals 0,1,2.
+                def _mk(field):
+                    o, _, u = field.partition("::at::")
+                    return {"headline": "UK council approves new policy",
+                            "outlet": o.strip(), "url": u.strip(),
+                            "summary": "", "categories": []}
+                probe = [_mk(parts[0]), _mk(parts[1]),
+                         {"headline": "UK council approves new policy",
+                          "outlet": "Filler Gazette", "url": "",
+                          "summary": "", "categories": []}]
+                order = compose.spread_outlets([0, 1, 2], probe)
+                got = "same" if order == [0, 2, 1] else (
+                    "apart" if order == [0, 1, 2] else "order=%s" % order)
+                ok = (got == expected.lower())
+                detail = "%s + %s -> %s" % (probe[0]["outlet"][:14],
+                                            probe[1]["outlet"][:14], got)
+            elif kind == "PAYWALL":
+                # PAYWALL <yes|no> | <outlet>
+                # Whether the credit line earns its "(£)". Naming and paywall status are set
+                # by two different tables, and on 27.08.2026 Chris corrected both on the same
+                # outlet in one note - so the fixture has to be able to state them separately.
+                raw = "|".join(parts).strip()
+                name = compose.tidy_outlet(raw)
+                got = "yes" if compose.PAYWALLED_OUTLETS.match(name) else "no"
+                ok = (got == expected)
+                detail = "%s -> %s" % (name[:34], got)
             else:
                 failed.append((n, "unknown assertion %r" % kind))
                 continue
@@ -351,6 +492,85 @@ def run(verbose=False):
                        % (len(self_blocked),
                           ", ".join(sorted({b for b, _ in self_blocked})))))
 
+
+    # The gnews decoder must not truncate a URL at its query value. See the function below.
+    trunc = test_gnews_decode_unescape()
+    if not trunc:
+        passed += 1
+    else:
+        failed.append(("smoke", "%d gnews payload(s) decoded to a truncated URL: %s"
+                       % (len(trunc), "; ".join("got %s, want %s" % (g, w)
+                                                for g, w in trunc))))
+
+    # A decode that is really a paginated index must not be trusted. See the function below.
+    idx = test_gnews_index_decode_flagged()
+    if not idx:
+        passed += 1
+    else:
+        failed.append(("smoke", "%d decoded URL(s) misjudged as article/index: %s"
+                       % (len(idx), "; ".join(idx))))
+
+    # A relaying primary source must not lead a cluster. See the function below.
+    relay = test_cluster_relay_not_primary()
+    if not relay:
+        passed += 1
+    else:
+        failed.append(("smoke", "%d cluster-provenance failure(s): %s"
+                       % (len(relay), "; ".join(relay))))
+
+    # SOURCE_TIER must not substring-match a different masthead. See the function below.
+    tiermatch = test_source_tier_not_substring()
+    if not tiermatch:
+        passed += 1
+    else:
+        failed.append(("smoke", "%d SOURCE_TIER mis-match(es): %s"
+                       % (len(tiermatch), "; ".join(tiermatch))))
+
+    # A dead redirect must not lead a cluster over a clean sibling. See the function below.
+    clead = test_cluster_lead_prefers_a_readable_link()
+    if not clead:
+        passed += 1
+    else:
+        failed.append(("smoke", "cluster lead link quality: %s" % "; ".join(clead)))
+
+    # A site that identifies articles by query string must not retire wholesale. See below.
+    ukey = test_url_key_keeps_article_ids()
+    if not ukey:
+        passed += 1
+    else:
+        failed.append(("smoke", "url_key: %s" % "; ".join(ukey)))
+
+    # A WordPress REST collection must parse as a feed. See the function below.
+    wpj = test_wpjson_parses_as_a_feed()
+    if not wpj:
+        passed += 1
+    else:
+        failed.append(("smoke", "wpjson feed mode: %s" % "; ".join(wpj)))
+
+    # The sheet's coverage line must measure readability, not fetch work. See below.
+    cov = test_text_coverage_line_counts_openings()
+    if not cov:
+        passed += 1
+    else:
+        failed.append(("smoke", "text coverage line: %s" % "; ".join(cov)))
+
+    # Judgement/measurement files, not just scripts. See test_all_data_files_backed_up.
+    unbacked, orphans = test_all_data_files_backed_up()
+    if not unbacked:
+        passed += 1
+    else:
+        # Three failure classes share this list and the message must fit all of them: a plain
+        # filename means "backed up nowhere"; the other two arrive as whole sentences. The
+        # first version hard-coded the first class into the prefix and then printed
+        # "not declared derived: X is declared derived by compose.py", which reads as a
+        # contradiction to whoever hits it at 6am.
+        failed.append(("smoke", "%d data-file backup problem(s) - a bare filename is in no "
+                                "backup list and declared derived by nothing: %s"
+                       % (len(unbacked), "; ".join(unbacked))))
+    if orphans:
+        print("  note: %d orphan data file(s) on disk, in no backup list and read by no "
+              "code: %s" % (len(orphans), ", ".join(orphans)))
+
     print("\n%d passed, %d failed, %d total" % (passed, len(failed), passed + len(failed)))
     for n, msg in failed:
         # n is a line number for a testcases.txt case and a label ("smoke") for the built-in
@@ -490,6 +710,502 @@ def test_no_self_blocked_feed():
             if b and b in blob:
                 bad.append((b, blob[:90]))
     return bad
+
+def test_cluster_lead_prefers_a_readable_link():
+    """The one line the sheet prints must not be the cluster member with a dead link.
+
+    corroborate() sorts on rank_score, which is _score + TIER_BUMP + ACTION_BUMP and knows
+    nothing about the URL. So an item whose link is an undecodable Google News redirect
+    sorted level with a sibling carrying a clean publisher URL for the identical story.
+    On 01.09.2026 that put Japan Today's redirect - which resolve() returns None for - at
+    the head of a cluster whose other member, The Japan Times, had
+    japantimes.co.jp/news/2026/08/31/japan/marriage-wish-survey and was supplying the text
+    the sheet printed. Chris asked why the story linked where it did.
+
+    This is the same shape as the relay bug fixed the day before: cluster_rank DOES weigh
+    link quality, and cluster_rank is not what chooses this line.
+
+    Relay status still dominates - a primary source with an ugly link keeps the lead over a
+    newsroom relaying it, because that is a provenance question and this is only a
+    readability one.
+    """
+    import shortlist
+    bad = []
+    GN = ("https://news.google.com/rss/articles/CBMirAFBVV95cUxQZGNNQ1pQLW1mU3dndF9i"
+          "NjlRa2tFNWIwa3pwSGE1UDJMSGZ4Q0Jndj")
+    def it(outlet, url, headline):
+        return {"outlet": outlet, "url": url, "headline": headline, "_score": 5,
+                "summary": "", "categories": []}
+    a = it("Japan Today", GN,
+           "35% of unmarried young people in Japan say they do not plan to marry: survey")
+    b = it("The Japan Times",
+           "https://www.japantimes.co.jp/news/2026/08/31/japan/marriage-wish-survey",
+           "35% of young unmarried people in Japan have no wish to get wed")
+    for pair in ([a, b], [b, a]):          # order in must not decide order out
+        ranked = sorted(pair, key=shortlist.cluster_lead_key)
+        if "news.google.com" in (ranked[0].get("url") or ""):
+            bad.append("a cluster led by an undecodable redirect while a sibling had a "
+                       "direct publisher URL (input order %s)"
+                       % ("redirect first" if pair[0] is a else "direct first"))
+    # ORDERING: provenance must outrank readability. Without this the two terms can be
+    # swapped and every test still passes - which was true when this test was first written,
+    # so the docstring's claim that relay dominates was unenforced.
+    # relays_another_outlet() is True only for a PRIMARY_SOURCE item - a newsroom holds no
+    # provenance bump and so cannot lose it. Both fixtures therefore have to be primary
+    # sources; only their summaries and links differ.
+    relay_clean = it("SPUC", "https://spuc.org.uk/burnham-abstains",
+                     "Andy Burnham will NOT vote on assisted suicide")
+    relay_clean["summary"] = ("According to The Telegraph, the Prime Minister will abstain "
+                              "at second reading.")
+    primary_ugly = it("ADF International", GN,
+                      "ADF files brief in Supreme Court prayer case")
+    primary_ugly["summary"] = "ADF International filed its opening merits brief on Monday."
+    if not shortlist.relays_another_outlet(relay_clean):
+        bad.append("fixture problem: the relay item is not being detected as a relay, so "
+                   "the ordering assertion below proves nothing")
+    else:
+        ranked = sorted([relay_clean, primary_ugly], key=shortlist.cluster_lead_key)
+        if ranked[0] is relay_clean:
+            bad.append("a relaying newsroom with a clean link beat a primary source with a "
+                       "redirect - readability is outranking provenance")
+    return bad
+
+
+def test_url_key_keeps_article_ids():
+    """seen.json keys must distinguish articles a site identifies by query string.
+
+    url_key dropped the whole query, which is right for tracking junk and for display
+    variants (edition=us-edition is most of the query-carrying URLs in any sweep and must
+    still collapse), and catastrophic for a site whose article id IS the query. Forum 18
+    serves every article from /archive.php?article_id=N, so all of them keyed to
+    "forum18.org/archive.php": one piece ran on 19.08.2026 and every later Forum 18 article
+    arrived flagged "[ran 08-19]" and was skipped as a repeat. Found 01.09.2026 when Chris
+    asked why a Forum 18 report on Russia ordering Bibles destroyed was not picked.
+    """
+    import fetch_feeds
+    bad = []
+    k = fetch_feeds.url_key
+    if k("https://www.forum18.org/archive.php?article_id=3067") == \
+       k("https://www.forum18.org/archive.php?article_id=3041"):
+        bad.append("two different Forum 18 articles share one seen-key - the whole source "
+                   "retires the first time any one of its articles runs")
+    if "article_id=3067" not in k("https://www.forum18.org/archive.php?article_id=3067"):
+        bad.append("article_id is not retained in the key")
+    # Display variants and tracking must STILL collapse, or one article keys twice and
+    # every repeat check silently stops working for it.
+    if k("https://spectator.com/a/?edition=us-edition") != \
+       k("https://spectator.com/a/?edition=uk-edition"):
+        bad.append("edition= is being kept; one Spectator article now has two keys")
+    if k("https://e.com/s?utm_source=x&utm_medium=y") != k("https://e.com/s"):
+        bad.append("utm_* tracking parameters are being kept")
+    if k("https://e.com/s/") != k("https://e.com/s"):
+        bad.append("trailing-slash normalisation regressed")
+    return bad
+
+
+def test_wpjson_parses_as_a_feed():
+    """The ADF route. Returns a list of problems; empty means pass.
+
+    A WordPress REST collection must come out shaped exactly like parse_feed's entries -
+    same keys, tz-aware date from date_gmt, entities unescaped - or the sweep drops it
+    silently. Exists because ADF is the body the provenance rule names first and it had gone
+    eight editions contributing one item: adfmedia.org was never a configured source, and
+    every conventional route into it is dead (its feeds serve zero, /press-releases 404s,
+    gnews indexes nothing but "Book an Interview"). wp-json was the way in.
+    """
+    import fetch_feeds
+    import json as _json
+    bad = []
+    raw = _json.dumps([
+        {"date": "2026-08-31T15:56:50",
+         "date_gmt": "2026-08-31T19:56:50",
+         "link": "https://adfmedia.org/press-release/orthodox-jew-asks-us-supreme-court/",
+         "title": {"rendered": "Orthodox Jew asks for freedom to pray with friends&#8217; "
+                               "without a permit"},
+         "excerpt": {"rendered": "<p>ADF attorneys filed a petition.</p>"}},
+    ]).encode()
+    try:
+        rows = fetch_feeds.parse_wpjson(raw, "ADF")
+    except Exception as exc:  # noqa: BLE001
+        return ["parse_wpjson raised %s" % type(exc).__name__]
+    if len(rows) != 1:
+        return ["parsed %d rows, expected 1" % len(rows)]
+    r = rows[0]
+    for k in ("title", "link", "date", "author", "source", "feed_title", "summary",
+              "categories"):
+        if k not in r:
+            bad.append("missing the %r key parse_feed emits" % k)
+    if r.get("date") is None or r["date"].tzinfo is None:
+        bad.append("date must be tz-aware or the window filter compares naive to aware")
+    elif r["date"].hour != 19:
+        bad.append("date_gmt must win over site-local date, got hour=%d" % r["date"].hour)
+    if "&#8217;" in r.get("title", ""):
+        bad.append("WordPress entities not unescaped - the doc quotes headlines verbatim")
+    if "<p>" in r.get("summary", ""):
+        bad.append("excerpt HTML not stripped")
+    try:
+        fetch_feeds.parse_wpjson(b'{"code":"rest_no_route"}', "ADF")
+        bad.append("an error body parsed as an empty feed instead of raising")
+    except ValueError:
+        pass
+    except Exception as exc:  # noqa: BLE001
+        bad.append("an error body raised %s, expected ValueError" % type(exc).__name__)
+    return bad
+
+
+def test_text_coverage_line_counts_openings():
+    """The sheet's coverage line must count `opened`. Returns problems; empty means pass.
+
+    Until 01.09.2026 it reported only what the run had to FETCH and omitted openings - the
+    main text route - entirely. On a warm cache that read 19% while true coverage was 89%,
+    and in the other direction a total failure of attach_openings would have left the line
+    looking unchanged. The brief tells the morning run to report this number and treat a
+    drop as "the day was ranked on headlines", so it has to mean readability.
+    """
+    bad = []
+    src = open(os.path.join(HERE, "shortlist.py")).read()
+    i = src.find("text coverage:")
+    if i < 0:
+        return ["the sheet no longer prints a 'text coverage:' line"]
+    block = src[max(0, i - 2500):i + 1500]
+    if "opened" not in block:
+        bad.append("the coverage line does not mention `opened`; the main text route is "
+                   "being dropped from the number again")
+    if "_text_route" not in block:
+        bad.append("coverage is not computed per-lead, so it cannot report readability")
+    # Must mirror the sheet's own branch order or the number describes something the sheet
+    # does not print.
+    for route in ("_opening", "_preview", "real_summary", "_lede", "_sibtext"):
+        if route not in block:
+            bad.append("coverage route %s missing from _text_route" % route)
+    return bad
+
+
+def test_gnews_decode_unescape():
+    """decode_gnews must return the WHOLE publisher URL, query value included.
+
+    Chris, 31.08.2026. Google escapes characters inside the batchexecute payload as \\uXXXX,
+    and "=" is the one that matters because every query value starts with one. _GARTURL_RE
+    captured [^\\"]+, which stops dead at the backslash, so every decoded URL was cut at its
+    first parameter: "...obituary?id" for "...obituary?id=62306633".
+
+    It never published a wrong link - _looks_truncated plus the title check caught these and
+    fell back to keeping the redirect - so the symptom was silent: redirects reported as
+    "could not be resolved" that Google had in fact resolved correctly. Two of today's were
+    porn spam injected into a compromised Smithsonian host, which is how it was noticed at
+    all. Fixtures are real payloads captured off the wire, so this runs offline.
+    """
+    cases = [
+        # legacy.com - the query value IS the article id. Captured off the wire 31.08.2026;
+        # the payload nests one JSON string in another, so \" is one backslash and the
+        # \uXXXX escape arrives with two.
+        (r'[\"garturlres\",\"https://www.legacy.com/us/obituaries/name/'
+         r'james-rushton-obituary?id\\u003d62306633\",1]',
+         "https://www.legacy.com/us/obituaries/name/james-rushton-obituary?id=62306633"),
+        # the ABC News shape named in _looks_truncated (20.08.2026)
+        (r'[\"garturlres\",\"https://abcnews.go.com/Politics/story?id\\u003d12345\",1]',
+         "https://abcnews.go.com/Politics/story?id=12345"),
+        # two parameters, plus an escaped forward slash in the path
+        (r'[\"garturlres\",\"https://example.com/a\\/b?x\\u003d1&y\\u003d2\",1]',
+         "https://example.com/a/b?x=1&y=2"),
+        # no query at all - must come back byte-identical
+        (r'[\"garturlres\",\"https://example.com/plain-story\",1]',
+         "https://example.com/plain-story"),
+    ]
+    bad = []
+    for raw, want in cases:
+        m = resolve._GARTURL_RE.search(raw)
+        got = resolve._unescape_garturl(m.group(1)).rstrip("/") if m else None
+        if got != want:
+            bad.append((got, want))
+    return bad
+
+
+def test_gnews_index_decode_flagged():
+    r"""A decode that is really a paginated index must be made to prove itself.
+
+    Chris, 31.08.2026, found while fixing the \uXXXX truncation above - and the reason that
+    fix could not ship on its own. resolve_one() treats a well-formed decode as authoritative
+    and returns it WITHOUT a title check, on the reasoning in decode_gnews: Google's answer
+    beats a constructed URL, and title-verifying it would throw away correct decodes whenever
+    the publisher blocks the fetch (the Telegraph and Times do).
+
+    That reasoning holds for article URLs. It does not hold for what Google actually returns
+    for some feeds: a paginated category index. Nine Premier Christian News items and two
+    Desiring God items decoded to "/category/uk-news?page=475" and "/articles/all?page=271"
+    on 31.08.2026 - one listing page standing in for nine different stories.
+
+    Before the truncation fix these arrived as "...?form" and "...?page", which _looks_truncated
+    caught, so the title check ran, the index page failed it and the redirect was kept. Safe,
+    but only by accident: repairing the truncation made them structurally clean and would have
+    published all nine as article links. So index-shaped decodes now take the same route
+    truncated ones do - confirm or be dropped. Syntactic, no network, so a correct article
+    decode from a blocking publisher is never discarded.
+    """
+    bad = []
+    index_shaped = [
+        "https://premierchristian.news/en/category/uk-news?form=pcn-main&page=475",
+        "https://premierchristian.news/us/category/uk-news?page=791&form=newsnewsletter",
+        "https://www.desiringgod.org/articles/all?page=271&sort=864",
+        "https://www.desiringgod.org/scripture/1-corinthians.html?page=10&sort=oldest",
+        "https://example.com/tag/abortion",
+        "https://example.com/author/jane-smith?page=2",
+        "https://example.com/",
+    ]
+    article_shaped = [
+        "https://www.legacy.com/us/obituaries/name/james-rushton-obituary?id=62306633",
+        "https://www.telegraph.co.uk/us/news/2026/08/30/maduro-flashes-peace-sign-prison-picture",
+        "https://youtu.be/OICjuY3PZHE?si=oMhJ3skAgdCyDJkB",
+        "https://www.brusselstimes.com/belgium/2294776/flemish-students-return-to-school",
+        "https://www.milb.com/asheville/video/christian-rodriguez-in-play?t=t573-default-vtp",
+        # WORLD's real URL shape - the standing proof that slugs are not guessable. Must
+        # never be mistaken for an index just because the tail is numeric.
+        "https://wng.org/sift/some-headline-here-1786558522",
+    ]
+    for u in index_shaped:
+        if not resolve._looks_like_index(u):
+            bad.append("index not flagged: %s" % u)
+    for u in article_shaped:
+        if resolve._looks_like_index(u):
+            bad.append("article wrongly flagged: %s" % u)
+    return bad
+
+
+def test_cluster_relay_not_primary():
+    r"""A primary source RELAYING another outlet must not lead a cluster over that outlet.
+
+    Chris, 31.08.2026, from his markup of the 31.08 edition. Six national newsrooms filed
+    original reporting that Burnham would abstain on the assisted dying Bill - Telegraph,
+    Times, Independent x2, Manchester Evening News, LBC - and cluster_rank collapsed every
+    one of them under SPUC's item, whose own summary opens "According to Politics UK, Andy
+    Burnham has told Labour MPs...". The sheet prints one line per story, so the only line
+    the curator ever saw was SPUC's, and the edition ran an opinion column in place of the
+    news report. Same mechanism put Advocate.com over the Washington Post on the trans
+    military filing.
+
+    PRIMARY_SOURCE exists for the opposite case and must keep working: when ADF International
+    obtains and publishes a UN letter, that release IS the document and beats a newsroom's
+    write-up of it (14.08.2026). The distinction is issuing versus relaying, so the test is
+    attribution in the item's OWN feed summary - available at cluster time, unlike article
+    text, which is fetched only after leads are chosen.
+
+    The institution guard is the load-bearing half: "according to a new Government
+    assessment" is Right To Life reading a document, not relaying a newsroom, and that item
+    was tier 1 in the same edition.
+    """
+    prim = "SPUC"
+    cases = [
+        # (outlet, summary, expect_relay)
+        (prim, "Image Source: (L) UK Parliament According to Politics UK, Andy Burnham has "
+               "told Labour MPs that he will not be voting on the Bill.", True),
+        (prim, "Total decriminalisation would strip away existing legal time limits, opening "
+               "the door to abortion on demand up to the moment of birth.", False),
+        ("Right To Life UK",
+               "29 August 2026 - A new Government assessment of the revived assisted suicide "
+               "Bill has warned that poverty and poor care could lead to more deaths.", False),
+        ("Right To Life UK",
+               "A leaked copy of the Scottish National Party's conference draft agenda has "
+               "revealed that it includes a motion calling for a change in the law.", False),
+        # ADF publishing a document it obtained - must stay primary
+        ("ADF International",
+               "UN experts have released a letter warning Nigeria over blasphemy laws, "
+               "according to the United Nations special rapporteurs.", False),
+        # explicit newsroom relay forms
+        (prim, "The Telegraph reports that the Bill will return to the Commons in September.", True),
+        (prim, "As reported by Politico, the vote has been delayed.", True),
+        # a newsroom is never penalised - the bump is not theirs to lose
+        ("The Telegraph", "According to Politics UK, Burnham will abstain.", False),
+    ]
+    bad = []
+    for outlet, summary, want in cases:
+        got = shortlist.relays_another_outlet({"outlet": outlet, "summary": summary})
+        if bool(got) != want:
+            bad.append("%s: relay=%s want=%s | %s" % (outlet, bool(got), want, summary[:52]))
+
+    # THE SHEET's collapse, which is what a curator actually sees. corroborate() picks the
+    # one line printed per story and sorts by rank_score - which has no PRIMARY_SOURCE term
+    # at all - so this is a DIFFERENT selection from cluster_rank below. Getting this wrong
+    # once (31.08.2026) meant a fix that passed its own test changed nothing in the sheet.
+    spuc_row = {"headline": "Andy Burnham will NOT vote on assisted suicide", "outlet": "SPUC",
+                "summary": "According to Politics UK, Andy Burnham has told Labour MPs that "
+                           "he will not be voting on the Bill.",
+                "_score": 40, "_section": "Life"}
+    tel_row = {"headline": "Burnham to abstain from assisted dying vote",
+               "outlet": "The Telegraph", "summary": "Burnham to abstain from assisted dying "
+                                                     "vote The Telegraph",
+               "_score": 10, "_section": "Life"}
+    rows = [spuc_row, tel_row]
+    corr = shortlist.corroborate(rows)
+    lead = corr[id(spuc_row)][1]
+    if lead is not tel_row:
+        bad.append("sheet lead is %s, want The Telegraph (corroborate/rank_score path)"
+                   % lead.get("outlet"))
+
+    # and the ordering the whole thing exists for
+    tel = {"outlet": "The Telegraph", "summary": "Burnham to abstain from assisted dying vote",
+           "headline": "Burnham to abstain from assisted dying vote", "_score": 5}
+    spuc = {"outlet": "SPUC", "headline": "Andy Burnham will NOT vote on assisted suicide",
+            "summary": "According to Politics UK, Andy Burnham has told Labour MPs that he "
+                       "will not be voting on the Bill.", "_score": 5}
+    if shortlist.cluster_rank(spuc) > shortlist.cluster_rank(tel):
+        bad.append("relaying SPUC still outranks the Telegraph's own report")
+    # ...without breaking the ADF case it was built for
+    adf = {"outlet": "ADF International", "headline": "UN Experts Release Letter Warning of",
+           "summary": "ADF International has obtained and published the letter.", "_score": 5}
+    ewtn = {"outlet": "EWTN", "headline": "UN letter warns Nigeria", "summary": "", "_score": 9}
+    if shortlist.cluster_rank(adf) < shortlist.cluster_rank(ewtn):
+        bad.append("ADF's own release no longer beats EWTN's write-up")
+    return bad
+
+
+def test_source_tier_not_substring():
+    r"""SOURCE_TIER is matched by substring, and "the times" is a substring of others.
+
+    Chris, 31.08.2026. "the times" matched "The Times of India" and "The Times of Israel",
+    so both were scored as The Times of London: TIER_BUMP and the same tier_pos. 29 items on
+    that one sweep. It surfaced while chasing why the Burnham-abstain cluster would not lead
+    with the Telegraph - once SPUC's relay was demoted the lead went to The Times of India,
+    which had beaten the Telegraph on a bump it should never have had.
+
+    The rule: a SOURCE_TIER entry followed by " of " is a DIFFERENT masthead. Church Times,
+    Christian Post and the rest are unaffected, and The Times itself must keep its place.
+    """
+    bad = []
+    should = ["The Times", "Church Times", "The Christian Post", "The Telegraph", "Crux",
+              "Catholic Herald", "The Critic", "spiked", "GB News"]
+    should_not = ["The Times of India", "The Times of Israel", "The Times of India (cities)",
+                  "Korea JoongAng Daily", "Hindustan Times"]
+    for o in should:
+        if shortlist.source_tier_pos(o) is None:
+            bad.append("%s should be in SOURCE_TIER" % o)
+    for o in should_not:
+        if shortlist.source_tier_pos(o) is not None:
+            bad.append("%s must NOT match SOURCE_TIER" % o)
+    return bad
+
+
+def test_all_data_files_backed_up():
+    r"""Every judgement/measurement file here must be in STATE_FILES or JUDGEMENT_FILES.
+
+    Chris, 31.08.2026. The sibling test above walks only .py and .sh, so a missing .txt raised
+    nothing - which is how rank_eval_log.txt came to have never been backed up by any of the
+    three lists. It is the accumulated before/after of every scoring change ever made, it
+    cannot be rebuilt without every historical version of importance(), and the only reason
+    anyone noticed is that a push was being watched at the time. Widening the invariant from
+    "every script" to "every file we could not rebuild" is the point.
+
+    Three buckets, because a data file has three legitimate states and collapsing them is what
+    let this hide:
+
+      MISSING     it is ours, we could not rebuild it, and nothing backs it up. A real fault.
+      DERIVED     regenerated from scratch every run, so backing it up is noise. Listed
+                  explicitly with the command that rewrites it - an unexplained absence from
+                  the backup lists must never be inferred to be this.
+      ORPHAN      on disk, in no list, and read by no code. Reported separately rather than
+                  ignored: silently tolerating it is how a stale copy of a live file sits next
+                  to the real one for weeks. The bucket is EMPTY now; the case that built it
+                  was briefing-sources.opml, 48K of older Feedly export that nothing
+                  imported, beside the 72K sources.opml fetch_feeds.py actually reads.
+    """
+    import glob
+    import re
+    path = os.path.join(HERE, "state_sync.sh")
+    if not os.path.isfile(path):
+        return (["state_sync.sh itself is missing"], [])
+    with open(path) as fh:
+        src = fh.read()
+    listed = set()
+    for name in ("STATE_FILES", "JUDGEMENT_FILES"):
+        m = re.search(r'%s="((?:[^"\\]|\\.)*)"' % name, src, re.S)
+        if not m:
+            return (["could not parse %s out of state_sync.sh" % name], [])
+        listed |= set(m.group(1).replace("\\\n", " ").split())
+
+    # DERIVED is collected from the scripts, not held here. Each writer declares its own
+    # rewritten-every-run outputs as a module-level DERIVED_OUTPUTS tuple (compose.py has the
+    # only one today), and this test reads those declarations. Chris, 31.08.2026: the previous
+    # version kept the list in this file, where the path of least resistance for anyone hitting
+    # a red run was to append to it - which is exactly how the gap it was written to catch
+    # would come back.
+    #
+    # Parsed with ast, deliberately, not regex: a DECLARATION is reliably parseable where a
+    # USAGE pattern is not. An earlier attempt inferred derivation by scanning for
+    # open(NAME, "w") and found no access at all for 8 of the 19 data files, because they are
+    # written through helpers. Inference was then abandoned for a stronger reason: the only
+    # property a static pass could see - "written but never read back" - is FALSE for both
+    # genuinely derived files. mark_published.py reads expected_urls.txt and composed.json;
+    # archive_day.py reads composed.json. What makes them derived is that one command recreates
+    # them whole from backed-up inputs, which no static analysis can establish. So this is a
+    # declaration that cannot be made in the test, which is the honest guarantee available.
+    import ast
+    DERIVED = {}
+    for script in sorted(glob.glob(os.path.join(HERE, "*.py"))):
+        try:
+            tree = ast.parse(open(script).read())
+        except SyntaxError:
+            continue
+        for node in tree.body:
+            if not isinstance(node, ast.Assign):
+                continue
+            if not any(getattr(t, "id", None) == "DERIVED_OUTPUTS" for t in node.targets):
+                continue
+            try:
+                for name in ast.literal_eval(node.value):
+                    DERIVED[name] = os.path.basename(script)
+            except (ValueError, TypeError):
+                pass
+
+    ORPHANS = {}
+
+    # Each declared derived file must have a WRITER. This is a deliberate stand-in for the real
+    # guarantee - delete it, run the pipeline, confirm it comes back - which was costed on
+    # 31.08.2026 and rejected for the fixture:
+    #
+    #   * rebuilding needs /tmp/today.json AND /tmp/picks.json, both ephemeral and gone by the
+    #     next morning, plus network for link resolution, title verification and bylines. A
+    #     dry-run compose took 4-5 minutes against this fixture's ~2 seconds offline.
+    #   * worse, delete-then-rebuild DISARMS two guards to run. Without composed.json,
+    #     mark_published.py stops refusing a stale run and marks every pick "including any a
+    #     section cap dropped" - burning cap losers that should stay available. Without
+    #     expected_urls.txt, the only check that catches an INVENTED url is gone (it was
+    #     silently empty on 17.08.2026 and that is exactly what happened). A network flake
+    #     mid-rebuild leaves both disarmed in a directory whose next command may be
+    #     mark_published.py. A test must not be able to cause the fault it checks for.
+    #
+    # So this asserts the cheap half: the claim is plausible because something writes the file.
+    # It catches the mis-declaration that matters - a file called derived that nothing rebuilds,
+    # which would then be backed up nowhere. If the full check is ever wanted it belongs in a
+    # separate script, run deliberately, against a throwaway COPY of this directory, moving
+    # files aside rather than deleting them.
+    #
+    # Matched by looking at the ~40 chars after the filename literal rather than by parsing the
+    # call, after three structural patterns failed: [^)]* breaks on the ")" inside
+    # os.path.join(HERE_DIR, "composed.json"). That brittleness is the reason the declaration
+    # lives beside the writer and this test only sanity-checks it.
+    _py_src = {os.path.basename(f): open(f).read()
+               for f in glob.glob(os.path.join(HERE, "*.py"))}
+
+    def _writer_of(fname):
+        needle = re.escape('"%s"' % fname) + "|" + re.escape("'%s'" % fname)
+        for script, text in sorted(_py_src.items()):
+            for m in re.finditer(needle, text):
+                if re.match(r'\s*\)?\s*,\s*["\'][wa]', text[m.end():m.end() + 40]):
+                    return script
+        return None
+
+    on_disk = {os.path.basename(p) for pat in ("*.txt", "*.json", "*.opml")
+               for p in glob.glob(os.path.join(HERE, pat))}
+    missing = sorted(on_disk - listed - set(DERIVED) - set(ORPHANS))
+    # A file cannot be both backed up and declared throwaway: one of the two is a mistake, and
+    # left alone it would read as deliberate to whoever finds it next.
+    missing += sorted("%s is declared derived by %s AND listed in state_sync.sh - pick one"
+                      % (f, DERIVED[f]) for f in DERIVED if f in listed)
+    missing += sorted("%s is declared derived by %s but NO script writes it - if nothing "
+                      "rebuilds it, it is not derived, it is unbacked"
+                      % (f, DERIVED[f]) for f in DERIVED if not _writer_of(f))
+    orphans = sorted(f for f in ORPHANS if os.path.isfile(os.path.join(HERE, f)))
+    return (missing, orphans)
+
 
 if __name__ == "__main__":
     sys.exit(run(verbose="-v" in sys.argv))
