@@ -13,6 +13,9 @@
 #   SUPPRESS         | <outlet> | <headline>      (chaff / school gates / local incident)
 #   KEEP             | <outlet> | <headline>      (must NOT be suppressed)
 #   OUTLET  <shown>  | <raw outlet name>          (tidy_outlet, incl. paywall renames)
+#   CREDIT  <shown>  | <raw outlet name> | <url>  (who the credit NAMES, name + link together)
+#   SPREAD  <same|apart> | <outlet> ::at:: <url> | <outlet> ::at:: <url>
+#                                                 (one per-outlet bucket, or two?)
 #   ABOVE            | <headline A> | <headline B>  (A must outrank B in importance())
 #
 # ABOVE is the RANKING record - the ground truth the other kinds are for classification.
@@ -661,3 +664,532 @@ SECTION Religious Freedom & Persecution | National Review | Virginia's 'Religiou
 # 4 loose placements and sent 6 items to no section, two of them real border stories. So this
 # headline stays in Immigration: a wrong section is visible in the sheet, an unclassified item
 # is not.
+
+# --- Chris, 27.08.2026: markup of the 20260827 edition -------------------------------------
+# Twenty-six corrections on one edition. They fall into four groups, and the third is the
+# one that matters most: three stories were placed in the wrong country block by machinery
+# that had the right answer in front of it.
+
+# 1. "Remove as a source permanently" against each of these. News18 was already in
+# ENTERTAINMENT_DESKS, which only gates the marriage-gossip rule - it was never a ban, so its
+# religious-freedom output published freely. nenews.in and basketballnews.com arrive as bare
+# domains; the rest under their mastheads.
+BLOCKED | Dainik Jagran MP CG
+BLOCKED | Muslim Network TV
+BLOCKED | News18
+BLOCKED | nenews.in
+BLOCKED | The Topeka Capital-Journal
+BLOCKED | basketballnews.com
+BLOCKED | The Catholic Thing
+BLOCKED | Oz Arab Media
+
+# 2. Outlet naming. Each printed in the 27.08 edition under the name on the right of the pipe.
+# FIRE's masthead contains a pipe of its own and arrives truncated by the feed, which is why
+# the OUTLET assertion had to learn to carry one.
+OUTLET Swiss Info | SWI swissinfo.ch
+OUTLET FIRE | FIRE | Foundation for Individual Rights and 
+OUTLET FIRE | FIRE | Foundation for Individual Rights and Expression
+OUTLET NY Post | New York Post
+OUTLET Premier Christianity | Premier Christianity Magazine
+# "This source should read Premier Christianity and have a paywalled (£) with it."
+PAYWALL yes | Premier Christianity Magazine
+PAYWALL yes | Premier Christianity
+
+# 3. Country grouping. All three were decided without reading the article, and in two of them
+# the article was sitting right there.
+#
+# "While US is in the headline, this is a UK story. Shouldn't you be scanning text to confirm
+# such news" - HMRC is the actor and "US" only modifies the consultants it hired. The opening
+# names the Valuation Office Agency. region_detail consulted the body only when the headline's
+# sole geographic signal was a person's nationality, so a second, real place name shut the
+# body out entirely.
+REGION UK | Guido Fawkes | - | HMRC Recruited US Big Brother Experts for Tax Snooping Plans ::text:: The taxman hired US big brother experts to review its latest valuation and inspection technology. The Valuation Office Agency, now part of HMRC, hired a Washington consultancy.
+# "While Birmingham is a city in the UK, this is clearly a US story" - Birmingham, Michigan.
+# There is no body text at all here, so the outlet is the only evidence and it is decisive.
+REGION United States | FOX 2 Detroit | - | Birmingham parents split over schools' bell-to-bell cellphone ban
+# "This should be grouped with Australian stories" - NT is the Northern Territory. No place
+# token in the headline and no body, so this one is purely a hole in the outlet map.
+REGION Australia | NT Independent | - | Opinion: Euthanasia – the unheard side of the story
+# The UK reading of a bare "Birmingham" must survive for outlets that really are British.
+REGION UK | BBC UK | - | Birmingham to become England's first 20mph city
+
+# 4. Section. Four stories about the persecution of Christians filed as Church & Religion.
+SECTION Religious Freedom & Persecution | The Catholic Herald | Bishops consecrated in secret for Underground Church in China
+SECTION Religious Freedom & Persecution | Biblical Recorder | US advocacy promoted for China's 'Zion 8' church leaders awaiting verdicts
+SECTION Religious Freedom & Persecution | Word&Way | Settler Attacks Threaten the West Bank's Final Christian Village
+SECTION Religious Freedom & Persecution | The Catholic Herald | YouTuber converts, Leo says West has lost freedom and the UK bars Christian MP
+
+# 5. Not big enough to run. "Doesn't really cross section with our other issues."
+SUPPRESS | The Telegraph | Private schools ban Meta smart glasses amid bullying fears
+# One school's gadget rule is house-keeping; a government's is education policy.
+SUPPRESS | FOX 2 Detroit | Birmingham parents split over schools' bell-to-bell cellphone ban
+KEEP | The Guardian | Government bans phones in all English schools under new law
+KEEP | Sky News | Australia's nationwide social media ban for under-16s comes into force
+# The US-actor fallback must read the body too - a bare "US" was never a place signal, so it
+# skipped the borrowed-nationality test entirely and was filed American unread.
+REGION UK | Guido Fawkes | - | Taxman recruited US consultants for snooping plans ::text:: The Valuation Office Agency, now part of HMRC, hired a Washington consultancy to review its technology.
+REGION United States | Fox News | - | US troops deployed to Chicago ::text:: US troops arrived in Chicago on Tuesday morning.
+# "New Mexico should be further up in this section as we group by country" - the headline
+# named only DHS, which was not a US signal at all, so the story came out Unplaced.
+REGION United States | Law360 | - | Diocese Says Religious Freedom Fair Defense To DHS Taking
+
+# --- Chris, 27.08.2026: "Build story clustering across days" -------------------------------
+# Why it was needed. Right To Life published "Assisted suicide - Just over 2 weeks left" on
+# 25.08, we ran it, and on 27.08 they republished the identical piece at the same slug with
+# "-2" appended. seen.json is keyed on the URL, so the second copy was a story the pipeline
+# had never seen: it carried no [ran] flag at all and went into the edition unmarked. The
+# [ran] flag was never as reliable as it looked - it catches a repeat only when the publisher
+# reuses the URL.
+#
+# RANBEFORE | <headline today> ::was:: <headline in a recent edition>
+# Deliberately STRICTER than the within-day same_story: a wrong cross-day flag invites
+# dropping a story that never ran, which is the expensive error.
+RANBEFORE | Assisted suicide – Just over 2 weeks left ::was:: Assisted suicide – Just over 2 weeks left
+# A campaign countdown rewritten a week on is the same peg, not new news.
+RANBEFORE | Assisted suicide – Just over 3 weeks left ::was:: Assisted suicide – Just over 2 weeks left
+RANBEFORE | UK March for Life: Thousands expected in London on 5 September ::was:: UK March for Life: Thousands expected in London on 5 September
+# Two different stories from one campaigning outlet on one subject must NOT collapse. This is
+# the failure mode that would cost us a story, so it is asserted in both directions.
+NOTRANBEFORE | Labour MP and NHS doctor says care system must be fixed before considering assisted suicide ::was:: Assisted suicide – Just over 2 weeks left
+NOTRANBEFORE | Assisted suicide – Just over 2 weeks left ::was:: UK March for Life: Thousands expected in London on 5 September
+# A genuine development of a running story is new news and must stay unflagged - that is the
+# whole reason repeats are a judgement and not a suppression.
+NOTRANBEFORE | MPs vote down assisted suicide Bill at second reading ::was:: MPs to vote on assisted suicide Bill at second reading
+NOTRANBEFORE | Nigerian troops rescue 40 of the abducted mosque worshippers ::was:: Nigeria launches hunt for hundreds of kidnapped mosque worshippers
+# Same beat, different country: high word overlap, different story.
+NOTRANBEFORE | Goa cabinet clears anti-conversion bill with jail till end of life ::was:: Maharashtra anti-conversion law takes effect as churches sign forms
+# The ratio arm saturates on a short headline: a past headline with ONE significant word
+# scores 1.0 against anything sharing it. Measured on the 27.08 picks - 50 of 340 flagged,
+# and these were the ones that were plainly wrong.
+NOTRANBEFORE | Council switches off street lights in village where Andy Burnham will place 1,250 male asylum seekers ::was:: From the sea to the streets
+NOTRANBEFORE | Ceuta Crisis Forces Spain To Accelerate Asylum Law Reform ::was:: The Ceuta crisis isn't over
+# ...but a genuinely short pair that really is the same story must still match on the
+# absolute-count arm rather than the ratio.
+RANBEFORE | Bishops consecrated in secret for Underground Church in China ::was:: Bishops consecrated in secret for the Underground Church in China
+
+# --- Cross-day: the entity arm, turned on 27.08.2026 after repeat_eval.py --------------------
+# Word overlap alone finds 54% of same-story pairs; with a distinctive name in common plus
+# three shared significant words it finds 74%, and the flag rate on 30,000 real cross-day
+# same-section pairs stays at 19. ::entity:: builds an index over the pair so the arm fires.
+# These are rewrites - a different outlet's wording for one story - which is the whole case
+# the arm exists for and the case word overlap misses.
+RANBEFORE | Haiti church burns as gang kills 47 in farming area, UN says ::was:: Gang kills 47 in church attack, torches animals in Haiti ::entity::
+RANBEFORE | Court blocks Illinois assisted suicide mandate for religious objectors ::was:: Illinois agrees to pause enforcement of assisted suicide law against Catholic hospitals ::entity::
+#
+# Two things deliberately NOT asserted here, both found while writing these cases.
+#
+# 1. "Polish bishops demand full return of religion classes" / "Polish bishops warn reforms
+#    are marginalising religion in schools" is one story and is NOT linked, because
+#    is_development_of sees "return" - a NOUN here - and matches DEVELOPMENT's "returns?".
+#    That is the same asymmetry trap recorded above the DEVELOPMENT list, firing on a word
+#    already in it rather than one newly added. Left alone on purpose: the fix is to make
+#    DEVELOPMENT part-of-speech aware, which is a real change that needs its own measurement,
+#    and patching around one headline is what that note warns against.
+#
+# 2. The NEGATIVE side of the entity arm cannot be asserted in this file at all. A two-item
+#    fixture is a two-document corpus, so ENTITY_MIN_DF=2 makes every shared token look
+#    distinctive and ENTITY_MAX_DF never bites - the DF gate is exactly the thing that has no
+#    meaning at this scale. "Planned Parenthood staffer fired" against "St Louis Planned
+#    Parenthood suit" links here and correctly does not over a real corpus. Corpus-level
+#    behaviour is repeat_eval.py's job; this file holds the pair-level axioms.
+
+# --- Chris, 27.08.2026: "Fix the DEVELOPMENT noun/verb collision" ---------------------------
+# is_development_of fires on ASYMMETRY - one headline carrying a development word the other
+# lacks - so a word matched in its NOUN sense invents a stage difference that is not there.
+# Found via the Polish bishops pair, where "full return of religion classes" matched
+# DEVELOPMENT's "returns?" and stopped one story clustering with itself.
+#
+# Scoped by measurement, not by intuition. Scanning every DEVELOPMENT match across the eight
+# archived editions, only five tokens take a non-verbal reading in practice - return, returns,
+# win, wins, lost. The apparent noun readings of "convicted", "acquitted" and "dies" were an
+# artefact of the first heuristic tried ("followed by 'of'"), which is exactly BACKWARDS for
+# those: "convicted of rape" and "dies of malaria" are verbs. That heuristic was discarded.
+DEVELOPMENT no  | Polish bishops demand full return of religion classes ahead of school year ::vs:: Polish bishops warn reforms are marginalising religion in schools
+DEVELOPMENT no  | Court ruling is a win for Christian doctors ::vs:: Court backs Christian doctors in conscience case
+DEVELOPMENT no  | The lost generation of churchgoers ::vs:: Church attendance falls among the young
+# ...and the VERB senses must still register as a change of stage.
+DEVELOPMENT yes | Priest returns to ministry after abuse inquiry ::vs:: Priest suspended as abuse inquiry opens
+DEVELOPMENT yes | Christian doctors win appeal over conscience rights ::vs:: Christian doctors appeal conscience ruling
+# The verbs that legitimately take "of" must be untouched by the fix.
+DEVELOPMENT yes | Former priest convicted of child rape ::vs:: Former priest faces child rape trial
+DEVELOPMENT yes | German airport worker dies of malaria ::vs:: German airport worker in hospital with malaria
+# And the Polish pair, end to end, is what Chris actually saw.
+RANBEFORE | Polish bishops demand full return of religion classes ahead of school year ::was:: Polish bishops warn reforms are marginalising religion in schools ::entity::
+
+# --- Chris, 27.08.2026: "Fix the synonym-equivalence gap too" -------------------------------
+# is_development_of compares RAW matched strings, so two headlines describing one event with
+# different words look like two stages. Scanned across the archive for pairs that word overlap
+# would have merged and this function blocked, the causes ranked:
+#
+#     7x  win / wins          <- INFLECTION, not synonymy
+#     4x  return / returns    <- inflection
+#     2x  freed / released    <- genuine synonym
+#     2x  upholds / win       <- genuine synonym
+#     1x  resign / resignation, return / returned   <- inflection
+#     1x  overturning / struck down                 <- genuine synonym
+#
+# Inflection is two thirds of it and needs no semantic judgement at all, so it is fixed by
+# stemming. The synonym classes below are enumerated ONLY where the scan produced a real
+# blocked pair, each named in a comment - the list is evidence, not a thesaurus.
+DEVELOPMENT no  | Coalition Wins Court Fight Over Gender-Affirming Care Coverage ::vs:: Oregon AG celebrates court win in fight over gender-affirming care coverage
+DEVELOPMENT no  | La Marque residents call for mayor's resignation during tense meeting ::vs:: Residents call for La Marque Mayor to resign following indecent exposure charge
+DEVELOPMENT no  | US missionary kidnapped in Niger is released after 9 months in captivity ::vs:: American missionary abducted in Niger freed after nearly 10 months
+DEVELOPMENT no  | Supreme Court upholds Trump's order to overhaul mail-in ballots ::vs:: Supreme Court gives Trump an interim win on his mail voting order
+DEVELOPMENT no  | Texas drag show ban struck down by Reagan judge citing Dolly Parton ::vs:: Judge invokes Dolly Parton in overturning Texas drag show ban
+# Stages that are genuinely different must STILL block. Arrest and charge are left out of the
+# classes deliberately: the scan found one pair where they were the same story, but they are a
+# real progression and collapsing them would delete that signal everywhere it matters.
+DEVELOPMENT yes | Priest arrested over historic abuse claims ::vs:: Priest sentenced to eight years over historic abuse
+DEVELOPMENT yes | Bishop resigns after inquiry into abuse handling ::vs:: Bishop faces inquiry into abuse handling
+DEVELOPMENT yes | MPs vote down assisted suicide Bill at second reading ::vs:: MPs to vote on assisted suicide Bill at second reading
+
+# --- 28.08.2026: the Daily Sceptic's aggregation posts are credited to the paper they quote -
+# The Sceptic reposts a Telegraph or Mail story under its own domain, and the feed sets the
+# outlet field to the original masthead while the link goes to dailysceptic.org. The briefing
+# then credits a paper for a page it did not publish. Shipped wrong in the 28.08 edition:
+# "Number of foreign criminals on Britain's streets..." ran in Immigration & Asylum credited
+# to the Mail, linking to dailysceptic.org. The link is right - it is what the sweep supplied
+# and it is in expected_urls.txt - so this is a naming fault, not an invented URL.
+# OUTLET cannot state this: tidy_outlet only ever sees the name. credit() sees the whole item.
+CREDIT The Daily Sceptic | Daily Mail | https://dailysceptic.org/2026/08/27/number-of-foreign-criminals-on-britains-streets-who-should-be-deported-reaches-record-levels
+CREDIT The Daily Sceptic | The Telegraph | https://dailysceptic.org/2026/08/27/asylum-seekers-bumped-to-top-of-council-housing-list
+# The paywall flag rides along with the wrong name: item 960 in that sweep carried the
+# Telegraph's paywalled=True, so re-crediting the name alone would have printed a (£) on a
+# page anyone can read. Name and marker are one assertion because they are one fault.
+CREDIT The Daily Sceptic | The Telegraph | https://dailysceptic.org/2026/08/27/asylum-seekers-bumped-to-top-of-council-housing-list | paywalled
+# The ordinary cases must not move. A real Telegraph page keeps its masthead AND its (£),
+# and the Sceptic's own reporting is untouched - so the fix cannot be a blanket rename in
+# either direction, and cannot be done by dropping the paywall flag for everyone.
+CREDIT The Telegraph (£) | The Telegraph | https://www.telegraph.co.uk/world-news/2026/08/27/australian-woman-birth-twins-different-fathers-surrogate
+CREDIT The Daily Sceptic | The Daily Sceptic | https://dailysceptic.org/2026/08/26/police-chief-who-banned-maccabi-fans-investigated-for-gross-misconduct
+# The diversity cap must group by the SAME corrected masthead the credit line shows.
+# spread_outlets keyed on the raw feed field while credit() had begun correcting it, so two
+# Daily Sceptic reposts printed as the Sceptic but still spent the Mail's and the Telegraph's
+# slots in the per-outlet cap - and were dealt apart as though they were different papers,
+# which is the exact column-of-one-name effect the spread exists to prevent (28.08.2026).
+SPREAD same | Daily Mail ::at:: https://dailysceptic.org/2026/08/27/number-of-foreign-criminals-on-britains-streets-who-should-be-deported-reaches-record-levels | The Telegraph ::at:: https://dailysceptic.org/2026/08/27/asylum-seekers-bumped-to-top-of-council-housing-list
+# ...and genuinely different papers must still be dealt apart, or the "fix" is just a bucket
+# that swallows everything.
+SPREAD apart | The Telegraph ::at:: https://www.telegraph.co.uk/world-news/2026/08/27/australian-woman-birth-twins-different-fathers-surrogate | Daily Mail ::at:: https://www.dailymail.co.uk/news/article-1
+# RCP is NOT host-corrected: it is named correctly by its own feed, and the provenance we
+# want from it rides in the byline instead (see the BYLINE cases below). This case exists to
+# keep it that way - if realclearpolicy.com is ever added to REPUBLISHER_HOSTS again it will
+# still pass, which is the point: the entry would be inert, and an inert entry that looks
+# like a safeguard is worse than none (28.08.2026, added and pulled the same day).
+CREDIT RealClearPolicy | RealClearPolicy | https://www.realclearpolicy.com/2026/08/27/how_we_won_the_war_on_terror.html
+
+# --- 28.08.2026: RealClearPolicy syndicates other people's essays and its bylines vanished --
+# RCP reprints a piece and delivers the byline as "<Author>, <original venue>" - "Sheri
+# Berman, Persuasion", "Tod Lindberg, Commentary". That compound is the PROVENANCE: it says
+# who wrote it and where it first ran, while the link goes to the page RCP actually serves.
+# It was being discarded whole, because RCP was missing from COMMENTARY_OUTLETS, so every one
+# of these ran as a bare "- RealClearPolicy". Same fault as Statement on 19.08.2026.
+# The compound must survive intact - splitting the venue off to "tidy" the byline would throw
+# away the only record that this is a Persuasion essay. That is what these cases pin.
+BYLINE shown | RealClearPolicy | Sheri Berman, Persuasion | https://www.realclearpolicy.com/2026/07/29/germany_has_lost_the_thread_on_immigration.html
+BYLINE shown | RealClearPolicy | Tod Lindberg, Commentary | https://www.realclearpolicy.com/2026/08/27/how_we_won_the_war_on_terror.html
+# A comma in a byline is NOT a venue marker anywhere else, and nothing here may start
+# treating it as one: across the same sweep the Guardian, POLITICO and the Belfast News
+# Letter all use it for genuine co-authors, and a splitter would delete people who wrote the
+# piece. These stay whole for the opposite reason to the two above.
+BYLINE shown | The Atlantic | Jessica Elgot, Diane Taylor and Chris Osuh | -
+BYLINE shown | UnHerd | Anne McElvoy, Peter Snowdon | -
+
+# --- Chris, 28.08.2026 markup: "This is a UK story" -----------------------------------------
+# The National Secular Society on Barnet Council, filed Unplaced and so sitting below the UK
+# block. Nothing in the headline is geographic and the standfirst's only marker is "Barnet",
+# a London borough no rule names. secularism.org.uk was simply missing from DOMAIN_HOME.
+# Lands as how="outlet", which is correct: it must not lead the UK block ahead of stories
+# that are actually about Britain.
+REGION UK | NSS | https://www.secularism.org.uk/news/2026/08/faith-school-that-makes-7-year-olds-wear-hijab-to-join-state-sector | Faith school that makes 7 year olds wear hijab to join state sector
+# ...and the fallback must stay a fallback: a British domain writing about somewhere else
+# keeps the story's own signal. telegraph.co.uk on an Australian birth is Australia, not UK.
+REGION Australia | The Telegraph | https://www.telegraph.co.uk/world-news/2026/08/27/australian-woman-birth-twins-different-fathers-surrogate | Australian woman gives birth to twins with different fathers
+
+# --- Chris, 28.08.2026 markup: "This is a comment piece so should have had the authors name
+# (Konstantinos Bogdanos)". Brussels Signal's byline is in the page; it was discarded because
+# the masthead is not in COMMENTARY_OUTLETS - and must not be, since the same sweep carries
+# its prisons and Berlin police reports, both straight news.
+#
+# Decided on the PAGE'S OWN SECTION, read off the article by authors.py while it is already
+# open for the byline. Three cheaper routes were measured on 28.08 and all three failed:
+#   textsignals comment_score >= 1  -> 48 of 208 picked items (23%); it matches rhetorical
+#                                      voice, which quoted news speech is full of.
+#   section label in the cached opening -> 9 hits, 5 of them GB News NAV FURNITURE, the word
+#                                      "Opinion" in the site menu surviving the scrub.
+#   JSON-LD articleSection          -> absent on brusselssignal.eu.
+# What separates them is structured per-article markup: `category-opinion` in the body class
+# on the comment piece, `category-culture-war` on the report. That needs the page, so
+# authors.py now fetches FIRST and decides after - 123 pages on that day's picks rather than
+# 13, all of them items already missing a byline.
+BYLINE shown | Brussels Signal | Konstantinos Bogdanos | https://brusselssignal.eu/2026/08/from-pakistan-to-nigeria | ::section:: opinion
+# The same masthead's straight news must NOT gain a byline. This is the constraint that ruled
+# out simply listing Brussels Signal as a commentary outlet.
+BYLINE hidden | Brussels Signal | Some Reporter | https://brusselssignal.eu/2026/08/muslims-make-up-nearly-one-in-five-prisoners | ::section:: culture-war
+# A page with no section marker at all falls back to the old behaviour, unchanged: most sites
+# publish none, and absence must not be read as either answer.
+BYLINE hidden | Brussels Signal | Some Reporter | https://brusselssignal.eu/2026/08/whatever |
+
+# --- PENDING: Chris, 28.08.2026, "This is old news and should have been deduplicated" -------
+# BGEA's "UK Drops Travel Ban" on 28.08 is the SAME EVENT as Christian Today's "granted UK
+# visa" on 25.08 - the ban being lifted - three days late from a slower outlet.
+#
+# FIXED, and shipped: her name was not tokenised AT ALL. sig_words stripped [^a-z0-9] before
+# splitting, so "Päivi" became "p"/"ivi" and "Räsänen" became "r"/"s"/"nen", every fragment
+# below the length gate; ENTITY_RE's [A-Z][a-z]{2,} could not match her either. See
+# _deaccent(). That was never one Finn - "Müller" tokenised as "ller", "Gutiérrez" as
+# "guti"+"rrez", "México" as "xico". Measured on the archive: recall 0.676 -> 0.679, precision
+# held at 1.000, GOLD 12/12.
+#
+# ALSO FIXED: is_development_of had this arc backwards - "drops travel ban" vs "granted UK
+# visa" (one event) read as a development, while "drops travel ban" vs "UK bars Räsänen" (two
+# events) did not. Cause was the asymmetry trap the DEVELOPMENT list warns about: "drops" and
+# "bars" are both absent from it, so two of the three headlines scored no stage at all. Fixed
+# with a symmetric axis instead of more verbs - see _permission(). The two DEVELOPMENT cases
+# below are LIVE and passing.
+#
+# AND FIXED: the cross-day link now has a frequency gate. Two conditions together, each
+# learned by watching the other fail alone on 28.08.2026:
+#   a shared multi-word NAME, intact in both headlines - the DF gate alone merged "Virginia's
+#     Catch-22 for Military Chaplains" into "Canada Bars Military Chaplains", on loose tokens
+#     drawn from different phrases in each.
+#   every gateable token of it distinctive over the UNION of today and the history - phrases
+#     alone merged five Pope Leo stories, the White House, Dolly Parton and Our Lady.
+# The union corpus is the point, and answers ran_before's own docstring: "paivi"/"rasanen"
+# reach DF 2 - once today, once in history - while today's corpus alone rejects them at
+# MIN_DF=2, rare today precisely because the other use is in the past.
+# Two GATEABLE tokens, not two words: "bill gates" yields only {gates} because "bill" is under
+# five characters, and a lone surname is how "Farage on Clacton" merges with "Farage on
+# welfare" - it wrongly flagged four Bill Gates AI stories until that was tightened.
+# Measured: precision stays 1.000, GOLD 11/11; the rule fires rarely, which is the intent.
+#
+# The RANBEFORE case below stays commented out for a DIFFERENT reason, and that one is mine
+# rather than the code's. ran_before never compares across SECTIONS, and the 25.08 story ran
+# in Free Speech & Civil Liberties while I filed the 28.08 one in Religious Freedom &
+# Persecution - so the guard skipped the pair before any of this ran. Verified against the
+# real history:
+#     _section="Free Speech & Civil Liberties"    -> FLAGGED vs 20260825
+#     _section="Religious Freedom & Persecution"  -> not flagged
+# run_tests builds a two-item corpus with no document frequency at all, so it cannot exercise
+# this arm; repeat_eval is the real check. The lesson is a curation one: file a running story
+# where it ran before.
+# RANBEFORE | UK Drops Travel Ban for Finland MP Päivi Räsänen ::was:: ::entity:: Päivi Räsänen granted UK visa but not in time to attend free speech conference
+# NOTRANBEFORE | UK Drops Travel Ban for Finland MP Päivi Räsänen ::was:: UK bars Finnish Christian MP Päivi Räsänen
+#
+# The inversion itself, stated at the level it belongs to. These are the cases to make pass.
+DEVELOPMENT no  | UK Drops Travel Ban for Finland MP Päivi Räsänen ::vs:: Päivi Räsänen granted UK visa but not in time to attend free speech conference
+DEVELOPMENT yes | UK Drops Travel Ban for Finland MP Päivi Räsänen ::vs:: UK bars Finnish Christian MP Päivi Räsänen
+# Section names the marker actually has to sort. "commentary" is here because an anchored
+# "comment" alternative does not reach it, which the first draft got wrong; "news-analysis"
+# and "culture-war" are here because a substring match would wrongly catch both.
+BYLINE shown | Some Outlet | Jane Doe | https://example.com/x | ::section:: commentary
+BYLINE shown | Some Outlet | Jane Doe | https://example.com/x | ::section:: op-ed
+BYLINE hidden | Some Outlet | Jane Doe | https://example.com/x | ::section:: news-analysis
+BYLINE hidden | Some Outlet | Jane Doe | https://example.com/x | ::section:: politics
+
+# --- 28.08.2026: "Mass." is Massachusetts, not the liturgy ----------------------------------
+# Found while measuring the sue|lawsuit widening: WBUR's "Retailers sue to halt Mass. kratom
+# ban" classified as Church & Religion. It is systematic, not one headline - \bmass\b matches
+# the state abbreviation in every WBUR, Boston.com and NBC Boston story, and two items in the
+# 28.08 sweep were sitting in the Church & Religion candidate list because of it.
+SECTION None | WBUR | Retailers sue to halt Mass. kratom ban days before it takes effect
+# ...and once it is not a Mass, it classifies on its actual subject. A state primary is
+# Politics, which is the right answer and not a fallthrough - asserted so the fix cannot
+# quietly become "drop every Mass. headline".
+SECTION Politics, Government & Society | WBUR | Mass. gets ready for primary election next week
+SECTION None | NBC Boston | Mass. State Police release crash report
+# The liturgy must still classify. These are the reason the fix cannot just delete the word.
+SECTION Church & Religion | Catholic Sun | Archbishop celebrates Mass at the cathedral
+SECTION Church & Religion | Catholic Review | Red Mass, Blue Mass: How color Masses serve professionals
+
+# --- 28.08.2026: litigation keywords, added after measuring (see fetch_feeds.KEYWORDS) ------
+# The Stars and Stripes First Amendment suit reached the sweep from nobody: the FIRE piece on
+# the firings ran 08-27, and every outlet covering the LAWSUIT worded it without a topical
+# keyword. These pin what the widening must and must not let through.
+KEYWORD keep | Fired Stars and Stripes staffers sue Pentagon, claim violation of First Amendment rights
+KEYWORD keep | Pentagon Fired Journalists Over USS Abraham Lincoln Reports: Lawsuit
+KEYWORD keep | Minnesota Sues Texas to Extradite ICE Agent Who Shot Resident, Falsified Report
+# ...and the filter is still a filter. These carry no topical word and only match on the new
+# procedural ones, which is exactly the cost that was measured and accepted - they are kept at
+# fetch time and then die at the classifier, in the suppressed bucket where they are visible.
+KEYWORD keep | Alaska tribe sues feds to stop logging in Tongass National Forest
+SECTION None | Courthouse News | Alaska tribe sues feds to stop logging in Tongass National Forest
+SECTION None | Rolling Stone Australia | Selena Gomez Hits Back Against Absurd Fraud Claims in Wondermind Lawsuit
+# Sport is NOT the keyword filter's job and never was: "Christian Gonzalez" matches
+# christian\\w* at fetch time and is meant to, because the same token carries every real
+# story about Christians. SUPPRESS is where it dies. Stated here so the division of labour is
+# explicit - a future attempt to "tighten" the fetch filter for sport would be fixing the
+# wrong layer.
+KEYWORD keep | Patriots and Christian Gonzalez still far apart in contract talks
+SUPPRESS | Bleacher Report | Patriots and Christian Gonzalez still far apart in contract talks
+
+# --- Chris, 31.08.2026: pornographic spam reached two LIVE sections, not the chaff bucket ---
+# Both arrived on that day's sweep as unresolved Google News redirects. The redirect could not
+# be decoded, so the outlet parsed out as "Air and Space Museum" - a wrong name, not a real
+# publisher - and the headlines were classified on their own words: item 122 into Life and
+# item 388 into Gender, Identity & Sexuality. Neither was picked, but they were sitting in
+# real sections where a reader scanning the shortlist would have to step over them, rather
+# than in SUPPRESSED where wrong suppression is at least visible.
+#
+# The keyword feeds that carry them are search feeds ("gay sex", "Canada gender & life"), and
+# those are exactly the feeds the Gender and Life beats depend on - so the fix belongs in the
+# suppression gate, on the headline, not in the fetch filter or the feed list. Note the gate
+# has to fire on vocabulary alone: there is no outlet to blocklist here, because the outlet
+# name is itself an artefact of the failed decode and will differ next time.
+SUPPRESS | Air and Space Museum | [xXx]🌶SEX!+videos) hindi xxx movie maid xnxx new pornx
+SUPPRESS | Air and Space Museum | Xem Phim Sex Gay Vietsub - Phim Sex Bà Già Hay Nhất Full HD
+# ...and the gate must not take the beat down with it. These are real stories on the same
+# vocabulary and must survive.
+KEEP | The Christian Post | Abdul El-Sayed's bizarre defense of child sex changes on Fox News backfires
+KEEP | LifeSiteNews | Judge rules Texas can't ban exposing children to drag shows
+KEEP | The Daily Wire | You Can't Be Charged For Possessing AI Child Porn, Court Rules
+KEEP | The Conversation | Here's what you need to know about teens and sexual choking
+
+# --- Chris, 31.08.2026: OUTCOME is missing the persecution beat's core verbs ------------
+# Found by reading the whole 31.08 sheet. OUTCOME decides the said-versus-happened axis and
+# did not match "martyred" or "destroys", so the verb carrying the entire event scored zero:
+#
+#   Baptist Pastor Martyred in Myanmar by Military Dictatorship          i2
+#   Chinese Gov't Destroys Church Worth Millions                        i2
+#   China criminalises parents passing on their faith to their children  i2
+#
+# 25 verbs were absent - martyred, beheaded, executed, massacred, lynched, demolished, razed,
+# torched, bulldozed, desecrated, seized, confiscated, outlawed, criminalised among them.
+# These pairs test ONLY that those verbs are outcomes, against process and commentary. That
+# is the axis ABOVE is for.
+#
+# THREE PAIRS WERE WRITTEN HERE FIRST AND REMOVED, which is worth recording. They compared a
+# martyred pastor against a court order about two dogs, on the reasoning that a human being
+# killed for his faith obviously outranks an animal. Both sides scored i8 once the verbs
+# above were added, and no amount of outcome vocabulary would separate them, because the
+# claim is about SUBJECT MATTER and importance() does not model subject matter - it models
+# happened-versus-said, scale and commentary. Keeping them would have meant either a
+# permanently red fixture or bolting a subject-matter hack onto a reading-order heuristic.
+# The animal problem was real; it was just a CLASSIFICATION defect, and it is below.
+ABOVE | Baptist Pastor Martyred in Myanmar by Military Dictatorship | Campaigners call for action over the treatment of Christians in Myanmar
+ABOVE | Chinese Gov't Destroys Church Worth Millions | Why the persecuted church needs our prayers more than our outrage
+ABOVE | China criminalises parents passing on their faith to their children | Bishops urge China to respect the rights of Christian parents
+ABOVE | Church demolished and Christian homes razed in Plateau state attack | Nigeria's bishops call for an end to the killings
+ABOVE | Pastor beheaded by militants in northern Nigeria | Marriage diaries: My in-laws are stingy, despite being much richer than us
+ABOVE | Nigerian journalist cleared of criminal defamation charges after reporting on Christian persecution | Why the persecuted church needs our prayers more than our outrage
+ABOVE | Indonesia sentences Christian pastor to two years in prison under blasphemy law | Bishop laments the destruction of Christian heritage in Europe
+# ...and the guards that stopped this fix going too far on its first two runs. Bare
+# "criminalis" matched "deCRIMINALISes"; the nouns "destruction" and "demolition" gave
+# outcome credit to a lament and to a council SEEKING permission. Both are already covered
+# by pairs at lines 134 and 154 - listed here so a future edit knows they are load-bearing.
+#
+# The euthanasia CLASSIFIER defect: an animal being put down is not a Life story. All three
+# of these scored ('Life', 6) on 31.08.2026 - the same section and the same keyword weight as
+# a genuine assisted-dying story - which is how a dog and a bald eagle came to outrank a
+# martyred pastor in the first place.
+# The Bubba/Stewie headline never says "dog" - only its article text does, which is why this
+# one carries ::text:: (the pipeline passes the opening to classify() too).
+SECTION None | BenitoLink | Appeal of euthanasia order for 'Bubba,' 'Stewie,' dismissed by judge ::text:: The legal battle to spare two dogs, Bubba and Stewie, from euthanasia ended on Aug. 26 when a Superior Court judge struck down a second appeal. Bubba, a five-year-old terrier mix, and Stewie, a one-year-old German shepherd, were found to be dangerous animals by the Hollister Police Department.
+SECTION None | The Cool Down | Tennessee mayor helps halt federal euthanasia order for rescued bald eagle Phoenix
+SECTION None | CBS News | Frost Fund helps save animals from euthanasia with shelter transport trips
+# ...without taking human end-of-life stories with it. These must stay in Life.
+SECTION Life | The Walrus | My Mom's MAID Death Was the First to Be Investigated by Police
+SECTION Life | Rebel News | Nova Scotia hospital drops St. Martha's name after 120 years, potentially opening door to MAID and abortion
+SECTION Life | Euthanasia Prevention Coalition | Australia's Northern Territory legalizes assisted suicide
+SECTION Life | The Catholic Herald | Life insurance payouts included in French assisted suicide law, prompting concerns
+
+# ---------------------------------------------------------------------------
+# The CURLY APOSTROPHE defect (found by the 01.09.2026 pre-run test).
+# Every possessive in the Gender keyword table was written with a STRAIGHT
+# apostrophe - women'?s - which cannot match women’s (U+2019). British
+# newspapers publish the curly one, so the single most on-beat headline of the
+# day reached NO SECTION AT ALL and was dropped:
+#   Telegraph "Give biological men legal right to compete in women’s sport"
+#     -> (None, 0)   with ’     -> ('Gender, Identity & Sexuality', 5) with '
+# Measured on that day's 1,462 headlines: 283 carried a curly apostrophe and
+# exactly 3 changed section once normalised - all 3 the men-in-women's-sport
+# beat. Narrow, and aimed at the middle of what CitizenGO works on.
+# Second, separate gap in the same line: "biological (sex|male|female)" never
+# covered the PLURAL - "biological men" and "biological women" both missed.
+SECTION Gender, Identity & Sexuality | The Telegraph | Give biological men legal right to compete in women’s sport, say Greens
+SECTION Gender, Identity & Sexuality | LifeSiteNews | Even a majority of Democrats reject men in women’s sports: poll
+SECTION Gender, Identity & Sexuality | The Times | Biological men should not be in women’s changing rooms, says minister
+SECTION Gender, Identity & Sexuality | BBC | Row over biological males in women’s rugby reaches World Rugby
+# The straight-apostrophe forms must keep working - this is a widening, not a swap.
+SECTION Gender, Identity & Sexuality | GB News | Greens back biological men in women's sport
+
+# ---------------------------------------------------------------------------
+# The FETCH-TIME gate has no press-freedom vocabulary (Chris, 01.09.2026).
+# He listed five Free Speech stories that should have run. Two were dropped
+# here, before they ever became candidates:
+#   Brussels Signal "Turkish comic who mocked Erdogan rearrested..."  -> DROP
+#   Washington Post "Trump's attempts to crack down on speech..."     -> DROP
+# The gate holds 'free speech', 'hate speech', 'censor*', 'expression' and
+# 'blasphem*' - phrases a headline about a speech prosecution often never uses.
+#
+# The sharpest evidence is that the SAME STORY split two ways: Stockholm Center
+# for Freedom's version of the Turkish comedian's rearrest was KEPT, and only
+# because the headline happened to contain the word "prison". An incidental
+# noun decided which account of one story entered the sweep.
+KEYWORD keep | Turkish comic who mocked Erdogan rearrested on separate charges just after being released
+KEYWORD keep | Trump's attempts to crack down on speech and influence opinion
+KEYWORD keep | Cato expert: Trump's FCC threat against NBC's Kristen Welker is a free speech problem
+KEYWORD keep | Journalist jailed after reporting on Christian persecution in Kaduna
+KEYWORD keep | Press freedom groups condemn raid on newsroom
+# ...and must NOT swallow the ordinary political sense of "speech", which is why
+# a bare \bspeech\b is deliberately not what got added.
+# These two guards were written wrong first time and are kept in corrected form as a
+# reminder: "Prime Minister delivers speech..." and "The King's speech opens Parliament"
+# are both KEPT already, on 'Minister' and 'Parliament', nothing to do with speech. A guard
+# has to isolate the variable it is guarding, so these use headlines carrying no other
+# keyword at all.
+KEYWORD drop | Actor delivers moving speech at awards ceremony
+KEYWORD drop | Coach gives rousing speech before the final
+KEYWORD drop | Comedian announces UK arena tour dates for next spring
+# "chilling effect" was in the first draft of the widening above and was taken out the same
+# hour: measured against that day's 1,477 candidates it matched exactly one item, Journal &
+# Courier's "Indiana's abortion ban has a 'chilling effect' on ER pregnancy care" - the
+# phrase's ordinary non-speech sense. It admitted nothing Chris had asked for.
+# (Isolated: the real Journal & Courier headline is kept on 'abortion', quite rightly -
+# it is a Life story. The assertion has to strip the unrelated keyword to test the term.)
+KEYWORD drop | New rules have a chilling effect on small business hiring
+
+# Chris, 03.09.2026: "www.christiantoday.com should just be Christian Today. I shouldn't have
+# to keep asking for the source names to remain as I asked them."
+#
+# It kept coming back because OUTLET_FIXES is keyed on the LITERAL string, so one outlet needs
+# a separate entry per spelling. Christian Today was already fixed as "Christian Today | RSS"
+# (its OPML title) and still printed as a bare host, because item 206 on 03.09 arrived through
+# the "India life & family" Google News keyword feed, where Google reported the source as the
+# hostname rather than the masthead. Every gnews feed can do this to any outlet, so patching
+# one more literal key would only have deferred the next report.
+#
+# The fix resolves a host-shaped outlet against the sources we already track, so an outlet
+# named anywhere in sources.opml or extra_feeds.txt gets its own masthead whatever spelling
+# arrives. These cases pin that: the first is Chris's, the rest are the same shape.
+OUTLET Christian Today | www.christiantoday.com
+OUTLET Christian Today | christiantoday.com
+OUTLET Charlotte Gill | charlottecgill.co.uk
+OUTLET Gript | gript.ie
+OUTLET Premier | premierchristian.news
+# Already-correct names must survive the new lookup untouched.
+OUTLET Christian Today | Christian Today | RSS
+OUTLET The Times | The Times
+OUTLET Reduxx | Reduxx
+# Breitbart's feed is on feedburner, so no host in sources.opml belongs to it and the host
+# lookup cannot help. 03.09.2026's edition printed it three ways as "Breitbart" and once as
+# "breitbart.com"; this one stays a literal.
+OUTLET Breitbart | breitbart.com
+OUTLET Breitbart | Breitbart News
+# The host index must never lend a shared feed host's masthead to everyone behind it.
+OUTLET feeds.feedburner.com | feeds.feedburner.com
+
+# Charlotte Gill, added as a source 03.09.2026. The piece Chris flagged as missed reaches no
+# section on keywords - "£1.86 million: The taxpayer-funded research of 'Pregnant Men'
+# Professor Sally Hines" scores 0 - so adding the feed alone would have left it in the
+# NO SECTION MATCHED block every day, which is the same miss in a different place. She is a
+# single-issue source in the sense SOURCE_HINTS means: her beat is what public bodies fund in
+# gender and identity research.
+SECTION Gender, Identity & Sexuality | Charlotte Gill | £1.86 million: The taxpayer-funded research of “Pregnant Men” Professor Sally Hines
+SECTION Gender, Identity & Sexuality | Charlotte Gill | "Queer Fish" researcher also received £120,080 from the taxpayer-funded AHRC
+# A hint must never beat a headline that scores on its own. Her media-regulation reporting
+# has to keep going where the words send it, or the hint is just a relabel of the outlet.
+SECTION Free Speech & Civil Liberties | Charlotte Gill | From Hacked Off to Extinction Rebellion: The coalition demanding a media revolution and press censorship
+# Word-bounded, per the FireRescue1/FIRE bug the docstring records: a longer name that merely
+# contains hers must not inherit her section.
+SECTION None | Charlotte Gillingham Associates | Quarterly results announced for the partnership

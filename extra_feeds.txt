@@ -42,6 +42,12 @@ filter | Media: US and World     | New York Post               | https://nypost.
 # rather than the outlet vanishing quietly; the gnewsf line below is the working route.
 filter | Media: US and World     | Newsweek                    | https://www.newsweek.com/rss
 gnewsf | Media: US and World     | Newsweek                    | newsweek.com
+# The Daily Beast, added 28.08.2026: Chris asked why the Stars and Stripes lawsuit was
+# missing and it was not in the sweep at all - the outlet was not a source in any form.
+# gnewsf, not filter, because it is genuinely FEEDLESS: /rss, /feed, /rss.xml and
+# /arts-and-culture/rss all 404 and the homepage declares no <link type=application/rss+xml>.
+# Keyword-filtered like the other broad US outlets, or it floods the sweep with celebrity copy.
+gnewsf | Media: US and World     | The Daily Beast             | thedailybeast.com
 filter | Media: US and World     | Politico                    | https://rss.politico.com/politics-news.xml
 filter | Media: UK Mainstream    | GB News                     | https://www.gbnews.com/feeds/news.rss
 filter | Media: US and World     | The Hill                    | https://thehill.com/news/feed/
@@ -780,3 +786,103 @@ filter | Media: UK Mainstream    | PoliticsHome               | https://www.poli
 pass   | Advocacy: Secular       | Humanists UK               | https://humanists.uk/feed/
 # CathNews: cited for Archbishop Fisher on freedom to protest.
 filter | Media: Christian        | CathNews                   | https://cathnews.com/feed/
+
+# --- Chris, 31.08.2026: seven sources whose stories he added to the 31.08 edition by hand ---
+# All seven were absent from the sweep entirely - not ranked low, not suppressed, never
+# fetched - so no amount of curation could have found them. Each URL below was fetched and
+# confirmed to parse before being written here; none is a guessed pattern.
+# Modes: the five general nationals are keyword-FILTERED, because they carry far more
+# general news than issue news and 'pass' would flood the sections. organiser.org is
+# filtered for the same reason (heavy Indian political coverage around a real
+# anti-conversion beat).
+filter | Media: US and World      | Le Monde                | https://www.lemonde.fr/en/rss/une.xml
+filter | Media: UK Mainstream     | Scottish Daily Express   | https://www.scottishdailyexpress.co.uk/?service=rss
+# Evening Standard: standard.co.uk answers 403 to every direct route - /rss, /news/rss,
+# /rss.xml, /feed, /news/uk/rss - and has done since it was added on 31.08.2026, so the
+# source has never once contributed. It verified when I added it, which is exactly the
+# failure mode that makes a source look configured while producing nothing. Routed through
+# Google News instead, and FILTERED: the unfiltered query returns 100 items and the top of
+# it is entirely football transfers.
+gnewsf | Media: UK Mainstream     | Evening Standard         | standard.co.uk
+filter | Media: US and World      | The Blaze                | https://www.theblaze.com/feeds/feed.rss
+filter | Media: UK Mainstream     | The National             | https://www.thenational.scot/news/rss/
+filter | Media: US and World      | Organiser                | https://organiser.org/feed/
+# Herald Malaysia serves no reachable feed - /rss, /feed and /rss/news all refuse - so it
+# takes the documented feedless route. Small Catholic outlet, so unfiltered.
+gnews  | Media: Christian         | Herald Malaysia          | heraldmalaysia.com
+
+# --- ADF via the WordPress REST API, and two feed gaps (01.09.2026) ------------------------
+# Chris listed six religious-freedom stories the 01.09 pre-run test missed. Three were ADF's
+# own releases or commentary on them, and ADF had produced ONE item in the eight editions to
+# that date. Every route above is exhausted: adf.uk/feed/ and adfinternational.org/feed/
+# parse and serve zero (disabled 17.08), adfmedia.org/feed does the same, adfmedia.org's
+# /press-releases and /news both 404, and gnews site:adfmedia.org returns nothing but "Book
+# an Interview".
+#
+# CORRECTED later the same session. I first wrote here that the scrapesrc route 403'd and
+# that scrape_index yielded nothing from it. Both were wrong. The 403 was my own curl UA -
+# fetch()'s UA rotation gets through - and scrape_index extracts 275 dated entries from that
+# page. ADF International simply had not published since 27 August, so a 36h window correctly
+# returned nothing: it was never broken, and check_sources was right about it.
+#
+# The real gap was duller. adfmedia.org - ADF's US arm, and much the busier of the two - was
+# never a configured source at all. It filed on 21, 25, 27 and 31 August.
+#
+# Both sites are WordPress with a `press_release` custom post type, and wp-json hands over
+# ISO dates and canonical links. This is the primary-source route the provenance rule has
+# been asking for since 14.08: ADF's release, not a newsroom's write-up of it.
+wpjson | Advocacy: Christian     | ADF                         | https://adfmedia.org/wp-json/wp/v2/press_release?per_page=20&orderby=date&order=desc&_fields=date,date_gmt,link,title,excerpt
+# ADF International publishes roughly weekly - 13, 18, 19, 27 August - so the standard 36h
+# window misses it five days out of six. That is the FoRB in Full case exactly, which is what
+# FEED_WINDOWS was written for on 20.08.2026; seen.json stops anything already used returning.
+wpjson | Advocacy: Christian     | ADF International           | https://adfinternational.org/wp-json/wp/v2/press_release?per_page=20&orderby=date&order=desc&_fields=date,date_gmt,link,title,excerpt | window=168h
+# Superseded by the wpjson line above - strictly better data from the same source: real ISO
+# dates and canonical links rather than scraped cards. Disabled because running both would
+# duplicate every ADF International item, NOT because it is broken. It works.
+disable | https://adfinternational.org/newsroom/
+
+# National Review IS configured, on nationalreview.com/feed/ - which carries ZERO bench-memos
+# entries. Bench Memos is NR's legal blog and has its own feed; it carried "When Jewish Prayer
+# at Home Becomes a Municipal Offense" (the Ohio home-prayer case) that the main feed did not.
+# A configured outlet is not the same as a configured beat.
+pass   | Media: Alternative      | National Review - Bench Memos | https://www.nationalreview.com/bench-memos/feed/
+
+# Stockholm Center for Freedom monitors religious and press freedom in Turkey - jailed
+# clergy, Gulen-movement prosecutions, deaths in custody. Never configured; nothing else in
+# the list covers Turkey on this beat. 'pass' to match Bitter Winter, the closest comparable.
+pass   | Issues: Religious Freedom | Stockholm Center for Freedom | https://stockholmcf.org/feed/
+
+# --- Free Speech gaps from Chris's 01.09.2026 markup -------------------------------------
+# Cato Institute was never a source. Its own feeds are unusable - /rss/news-releases 404s,
+# /rss/commentary serves HTML, and rss.xml carried a single item when checked - so this goes
+# through Google News, which indexes the domain properly (18 items in a 2-day window).
+# FILTERED, because Cato publishes across the whole libertarian brief: occupational
+# licensing, Medicare projections, data-centre policy. Of 18 items, 7 pass the topical gate,
+# including the Kristen Welker/FCC free-speech release Chris asked for.
+gnewsf | Think Tanks: Secular    | Cato Institute              | cato.org
+
+# The Washington Post is configured on feeds.washingtonpost.com/rss/national ONLY, and the
+# host drops the connection on every other section feed (/rss/politics, /rss/opinions both
+# RemoteDisconnected). So its politics and opinion desks were invisible: Chris's
+# "Trump's attempts to crack down on speech and influence opinion" sits under /politics/.
+# Google News indexes all sections; filtered, 15 of 100 items pass the gate. Runs alongside
+# the national feed rather than replacing it - the sweep prefers direct links over redirects
+# where both carry a story.
+gnewsf | Media: US and World     | The Washington Post         | washingtonpost.com
+
+# The Independent is configured on independent.co.uk/rss, its main feed - 100 items and no
+# Asia desk. Chris asked on 01.09.2026 why "Malaysian state's cash incentive for teenage
+# marriages sparks backlash" was missing; it is on /asia/rss, which carried it at 11:56 that
+# morning, well inside the window. Thirteen items, tightly on-beat, so it costs almost
+# nothing to sweep. Same shape as the Washington Post gap above: a configured outlet is not
+# a configured desk.
+filter | Media: UK Mainstream     | The Independent (Asia)      | https://www.independent.co.uk/asia/rss
+
+# --- UK independent reporting -----------------------------------------------
+# Chris, 03.09.2026, after "£1.86 million: The taxpayer-funded research of 'Pregnant Men'
+# Professor Sally Hines" (01.09) was missed. Gill does FOI-driven reporting on what public
+# bodies fund in gender and identity research - a beat almost nothing else in the sweep
+# covers, and one where she is the primary source rather than a commentator on someone
+# else's story. Publishes 2-3 times a week, so window=168h: at the default 36h the sweep
+# would see her most days as silence, which is the failure check_sources.py exists to stop.
+pass   | Issues: Gender & Identity | Charlotte Gill              | https://www.charlottecgill.co.uk/feed | window=168h

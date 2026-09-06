@@ -37,6 +37,9 @@ else
   echo "reusing folder archive ($FID)"
 fi
 
+REPLACE=""
+for a in "$@"; do case "$a" in --replace) REPLACE=1 ;; esac; done
+
 for d in "$HERE"/archive/*/; do
   [ -d "$d" ] || continue
   day=$(basename "$d"); tgz="/tmp/$day.tar.gz"
@@ -46,6 +49,27 @@ for d in "$HERE"/archive/*/; do
   id=$(printf '%s' "$existing" | jq -r '.files[0].id // empty')
   remote=$(printf '%s' "$existing" | jq -r '.files[0].size // empty')
   if [ -n "$id" ] && [ -n "$remote" ] && [ "$remote" -gt 0 ] 2>/dev/null; then
+    # --replace exists because the skip is by PRESENCE, not by content. An archived edition
+    # is normally written once and never touched, which is what makes the incremental skip
+    # safe. Re-archiving a day breaks that assumption: on 27.08.2026 the edition was
+    # recomposed and re-archived after Chris's markup, and this loop then reported "already
+    # in Drive" while quietly keeping the superseded tarball. That copy is what history.py
+    # would be restored from, so a stale one would make tomorrow's cross-day repeat check
+    # compare against an edition that was never published.
+    if [ -n "$REPLACE" ]; then
+      resp=$(curl -s -X PATCH \
+        "https://www.googleapis.com/upload/drive/v3/files/$id?uploadType=media&supportsAllDrives=true&fields=id,size" \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/gzip" \
+        --data-binary "@$tgz")
+      got=$(printf '%s' "$resp" | jq -r '.size // empty')
+      if [ "$got" = "$sz" ]; then
+        echo "  $day.tar.gz: REPLACED in Drive ($remote -> $sz bytes)"
+      else
+        echo "  $day.tar.gz: replace FAILED (remote still $remote bytes)"
+      fi
+      rm -f "$tgz"; continue
+    fi
     echo "  $day.tar.gz: already in Drive ($remote bytes) - skipped"
     rm -f "$tgz"; continue
   fi

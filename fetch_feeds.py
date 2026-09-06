@@ -109,6 +109,25 @@ FILTER_CATEGORIES = {
 KEYWORDS = [
     # Freedom & Liberty
     r"free speech", r"freedom of (speech|expression|religion|belief)", r"censor\w*",
+    # Press-freedom and speech-prosecution vocabulary, added 01.09.2026. The gate held only
+    # the explicit phrases above, which a headline about a speech prosecution frequently
+    # never uses: Brussels Signal's "Turkish comic who mocked Erdogan rearrested" and the
+    # Washington Post's "Trump's attempts to crack down on speech" were both dropped before
+    # becoming candidates. Worst of it, Stockholm Center for Freedom's account of the SAME
+    # Turkish rearrest was kept - on the incidental word "prison".
+    #
+    # Deliberately NOT a bare \bspeech\b: "delivers a speech" is the ordinary political sense
+    # and would flood the pool. The two shapes below are what actually carry the beat - the
+    # act of curbing speech, and a speech-trade worker facing the law.
+    r"press freedom", r"freedom of the press", r"crack ?down on speech",
+    r"speech crack ?down", r"policing speech", r"speech police",
+    r"l[eè]se.?majest\w*", r"insulting the (president|king|head of state)",
+    r"(comedian|comic|satirist|cartoonist|journalist|blogger|columnist|broadcaster|"
+    r"newsroom|publisher)s?\b[^.!?]{0,70}?\b(arrest|re-?arrest|jail|imprison|detain|charg|"
+    r"convict|prosecut|sentenc|raid|deport)\w*",
+    r"\b(arrest|re-?arrest|jail|imprison|detain|charg|convict|prosecut|sentenc|raid)\w*"
+    r"[^.!?]{0,70}?\b(comedian|comic|satirist|cartoonist|journalist|blogger|columnist|"
+    r"broadcaster|newsroom|publisher)s?\b",
     r"blasphem\w*", r"religious (freedom|liberty|hatred|discrimination)", r"persecut\w*",
     r"debank\w*", r"hate speech", r"non-crime hate", r"street preacher", r"chaplain",
     r"christian\w*", r"church(es)?", r"cathedral", r"bishop", r"archbishop",
@@ -180,6 +199,22 @@ KEYWORDS = [
     r"di[oó]cesis", r"diocesi", r"vaticano", r"cardenal", r"cardinale",
     r"cristian", r"evang[eé]lic", r"evangelic", r"laicismo", r"laicit[aà]",
     r"misa\b", r"messa\b", r"oraci[oó]n", r"preghiera",
+
+    # Litigation. The ONLY procedural entry in this list — everything above names a subject,
+    # these name a legal stage — so it was measured before being added rather than reasoned
+    # about (Chris, 28.08.2026, on the Stars and Stripes lawsuit reaching us from nobody).
+    #
+    # Across all 115 answering filtered feeds, 3,958 items: kept rises from 1,000 (25.27%) to
+    # 1,021 (25.80%). Twenty-one marginal items, read individually: 15 on-beat — five separate
+    # outlets on the Stars and Stripes First Amendment suit, the Meta child-safety settlement
+    # from three, Minnesota v Texas over the ICE agent, DOJ v four states on noncitizen
+    # tuition, Trump v Arizona on Dreamers' tuition. Six were noise, and five of those six
+    # reach NO SECTION and stay in the suppressed bucket where they are visible and harmless.
+    #
+    # It earns its place because the sources here are already topical: a lawsuit reported by
+    # WBUR or UPI or Courthouse News is usually about something on our beats. The same three
+    # words on a general wire would not pay.
+    r"\bsues?\b", r"\bsued\b", r"\blawsuits?\b",
 ]
 KEYWORD_RE = re.compile("|".join(KEYWORDS), re.IGNORECASE)
 
@@ -268,9 +303,9 @@ def fetch(url, retry_uas=2, data=None, headers=None):
 # Source loading
 # ---------------------------------------------------------------------------
 FEED_MODES = ("pass", "filter", "gnews", "gnewsf", "bing", "bingf",
-              "scrapesrc", "scrapesrcf")
+              "scrapesrc", "scrapesrcf", "wpjson", "wpjsonf")
 # Modes that keep only items matching the topical keyword list.
-FILTERED_MODES = {"filter", "gnewsf", "bingf", "scrapesrcf"}
+FILTERED_MODES = {"filter", "gnewsf", "bingf", "scrapesrcf", "wpjsonf"}
 
 
 # Per-feed sweep window, keyed by outlet title (lowercased). Title is used rather than URL
@@ -414,7 +449,7 @@ def load_feeds():
             if domain.startswith("kw:"):
                 domain = ""
             target = gnews_url(target) if mode.startswith("gnews") else bing_url(target)
-        elif mode.startswith("scrapesrc"):
+        elif mode.startswith(("scrapesrc", "wpjson")):
             domain = urllib.parse.urlsplit(target).netloc
         add(category, title, target, mode, domain)
 
@@ -480,6 +515,56 @@ def sanitise_xml(raw):
     raw = raw.decode("utf-8", "replace").encode("utf-8")
     raw = CTRL_CHARS.sub(b"", raw)
     return BARE_AMP.sub(b"&amp;", raw)
+
+
+def parse_wpjson(raw, feed_title=""):
+    """Read a WordPress REST collection as feed entries.
+
+    Exists for ADF. ADF International and ADF (US, adfmedia.org) are the two organisations
+    the briefing's own provenance rule names FIRST - link the body that published the
+    document, not the newsroom that wrote it up - and between them they had produced ONE
+    item in the eight editions to 01.09.2026. Every conventional route is dead or empty:
+    adf.uk/feed/ and adfinternational.org/feed/ parse and serve zero items (recorded in
+    extra_feeds.txt since 17.08), adfmedia.org/feed the same, /press-releases 404s, and a
+    gnews site: query returns nothing but "Book an Interview". The scrapesrc route reaches
+    adfinternational.org/newsroom/ fine - 773KB, 260 /news/ links - but the listing is
+    JS-rendered with no <article> blocks and no datestamps in the HTML, so scrape_index
+    finds nothing to date and yields zero.
+
+    Both sites are WordPress with a `press_release` custom post type, and the REST API
+    hands over exactly what a feed would: ISO dates, canonical links, rendered titles.
+    Requesting `_fields` keeps the payload to what is used.
+    """
+    data = json.loads(raw.decode("utf-8", "replace"))
+    if isinstance(data, dict):                       # an error body, not a collection
+        raise ValueError("wpjson-not-a-list")
+    out = []
+    for p in data:
+        if not isinstance(p, dict):
+            continue
+        title = (p.get("title") or {})
+        title = title.get("rendered", "") if isinstance(title, dict) else str(title)
+        # WordPress renders entities in the title; the doc quotes headlines verbatim, so
+        # unescape here rather than leaving &#8217; to reach the page.
+        title = html_mod.unescape(re.sub(r"<[^>]+>", "", title)).strip()
+        excerpt = (p.get("excerpt") or {})
+        excerpt = excerpt.get("rendered", "") if isinstance(excerpt, dict) else ""
+        excerpt = html_mod.unescape(re.sub(r"<[^>]+>", " ", excerpt)).strip()
+        out.append({
+            "title": title,
+            "link": p.get("link") or "",
+            # date_gmt is naive-but-UTC; date is site-local with no offset. Prefer the
+            # former and mark it, so parse_date does not read UTC as local.
+            "date": parse_date((p.get("date_gmt") or "") + "Z" if p.get("date_gmt")
+                               else p.get("date") or ""),
+            "author": "",
+            "source": feed_title,
+            "source_url": "",
+            "feed_title": feed_title,
+            "summary": excerpt,
+            "categories": [],
+        })
+    return out
 
 
 def parse_feed(raw):
@@ -561,12 +646,37 @@ def clean_url(url):
                                     urllib.parse.urlencode(q), ""))
 
 
+# Query parameters that IDENTIFY an article rather than decorate a request. Everything else
+# is dropped, which keeps the old behaviour for tracking junk (utm_*, ref_, sm_guid) and for
+# display variants - `edition=us-edition` is 41 of the 50 query-carrying URLs in a typical
+# sweep (Spectator, UnHerd) and must stay dropped or one article keys twice.
+#
+# This list exists because dropping the WHOLE query silently retired an entire source.
+# Forum 18 identifies every article by query string alone - /archive.php?article_id=3067 -
+# so every one of its articles collapsed onto the single key "forum18.org/archive.php". One
+# Forum 18 piece ran on 19.08.2026, and from that moment every future Forum 18 article
+# arrived flagged "[ran 08-19]" and was passed over as a repeat. Chris asked on 01.09.2026
+# why a Forum 18 report on Russia ordering Bibles destroyed had not been picked; that is why.
+# The flag was not a judgement call gone wrong, it was a false positive by construction.
+_ID_PARAMS = re.compile(
+    r"^(?:article_?id|story_?id|news_?id|item_?id|post_?id|page_?id|thread_?id"
+    r"|show_?id|video_?id|a?id|nid|sid|pid|p)$", re.I)
+
+
 def url_key(url):
     try:
         p = urllib.parse.urlsplit(url)
     except ValueError:
         return url.lower()
-    return p.netloc.lower().replace("www.", "") + p.path.rstrip("/").lower()
+    base = p.netloc.lower().replace("www.", "") + p.path.rstrip("/").lower()
+    keep = []
+    for kv in (p.query or "").split("&"):
+        if not kv:
+            continue
+        k, _, v = kv.partition("=")
+        if v and _ID_PARAMS.match(k):
+            keep.append("%s=%s" % (k.lower(), v))
+    return base + ("?" + "&".join(sorted(keep)) if keep else "")
 
 
 STOP = {"the", "and", "for", "with", "that", "from", "have", "has", "was", "are",
@@ -1088,6 +1198,10 @@ def main():
                     entries = [{"title": t, "link": u, "date": when, "author": "",
                                 "source": ftitle, "feed_title": ftitle}
                                for t, (u, when) in scrape_index(furl).items()]
+                elif mode.startswith("wpjson"):
+                    # A WordPress REST collection. Dated like a feed, so it takes the
+                    # normal window path below - nothing here is dateless.
+                    entries = parse_wpjson(job.result(), ftitle)
                 else:
                     entries = parse_feed(job.result())
             except Exception as exc:  # noqa: BLE001

@@ -1,0 +1,57 @@
+
+=== 2026-08-27  entity arm on; thresholds 0.70/6/4 -> 0.55/5/3, set by sweep not by argument
+GOLD    11/11 testcases pairs agree
+URL     74/82  same-URL cross-day repeats recovered  (recall 0.902)
+CLUSTER recall 0.736 (1457/1979)   false-positive rate 0.000 (0/28429)
+CLUSTER precision 1.000   F1 0.848
+XDAY    flag rate 0.0006 (19/30000) on real cross-day same-section pairs   -- an upper bound on FP, not an FPR: some are genuine repeats
+thresholds: overlap>=0.55  words>=5  min-words>=4  entity-words>=3
+entity index: 2648 distinctive token(s), MIN_DF=2 MAX_DF=12
+
+=== 2026-08-27  DEVELOPMENT noun/verb fix: nominal readings of return/wins/lost no longer count as a stage change
+GOLD    12/14 testcases pairs agree   *** VETO: 2 FAILING ***
+URL     74/82  same-URL cross-day repeats recovered  (recall 0.902)
+CLUSTER recall 0.738 (1453/1969)   false-positive rate 0.000 (0/28429)
+CLUSTER precision 1.000   F1 0.849
+XDAY    flag rate 0.0006 (18/30000) on real cross-day same-section pairs   -- an upper bound on FP, not an FPR: some are genuine repeats
+thresholds: overlap>=0.55  words>=5  min-words>=4  entity-words>=3
+entity index: 2648 distinctive token(s), MIN_DF=2 MAX_DF=12
+
+--- correction to the entry above -------------------------------------------------------
+The "VETO: 2 FAILING" line above was a fault in this harness, not in the fix it was scoring.
+Both failures were artefacts, found and fixed the same hour:
+  1. gold_pairs() left run_tests' "::entity::" marker inside the past headline, so the word
+     "entity" entered the comparison. One phantom failure.
+  2. The remaining case (Illinois assisted suicide) asserts the ENTITY ARM fires, which
+     depends on a token's document frequency in whatever corpus is loaded - "illinoi" clears
+     the gate in production's corpus and not in this eval's. A veto has to be
+     corpus-independent, so ::entity:: cases are now excluded from GOLD and left to
+     run_tests, which checks them at pair level.
+Re-run after both fixes, same code under test:
+
+GOLD    11/11 testcases pairs agree
+URL     74/82  same-URL cross-day repeats recovered  (recall 0.902)
+CLUSTER recall 0.738 (1453/1969)   false-positive rate 0.000 (0/28429)
+CLUSTER precision 1.000   F1 0.849
+XDAY    flag rate 0.0006 (18/30000)
+thresholds: overlap>=0.55  words>=5  min-words>=4  entity-words>=3
+
+Net effect of the DEVELOPMENT fix: recall 0.736 -> 0.738, XDAY flags 19 -> 18, precision
+unchanged. Small, because the collision is rare - five tokens - but it was costing whole
+stories, which is what recall on 1,969 pairs cannot show and Chris reading one edition can.
+
+=== 2026-08-27  synonym-equivalence: dev tokens compared on stem-or-class, not raw string
+GOLD    11/11 testcases pairs agree
+URL     74/82  same-URL cross-day repeats recovered  (recall 0.902)
+CLUSTER recall 0.738 (1470/1993)   false-positive rate 0.000 (0/28429)
+CLUSTER precision 1.000   F1 0.849
+XDAY    flag rate 0.0003 (10/30000) on real cross-day same-section pairs   -- an upper bound on FP, not an FPR: some are genuine repeats
+thresholds: overlap>=0.55  words>=5  min-words>=4  entity-words>=3
+entity index: 2648 distinctive token(s), MIN_DF=2 MAX_DF=12
+
+=== 2026-08-28  scheduled re-scan against fresh archive
+DEV COLLISIONS - 2 pair(s) that word overlap would merge and is_development_of blocks
+(27.08.2026 baseline: 20 before the stem/class fix, 1 after - an arrest/charge pair left blocked deliberately)
+    2x  arrest                   vs charg                   
+        Man charged with arson after historic New Brunswick church destroyed by fi
+        Suspect Arrested for Arson in Burning of Historic Catholic Church in New B

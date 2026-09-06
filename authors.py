@@ -131,8 +131,55 @@ def _load_cache():
         return {}
 
 
+# The article's OWN section, from structured markup rather than page text. Chris, 28.08.2026:
+# Brussels Signal's "From Pakistan to Nigeria" is a comment piece whose byline was dropped,
+# and the masthead cannot be listed as commentary because the same sweep carries its straight
+# news. Read here because this is where the page is already open.
+#
+# Ordered most reliable first, and body class LAST: it is a WordPress convention rather than a
+# standard, but it is the only marker brusselssignal.eu actually publishes.
+SECTION_META = re.compile(
+    r'<meta[^>]+?(?:property|name)=["\']article:section["\'][^>]+?'
+    r'content=["\']([^"\']{2,40})["\']', re.I)
+SECTION_META_REV = re.compile(
+    r'<meta[^>]+?content=["\']([^"\']{2,40})["\'][^>]+?'
+    r'(?:property|name)=["\']article:section["\']', re.I)
+SECTION_LD = re.compile(r'"articleSection"\s*:\s*"([^"]{2,40})"', re.I)
+SECTION_BODYCLASS = re.compile(r'<body[^>]*\bclass=["\']([^"\']{0,400})["\']', re.I)
+
+
+def page_section(html):
+    """The article's own section, lowercased, or None when the page declares none.
+
+    None is a real answer and must not be read as either "news" or "comment": most sites
+    publish no marker at all, and guessing from page TEXT is what was measured and rejected -
+    the word "Opinion" in a site's nav menu is indistinguishable from its section label once
+    the HTML is stripped.
+    """
+    for rx in (SECTION_META, SECTION_META_REV, SECTION_LD):
+        m = rx.search(html or "")
+        if m:
+            return m.group(1).strip().lower()
+    m = SECTION_BODYCLASS.search(html or "")
+    if m:
+        cats = re.findall(r"\bcategory-([a-z0-9-]{2,30})\b", m.group(1), re.I)
+        if cats:
+            return cats[0].lower()
+    return None
+
+
 def enrich(items, workers=8, use_cache=True, is_commentary=None):
-    """Fill item['author'] in place. Returns (filled, overridden, unreachable)."""
+    """Fill item['author'] and item['_page_section'] in place.
+
+    Returns (filled, overridden, unreachable).
+
+    `is_commentary` is accepted and DELIBERATELY NOT used to skip fetching any more. It used
+    to gate which pages were opened at all, which made the whole thing circular once the
+    commentary decision started depending on the page: compose asked "is this commentary?" to
+    decide whether to look, and the answer was on the page it had declined to open. Fetch
+    first, decide after. On the 28.08.2026 picks that is 123 pages rather than 13 - every
+    picked item that is missing a byline, which is the set worth opening regardless.
+    """
     overrides = load_overrides()
     cache = _load_cache() if use_cache else {}
 
@@ -157,8 +204,6 @@ def enrich(items, workers=8, use_cache=True, is_commentary=None):
                 overridden += 1
                 break
         else:
-            if is_commentary is not None and not is_commentary(it):
-                continue
             todo.append(it)
 
     # No page to read: the item is only a Google News redirect.
@@ -169,27 +214,35 @@ def enrich(items, workers=8, use_cache=True, is_commentary=None):
     for it in list(fetchable):
         u = it["url"]
         if u in cache:
-            if cache[u]:
-                it["author"] = cache[u]
+            # Legacy entries are a bare name (or None); current ones carry the section too.
+            entry = cache[u]
+            name, sect = ((entry.get("author"), entry.get("section"))
+                          if isinstance(entry, dict) else (entry, None))
+            if name:
+                it["author"] = name
                 filled += 1
+            if sect:
+                it["_page_section"] = sect
             fetchable.remove(it)
 
     def work(it):
         try:
             html = fetch_feeds.fetch(it["url"]).decode("utf-8", "replace")
         except Exception:  # noqa: BLE001
-            return it["url"], None
-        return it["url"], byline(html, it.get("outlet") or "")
+            return it["url"], None, None
+        return it["url"], byline(html, it.get("outlet") or ""), page_section(html)
 
     if fetchable:
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
-            for url, name in pool.map(work, fetchable):
-                hits[url] = name
+            for url, name, sect in pool.map(work, fetchable):
+                hits[url] = {"author": name, "section": sect}
         for it in fetchable:
-            name = hits.get(it["url"])
-            if name:
-                it["author"] = name
+            got = hits.get(it["url"]) or {}
+            if got.get("author"):
+                it["author"] = got["author"]
                 filled += 1
+            if got.get("section"):
+                it["_page_section"] = got["section"]
 
     if use_cache and hits:
         cache.update(hits)

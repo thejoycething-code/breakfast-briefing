@@ -19,16 +19,19 @@ Usage:
 """
 
 import argparse
+import collections
 import json
 import math
 import os
 import re
 import sys
+import unicodedata  # fold accents before tokenising - see _deaccent()
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import regions
 import fetch_feeds   # url_key + fetch_lede, for the sheet's bounded lede fetch
 import textsignals   # report-vs-comment and friends, read off the article opening
+import history      # what actually appeared in recent editions, for the cross-day repeat check
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -69,6 +72,36 @@ SECTIONS = [
         # on 19.08.2026, though it is a textbook religious-liberty win.
         (5, r"sabbath|(religious|sunday|sabbath) (exemption|accommodation|observance)"
             r"|exemption from working|refus\w+ to work on (sunday|the sabbath)"),
+        # Chris, 27.08.2026: four persecution stories filed as Church & Religion. Each was a
+        # shape the vocabulary above did not have.
+        #
+        # 1. A believer already in custody, waiting on the court. The verbs at (4) are all
+        #    about the MOMENT of arrest - jailed, detained, sentenced - so a story about
+        #    what happens next scored nothing ("China's 'Zion 8' church leaders awaiting
+        #    verdicts"). "Underground church" is added alongside it: the word exists in
+        #    English almost solely to describe a church the state has driven out of sight.
+        (5, r"underground church|house church(es)? raid"
+            r"|(church|christian|pastor|priest|bishop|nun|convert|believer)\w*\b.{0,40}"
+            r"(awaiting|await|face[sd]?) (a )?(verdict|verdicts|trial|sentencing|retrial)"
+            r"|(verdict|sentencing|trial) .{0,30}(pastor|priest|bishop|church leaders?)"),
+        # 2. A named group attacking a religious community. (4) covers killing and kidnapping
+        #    but not the slower kind - Word&Way's "Settler Attacks Threaten the West Bank's
+        #    Final Christian Village" is intimidation and land seizure, and read as ordinary
+        #    church news. Anchored to the ATTACKER, not to the bare word "attack", which is
+        #    far too common to key a section on.
+        (5, r"(settler|mob|militant|extremist|gunmen|jihadist|islamist|insurgent|vigilante"
+            r"|hardline|nationalist|bajrang dal|boko haram|fulani)\w*\s+"
+            r"(attack|attacks|violence|raid|raids|mob)"
+            r"|attacks?\b.{0,40}(christian|catholic|worshipper|churchgoer|believer|convert)"
+            r"s?\s+(village|community|town|quarter|neighbourhood|neighborhood)"),
+        # 3. A state refusing a believer entry. The Rasanen visa story ("the UK bars Christian
+        #    MP") is a government acting against someone for their faith, which is this beat
+        #    exactly, but no pattern here described a border rather than a jail.
+        (5, r"(bar|bars|barred|ban|bans|banned|refus\w+|denie[sd]|revok\w+|cancel\w+)"
+            r"\b.{0,30}(christian|catholic|muslim|jewish|pastor|priest|bishop|imam|rabbi"
+            r"|missionary|evangelist)\w*\b.{0,30}\b(visa|entry|\bETA\b|conference|from entering)"
+            r"|(bars?|barred|denie[sd]|refus\w+)\s+(a\s+|the\s+)?(christian|catholic|muslim"
+            r"|jewish)\s+(mp|senator|lawmaker|politician|pastor|priest|bishop|speaker)"),
         # Chris, 20.08.2026: "the ADF release should be in religious freedom". A
         # religious-liberty CASE carries none of the persecution vocabulary above - nobody is
         # killed, jailed or attacked - so "Christian employers free to conduct business
@@ -198,7 +231,11 @@ SECTIONS = [
             r"|activis|lobby|agenda|orthodoxy|theory|extremis)"
             r"|trans (youth|kids|child|care|health|women|men|athlete)|youth gender|child gender"),
         (5, r"single.sex|women.only|gender recognition|\bGRC\b|\bEHRC\b|changing room"
-            r"|strip.search|gender.critical|self-?id\b|biological (sex|male|female)"
+            # "biological (sex|male|female)" never covered the PLURAL: "biological male"
+            # catches "males" by substring, but "biological men" and "biological women"
+            # both missed entirely. Separate defect from the apostrophe one, same headline
+            # found both (Telegraph, 31.08.2026).
+            r"|strip.search|gender.critical|self-?id\b|biological (sex|male|female|m[ae]n|women)"
             r"|women'?s (sport|football|rugby|swimming|boxing|cricket|league|spa)"
             r"|female categor|male athlete"),
         (3, r"\bLGBT|\bpride\b|\bqueer\b|lesbian|\bgay\b|bisexual|non-?binary|stonewall"
@@ -242,7 +279,13 @@ SECTIONS = [
         (3, r"\bchurch(es|goer|going)?\b|christian|catholic|evangelical|protestant"
             r"|orthodox|baptist"
             r"|methodist|presbyterian|congregation|pastor|priest|clergy|chaplain"
-            r"|sermon|liturg|\bmass\b|worship|discipleship|evangeli|missional"),
+            # "Mass" but NOT "Mass." — the abbreviation for Massachusetts. Found 28.08.2026
+            # while measuring the sue|lawsuit widening: \bmass\b matched the state in every
+            # WBUR, Boston.com and NBC Boston headline, and two items in that day's sweep sat
+            # in the Church & Religion candidate list on the strength of it. A trailing period
+            # is the whole tell — the liturgy is written "Mass at the cathedral", "Red Mass",
+            # never "Mass." unless a sentence ends there, which headlines do not do.
+            r"|sermon|liturg|\bmass\b(?!\.)|worship|discipleship|evangeli|missional"),
         # faith[- ]: the space-only form silently dropped every hyphenated compound, so the
         # State Department's $2bn in grants to "Faith-Based Charities" reached no section at
         # all (found 19.08.2026). Same class of bug as law/laws below.
@@ -451,6 +494,14 @@ SOURCE_HINTS = {
     ],
     "Gender, Identity & Sexuality": [
         "reduxx", "sex matters", "transgender trend", "lgb alliance",
+        # Chris, 03.09.2026, adding her as a source after the "Pregnant Men" funding piece was
+        # missed. The hint is the half that matters: her headlines lead on the money and the
+        # institution ("£1.86 million: The taxpayer-funded research of...") and name the beat
+        # only in passing, so they score 0 and the feed alone would have dropped her into
+        # NO SECTION MATCHED daily. Safe here because SOURCE_HINTS is consulted only when
+        # nothing scored - her press-regulation reporting still goes to Free Speech on its
+        # own words, which testcases.txt pins.
+        "charlotte gill",
     ],
 }
 SOURCE_BOOST = 4
@@ -523,6 +574,33 @@ CHAFF_HARD = re.compile(
     r"|reflection for|daily devotion|verse of the day|prayer of the day"
     r"|quiz:|\brecipe|horoscope|lottery|deals? of the day|\d+ things|top \d+|best \d+"
     r"|fringe (comedy )?review|album review|restaurant review|theatre review|gig review",
+    re.I)
+
+
+# Pornographic SEO spam, riding in on the Gender and Life search feeds. Chris, 31.08.2026:
+# two of these reached LIVE sections rather than the suppressed bucket - a Vietnamese porn
+# scrape classified into Gender, Identity & Sexuality and an "[xXx]...xnxx new pornx" string
+# into Life - because their headlines were read as ordinary words.
+#
+# Two things force the shape of this pattern. There is no outlet to blocklist: both arrived
+# as Google News redirects the decoder could not resolve, so the outlet parsed out as "Air
+# and Space Museum", a name that will be different and equally wrong next time. And the feeds
+# carrying them are search feeds the beats depend on, so this cannot move up into the fetch
+# filter without costing real Gender and Life coverage.
+#
+# So it matches on spam ORTHOGRAPHY, never on subject matter. Bare "porn", "sex" and "nude"
+# are deliberately absent: "You Can't Be Charged For Possessing AI Child Porn, Court Rules"
+# and "child sex changes" are real stories on this beat, and a subject-matter rule would take
+# the beat down with the spam. What is matched instead is the vocabulary of scraper sites -
+# xxx/xnxx runs, porn- with a site suffix, and the Vietnamese scrape markers - none of which
+# a newsroom ever writes.
+PORN_SPAM = re.compile(
+    r"\bxn?x{2,}\b"                             # xxx, [xXx], xnxx
+    r"|\bporn(?:x|o|hub|tube|star)s?\b"          # pornx/porno/pornhub - NOT bare "porn"
+    r"|\bx-?videos?\b|\bxhamster\b|\bsex-?videos?\b|sex!\+?videos?"
+    r"|\bphim\s+sex\b|\bxem\s+phim\b|\bvietsub\b"   # Vietnamese porn scrapes
+    r"|\bnude\s+(?:pics?|photos?|videos?|scenes?)\b"
+    r"|\b(?:watch|download)\s+(?:full\s+)?(?:sex|porn)\b",
     re.I)
 
 
@@ -650,14 +728,30 @@ SCHOOL_ROUTINE = re.compile(
     r"|school assembly|morning assembly"
     r"|sports day|school (fair|fete|concert|play|musical|trip|bus route|lunch menu)"
     r"|first day of (school|term)|term (starts|begins)|enrol(ment|ling) opens"
-    r"|new (principal|headteacher) (named|appointed)|ribbon.cutting", re.I)
+    r"|new (principal|headteacher) (named|appointed)|ribbon.cutting"
+    # Chris, 27.08.2026, on the Telegraph's "Private schools ban Meta smart glasses amid
+    # bullying fears" and FOX 2 Detroit's "Birmingham parents split over schools'
+    # bell-to-bell cellphone ban": "This isn't a big enough story and doesn't really cross
+    # section with our other issues to warrant inclusion." One school or district setting its
+    # own rule about a gadget is house-keeping. The escape hatch below is what keeps the real
+    # version of this story: a government banning phones in schools carries "law", "bill",
+    # "policy" or one of the governance words now in EDUCATION_ANCHOR, so it survives.
+    r"|bell.?to.?bell"
+    r"|(ban|bans|banned|bar|bars|barred|prohibit)\w*\b.{0,30}\b(phone|phones|smartphone"
+    r"|smartphones|cellphone|cellphones|mobile|mobiles|smart ?glasses|smart ?watch"
+    r"|smartwatches|earbuds|headphones|device|devices)\b", re.I)
 # What makes an education story ours: who decides, what is taught, what a child is exposed to.
 EDUCATION_ANCHOR = re.compile(
     r"parental (rights|consent|notification|opt.?out)|parents'? rights|sex education"
     r"|relationships education|\bRSE\b|curriculum|faith school|home ?school|ofsted"
     r"|school prayer|gender|trans|LGBT|safeguarding|grooming|abuse|censor|free speech"
     r"|banned book|library|indoctrinat|ideolog|religio|christian|catholic|islam"
-    r"|lawsuit|court|ruling|policy|bill\b|law\b|inquiry|tribunal|discriminat", re.I)
+    r"|lawsuit|court|ruling|policy|bill\b|law\b|inquiry|tribunal|discriminat"
+    # Governance words, added 27.08.2026 with the device clause in SCHOOL_ROUTINE above.
+    # A single school's gadget rule is house-keeping; a government's is education policy, and
+    # only the actor tells the two apart.
+    r"|government|minister|parliament|congress|legislat|governor|senate|statewide"
+    r"|nationwide|countrywide|department for education|\bDfE\b|school board vote", re.I)
 
 
 # A crime that happens to occur at a school or university. Chris, 17.08.2026: "We're
@@ -774,7 +868,16 @@ BLOCKED_OUTLETS = re.compile(
     # four reach us as Google News redirects, so the block has to be on the display name.
     r"|صوت الإمارات|voice[- ]?of[- ]?emirates|\brediff\b|china[- ]?daily|\baol\b"
     # Chris's markup of the TEST 20260825 draft: "Remove as a source" against each of these.
-    r"|moneycontrol|brobible|lgbtqnation|queerty", re.I)
+    r"|moneycontrol|brobible|lgbtqnation|queerty"
+    # Chris's markup of the 20260827 edition: "Remove as a source permanently" against seven
+    # more. Two lessons in this batch. News18 was already in ENTERTAINMENT_DESKS, which only
+    # gates the marriage-gossip rule - it had never been a ban, so its religious-freedom
+    # output published freely; a source Chris rules out has to reach THIS list, not a
+    # topic-specific one. And "Topeka Capital-Journal" is a Gannett masthead of the
+    # <City> Capital-Journal shape, so the token is anchored to Topeka rather than left as a
+    # bare "capital-?journal" that would also take the Kansas and Ohio papers with it.
+    r"|dainik[- ]?jagran|muslim[- ]?network[- ]?tv|\bnews18\b|nenews|topeka[- ]?capital"
+    r"|basketballnews|the[- ]?catholic[- ]?thing|oz[- ]?arab", re.I)
 
 
 
@@ -901,6 +1004,9 @@ def is_chaff(headline, outlet="", categories=None):
     if NEWSLETTER_INDEX.match(headline or ""):
         return True
     if is_blocked_outlet(outlet):
+        return True
+    # Unconditional, and ahead of every rescue: no subject matter redeems porn spam.
+    if PORN_SPAM.search(headline or ""):
         return True
     if outlet and SPORTS_OUTLETS.search(outlet):
         return True
@@ -1094,6 +1200,13 @@ SOURCE_TIER = [
     # Gap surfaced on 14.08.2026: Baptist Press ran in that edition but was untiered,
     # so an untiered aggregator beat it inside a duplicate cluster.
     "baptist press", "catholic review", "catholic sun", "the pillar", "zenit",
+    # Chris, 31.08.2026: APPENDED, not inserted, so his order of preference above is
+    # untouched. SOURCE_TIER held no mainstream national beyond the Telegraph, Times and
+    # GB News, so on the trans-military filing Advocate.com - an advocacy outlet, unlisted
+    # - led a cluster of eight over the Washington Post's own report on keyword score
+    # alone, and he added that link back by hand. Only the case he flagged is added here;
+    # the wider gap (Guardian, BBC, Sky, Independent, Mail all absent) is his call.
+    "washington post",
 ]
 TIER_BUMP = 6
 
@@ -1166,9 +1279,82 @@ def _stem(w):
     return w
 
 
+def _deaccent(s):
+    """Fold accents to ASCII, so an accented name survives tokenising as ONE word.
+
+    Chris, 28.08.2026: "This is old news and should have been deduplicated" - BGEA's "UK
+    Drops Travel Ban for Päivi Räsänen" against Christian Today's "Päivi Räsänen granted UK
+    visa" three days earlier. Not a threshold problem. sig_words strips [^a-z0-9] BEFORE
+    tokenising, so every accented word was SPLIT at the accent and the fragments then failed
+    the length gate: "Päivi" -> "p"/"ivi", "Räsänen" -> "r"/"s"/"nen", all discarded. Her
+    name was invisible to sig_words, to ENTITY_RE (whose [A-Z][a-z]{2,} cannot match "Pä"
+    either) and therefore to every clustering and repeat check that reads them.
+
+    The blast radius was never one Finn: "Müller" tokenised as "ller", "Gutiérrez" as
+    "guti"+"rrez", "México" as "xico", "Orbán" vanished. Every non-English name in the sweep
+    was either destroyed or replaced by junk that could only match other junk.
+    """
+    return unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode("ascii")
+
+
 def sig_words(headline):
-    t = re.sub(r"[^a-z0-9 ]", " ", (headline or "").lower())
+    t = re.sub(r"[^a-z0-9 ]", " ", _deaccent(headline).lower())
     return {_stem(w) for w in t.split() if len(w) > 3 and w not in STOPW}
+
+
+# A primary source that is RELAYING a newsroom is not the primary source of that story.
+#
+# Chris, 31.08.2026. PRIMARY_SOURCE exists because an advocacy body's own release IS the
+# document (the ADF/EWTN case, 14.08.2026). But the bump was unconditional, so it also fired
+# when the body was simply passing on someone else's reporting - and then it SUPPRESSED that
+# reporting. Six newsrooms filed on Burnham abstaining (Telegraph, Times, Independent x2,
+# Manchester Evening News, LBC) and all six collapsed under SPUC's item, whose own summary
+# opens "According to Politics UK, Andy Burnham has told Labour MPs...". The sheet shows one
+# line per story, so only SPUC's was ever visible and the edition ran an opinion column where
+# the news report should have been.
+#
+# Tested on the item's own FEED SUMMARY, not its article text: clustering happens before
+# attach_openings, so at this point the text does not exist yet. The summary is free and,
+# for the cases that matter, carries the attribution verbatim.
+#
+# The institution guard is the half that keeps the original behaviour intact. "According to a
+# new Government assessment" is Right To Life reading a document - tier 1 in the same edition
+# - and "according to the United Nations" is ADF citing the body whose letter it published.
+# Only attribution to something that is NOT an institution counts as a relay.
+_RELAY_ATTRIB = re.compile(
+    # trigger matched case-insensitively, the NAME case-sensitively: requiring a capitalised
+    # proper noun is what separates "According to Politics UK" from "according to a report".
+    r"\b(?i:according to|as (?:first )?reported by|citing|per)\s+(?:the\s+)?"
+    r"((?:[A-Z][\w’'&.\-]*\s+){0,3}[A-Z][\w’'&.\-]*)"
+    r"|((?:[A-Z][\w’'&.\-]*\s+){0,3}[A-Z][\w’'&.\-]*)\s+(?:reports|reported|has reported)\b")
+
+_INSTITUTION = re.compile(
+    r"government|court|commission|ministr|department|office|council|parliament|senate"
+    r"|congress|assembly|tribunal|inquiry|committee|police|nhs|united nations|\bun\b"
+    r"|\bwho\b|assessment|survey|census|study|data|figures|statistics|report\b|analysis"
+    r"|minister|bishop|diocese|conference|charity|organisation|organization|foundation"
+    r"|institute|society|association|coalition|campaign|spokes|university|hospital"
+    r"|ombudsman|regulator|authority|agency|bureau|council", re.I)
+
+
+def relays_another_outlet(item):
+    """True if a PRIMARY_SOURCE item attributes its story to another news outlet.
+
+    Only ever True for a primary source: a newsroom does not hold the provenance bump, so
+    it has nothing to lose and must not be penalised for ordinary sourcing.
+    """
+    outlet = (item.get("outlet") or "").lower()
+    if not any(t in outlet for t in PRIMARY_SOURCE):
+        return False
+    for m in _RELAY_ATTRIB.finditer(item.get("summary") or ""):
+        name = (m.group(1) or m.group(2) or "").strip()
+        if not name or _INSTITUTION.search(name):
+            continue
+        # Its own name is not a relay - "SPUC reports" is SPUC reporting.
+        if name.lower() in outlet or outlet.split()[0:1] and outlet.split()[0] in name.lower():
+            continue
+        return True
+    return False
 
 
 def cluster_rank(item):
@@ -1197,10 +1383,15 @@ def cluster_rank(item):
     # ties between two cited outlets. Without this the winner was just feed order: the
     # two pairs the 12.08.2026 fix was built around (Catholic Herald vs OSV News,
     # Telegraph vs GB News) score identically and were decided by luck.
-    tier_pos = next((i for i, t in enumerate(SOURCE_TIER) if t in outlet), len(SOURCE_TIER))
+    _tp = source_tier_pos(item.get("outlet"))
+    tier_pos = len(SOURCE_TIER) if _tp is None else _tp
+    # 2 = a primary source publishing its own document, 1 = everything else, 0 = a primary
+    # source merely relaying a newsroom, which must not outrank that newsroom's own report.
+    relays = relays_another_outlet(item)
+    primacy = 0 if relays else (2 if any(t in outlet for t in PRIMARY_SOURCE) else 1)
     return (
-        1 if any(t in outlet for t in PRIMARY_SOURCE) else 0,   # who published it
-        1 if any(t in outlet for t in SOURCE_TIER) else 0,      # outlets Chris cites
+        primacy,                                                # who published it
+        1 if _tp is not None else 0,                            # outlets Chris cites
         0 if item.get("seen_on") else 1,                        # don't re-lead old news
         -tier_pos,                                              # preferred outlet first
         0 if (item.get("url") or "").startswith("https://news.google.com/") else 1,
@@ -1269,7 +1460,9 @@ ENTITY_COOCCUR_MIN = 3
 def entities(headline):
     """Multi-word proper nouns, minus sentence-initial noise."""
     out = set()
-    for m in ENTITY_RE.finditer(headline or ""):
+    # Deaccented first: ENTITY_RE is [A-Z][a-z]{2,}, which cannot match "Päivi" or "Orbán",
+    # so accented names were not entities at all. See _deaccent().
+    for m in ENTITY_RE.finditer(_deaccent(headline)):
         phrase = m.group(1).strip()
         words = [w for w in phrase.split() if w not in ENTITY_STOP]
         if not words:
@@ -1334,6 +1527,159 @@ DEVELOPMENT = re.compile(
     r"|uphold\w*|convicted|acquitted|sentenc\w*|released|freed|resign\w*|elected|struck down"
     r"|blocked|approved|rejected|dismissed|settle[ds]?|dropped|dies?|died|arrested|charged"
     r"|handed over|returns?|returned|reunited|custody)\b", re.I)
+#
+# Do NOT extend this list with more outcome verbs. Tried on 27.08.2026 and reverted the same
+# hour: adding "passes" broke the France Constitutional Court pair in testcases.txt, because
+# is_development_of fires on ASYMMETRY - one headline carrying a word the other lacks - and
+# "approves" was not in the list. Two reports of one ruling then looked like two stages of a
+# story. Every verb added here creates that trap with each of its own synonyms that is
+# absent, so the list is safer incomplete than half-extended. The prospective/outcome axis
+# below is the safe way to separate stages, because it tests a property both headlines have.
+
+# Language that places a story BEFORE the event, as against reporting the event. A separate
+# axis from DEVELOPMENT above, which lists outcomes: "MPs to vote on the Bill" and "MPs vote
+# down the Bill" share almost every significant word and neither carried an outcome verb, so
+# the cross-day check called the second a repeat of the first. A scheduled event and its
+# result are never the same story.
+PROSPECTIVE = re.compile(
+    r"\bto (vote|rule|decide|hear|consider|debate|publish|announce|introduce|table|meet)\b"
+    r"|\bset to\b|\bexpected to\b|\bdue to (vote|rule|decide|begin|start)\b"
+    r"|\bpoised to\b|\bprepares? to\b|\bplans? to\b|\blooks? set to\b"
+    r"|\bahead of (the |a )?(vote|ruling|hearing|debate|reading|decision)\b"
+    r"|\bcountdown\b|\bweeks? left\b|\bdays? left\b", re.I)
+
+
+# Was permission GIVEN or WITHHELD? A third axis, and built the way the warning above says a
+# stage test has to be: it asks a question BOTH headlines answer, so it cannot fire merely
+# because one of them happens to use a word the other's synonym list is missing.
+#
+# Chris, 28.08.2026, on the Räsänen arc. Three headlines, one story, and the DEVELOPMENT list
+# scored all the wrong ones:
+#   "UK Drops Travel Ban for Päivi Räsänen"        -> no match at all ("drops" absent)
+#   "Päivi Räsänen granted UK visa but not in time" -> "granted"
+#   "UK bars Finnish Christian MP Päivi Räsänen"    -> no match at all ("bars" absent)
+# So the ban being LIFTED read as staged-against-unstaged and was called a development of
+# itself, while the ban being IMPOSED and the ban being LIFTED both scored empty and could
+# not be told apart. Exactly the asymmetry trap, from two absent synonyms.
+#
+# Extending DEVELOPMENT was the obvious fix and is the one that comment forbids, for good
+# reason: ~20 present-tense forms would each open the same trap against their own missing
+# synonyms. Polarity sidesteps it. Both headlines are placed on the axis or neither is, and
+# two headlines on the SAME side are reporting the same moment however differently they word
+# it — which is the claim _DEV_CLASSES makes one synonym pair at a time.
+PERMISSION_GIVEN = re.compile(
+    r"\b(grants?|granted|lifts?|lifted|drops?|dropped|allows?|allowed|admits?|admitted"
+    r"|clears?|cleared|reinstates?|reinstated|restores?|restored)\b", re.I)
+PERMISSION_REFUSED = re.compile(
+    r"\b(bars?|barred|bans?|banned|denies|denied|refuses?|refused|revokes?|revoked"
+    r"|suspends?|suspended|excludes?|excluded)\b", re.I)
+
+
+# A lifting verb governing a restriction NOUN. "UK Drops Travel Ban" reads as both sides at
+# once otherwise - "Drops" is the verb and "Ban" is merely its object - and that ambiguity is
+# what left the headline unplaced on this axis and so still broken. Checked first, because the
+# verb decides the direction and the noun is only what it acts on.
+LIFTS_RESTRICTION = re.compile(
+    r"\b(drops?|dropped|lifts?|lifted|overturns?|overturned|quashe?[sd]?|ends?|ended"
+    r"|scraps?|scrapped|reverses?|reversed)\s+(?:\w+\s+){0,3}?"
+    r"(ban|barring|exclusion|embargo|restriction|sanction)s?\b", re.I)
+
+
+def _permission(headline):
+    """'given', 'refused', or None when the headline does not sit on this axis at all.
+
+    None for BOTH readings at once as well as neither: a headline arguing both ways is
+    exactly the case where this axis has nothing useful to say, so it defers to the word
+    lists rather than guessing.
+    """
+    if LIFTS_RESTRICTION.search(headline):
+        return "given"
+    given = bool(PERMISSION_GIVEN.search(headline))
+    refused = bool(PERMISSION_REFUSED.search(headline))
+    if given == refused:
+        return None
+    return "given" if given else "refused"
+
+
+# DEVELOPMENT members that also have an everyday NOUN or ADJECTIVE reading. Chris,
+# 27.08.2026: "Fix the DEVELOPMENT noun/verb collision."
+#
+# This list is short because it was measured rather than imagined. Scanning every DEVELOPMENT
+# match across the archived editions, these five are the only members where a non-verbal
+# reading actually occurs: "full return of religion classes", "is a win for", "The Lost
+# Drive". The first heuristic tried - treat a match followed by "of" as nominal - looked
+# right and is exactly backwards for the other candidates it flagged, because "convicted OF
+# child rape", "acquitted OF inviting support" and "dies OF malaria" are all verbs taking a
+# complement. It was measured, found to misread 60% of "convicted", and discarded.
+DEV_AMBIGUOUS = re.compile(r"^(returns?|wins?|lost)$", re.I)
+
+# What immediately precedes a noun and never a finite verb: a determiner, a possessive, a
+# number or an ordinary attributive adjective. Deliberately a CLOSED list of function words
+# plus the handful of adjectives that actually turn up in front of these five - an open-ended
+# adjective list would eventually swallow a subject noun and start deleting real verbs.
+DEV_NOMINAL_BEFORE = re.compile(
+    r"\b(the|a|an|its|his|her|their|our|my|your|this|that|these|those|no|any|some|each"
+    r"|every|another|both|either|neither|full|partial|complete|total|outright|swift|sudden"
+    r"|dramatic|historic|eventual|surprise|shock|possible|likely|apparent|so-called"
+    r"|first|second|third|fourth|final|latest|next|last|only|same|such)\s+$", re.I)
+
+
+# Inflection. Two thirds of the blocked pairs the archive scan found were one word in two
+# forms - win/wins, return/returns/returned, resign/resignation - and normalising those needs
+# no semantic judgement whatsoever, which is why it is done first and separately from the
+# classes below. Longest suffix first, and only on stems long enough to survive it.
+_DEV_SUFFIXES = ("ation", "ings", "ing", "ies", "ed", "es", "s", "d")
+
+
+def _dev_stem(token):
+    token = token.lower().strip()
+    for suf in _DEV_SUFFIXES:
+        if token.endswith(suf) and len(token) - len(suf) >= 4:
+            return token[: -len(suf)]
+    return token
+
+
+# Genuine synonymy, and ONLY where the archive scan produced a pair this function wrongly
+# blocked. Each line names the pair that earned it. This is deliberately not a thesaurus: every
+# class added here is a claim that two words describe the SAME moment, and a wrong one merges
+# two real stories for good.
+#
+# "arrested"/"charged" is deliberately absent. The scan found one pair where they were the same
+# story (a New Brunswick church arson reported a day apart), but arrest and charge are a real
+# progression, and a class collapsing them would delete that signal everywhere else.
+_DEV_CLASSES = [
+    # "US missionary ... is released" / "American missionary ... freed"; and the same story
+    # again as "reunited with wife".
+    {"freed", "free", "frees", "releas", "released", "release", "reunit", "reunited"},
+    # "Supreme Court upholds Trump's order" / "Supreme Court gives Trump an interim win".
+    # "win"/"wins" are listed as both forms rather than stemmed: _dev_stem protects stems
+    # shorter than four characters, because the alternative - stripping down to three - turns
+    # "freed" into "fre" while "free" stays "free", which is worse than enumerating two words.
+    {"uphold", "upholds", "upheld", "win", "wins", "back", "backs", "backed"},
+    # "Texas drag show ban struck down" / "judge ... in overturning Texas drag show ban".
+    {"struck down", "strike down", "overturn", "quash", "revers"},
+]
+_DEV_CLASS_OF = {}
+for _n, _cls in enumerate(_DEV_CLASSES):
+    for _w in _cls:
+        _DEV_CLASS_OF[_w] = "class%d" % _n
+
+
+def _dev_key(token):
+    """The identity a development word is compared on: its class, else its stem."""
+    stem = _dev_stem(token)
+    return _DEV_CLASS_OF.get(stem) or _DEV_CLASS_OF.get(token.lower()) or stem
+
+
+def _dev_matches(headline):
+    """DEVELOPMENT hits in `headline`, with the nominal readings dropped."""
+    out = set()
+    for m in DEVELOPMENT.finditer(headline):
+        token = m.group(0)
+        if DEV_AMBIGUOUS.match(token) and DEV_NOMINAL_BEFORE.search(headline[:m.start()]):
+            continue        # "full return of...", "a win for...", "the lost generation"
+        out.add(_dev_key(token))
+    return out
 
 
 def is_development_of(a, b):
@@ -1342,8 +1688,20 @@ def is_development_of(a, b):
     Only fires when one carries a development word the other does not - so two reports of the
     same ruling still cluster, but "will fight for custody" and "parents get custody" do not.
     """
-    da = {m.group(0).lower() for m in DEVELOPMENT.finditer(a.get("headline") or "")}
-    db = {m.group(0).lower() for m in DEVELOPMENT.finditer(b.get("headline") or "")}
+    ha, hb = a.get("headline") or "", b.get("headline") or ""
+    # One looking forward to an event and the other reporting it are different stages, even
+    # when neither names an outcome verb (27.08.2026).
+    if bool(PROSPECTIVE.search(ha)) != bool(PROSPECTIVE.search(hb)):
+        return True
+    # Permission given vs withheld, when BOTH headlines sit on that axis. Decided here rather
+    # than left to fall through, because the whole point is that it is more reliable than the
+    # DEVELOPMENT word lists for this shape of story: same side means one moment worded two
+    # ways, opposite sides mean the restriction was imposed and then lifted, which is the
+    # genuine development in the arc. See _permission() (28.08.2026, the Räsänen markup).
+    pa, pb = _permission(ha), _permission(hb)
+    if pa and pb:
+        return pa != pb
+    da, db = _dev_matches(ha), _dev_matches(hb)
     if not da and not db:
         return False
     return bool(da ^ db) and not (da & db)
@@ -1388,6 +1746,157 @@ def same_story(a, b, wa, wb, shared_entities):
         # absurd pair above shares <=1 and no longer does.
         return len(wa & wb) >= ENTITY_COOCCUR_MIN
     return False
+
+
+# --- Cross-day repeats --------------------------------------------------------------------
+# Chris, 27.08.2026: "Build story clustering across days."
+#
+# STRICTER than same_story above, on purpose. Within a day a wrong merge costs one line off
+# the sheet. Across days a wrong flag says "you already ran this", and the natural response
+# is to drop it - so the expensive error is a false positive, and the thresholds are set to
+# make that rare rather than to catch every repeat. A missed repeat costs a duplicate item in
+# one edition; a false one costs a story that never ran at all.
+# Set by repeat_eval.py on 27.08.2026, replacing the 0.70/6 these shipped at that morning.
+# Those were chosen by eyeballing one day's flags on the reasoning that cross-day matching
+# should be STRICTER than within-day, because a wrong cross-day flag invites dropping a story
+# that never ran. Measured, that strictness bought nothing and cost 30 points of recall: at
+# 0.70/6 the matcher found 43.9% of same-story pairs, at 0.55/5 it finds 73.6%, and the flag
+# rate on 30,000 real cross-day same-section pairs moved from 13 to 19. Same question, same
+# thresholds as same_story - the day between two headlines is not itself evidence.
+CROSSDAY_OVERLAP = 0.55
+CROSSDAY_WORDS = 5
+# The ratio arm divides by the SMALLER significant-word set, so a short headline saturates it:
+# "From the sea to the streets" reduces to one word, {street}, and scored 1.0 against every
+# headline mentioning a street. Measured on the 27.08 picks, that mechanism produced the only
+# two flags that were plainly wrong out of 50. Below this floor the ratio is not evidence and
+# only the absolute-count arm may fire.
+CROSSDAY_MIN_WORDS = 4
+# The entity arm, cross-day. Off unless the caller supplies an index built over the UNION of
+# today's corpus and the recent editions - a document frequency measured on one day cannot
+# say whether a token is distinctive across a week. Numbers here are set by repeat_eval.py,
+# not by argument; see repeat_eval_log.txt for what each change moved.
+# Also 3, and also measured: at 4 recall was 0.439 against 0.540 at 3, with the cross-day
+# flag rate unchanged to three decimal places. At 2 it gains one point of recall and 21
+# same-day false positives, which is the trade this floor exists to refuse.
+CROSSDAY_ENTITY_WORDS = 3
+# Distinctive entity TOKENS that alone justify a cross-day link, with no other word overlap
+# required. Two, i.e. a full personal name whose forename and surname each survive the DF gate
+# independently. One is deliberately not enough: a single distinctive surname is how "Farage
+# on Clacton" and "Farage on welfare" would merge, which is the same error the within-day
+# ENTITY_COOCCUR_MIN exists to prevent (28.08.2026).
+CROSSDAY_ENTITY_TOKENS = 2
+
+
+def phrase_tokens(phrase):
+    """The DF-gateable tokens of an already-lowercased entity phrase.
+
+    Mirrors ent_tokens' inner rule, but takes the phrase directly. ent_tokens cannot be used
+    on one: it re-runs ENTITY_RE, which needs capitals, so a lowercased phrase yields the
+    empty set - and `all(t in ents for t in set())` is vacuously True, which silently turned
+    the DF gate off for every short name ("pope leo", both words under five characters) on
+    28.08.2026. An empty result here means "no gateable token", and callers must read it as
+    a refusal rather than a pass.
+    """
+    return {w[:-1] if len(w) > 6 and w.endswith("s") else w
+            for w in (phrase or "").split() if len(w) >= 5}
+
+
+def union_entity_index(rows, past):
+    """Distinctive entities over today's corpus AND the recent editions, as one corpus.
+
+    Document frequency is a property of a corpus, so asking whether a token is distinctive
+    "across two days" is not a well-formed question until the two days are one corpus. That
+    is all this does. Built once per run and handed to ran_before; without it the entity arm
+    stays off, which is the correct default for a two-item comparison that has no corpus at
+    all (run_tests calls it that way).
+    """
+    corpus = [{"headline": it.get("headline") or ""} for it in rows]
+    corpus += [{"headline": h.get("headline") or ""} for h in past]
+    return entity_index(corpus)
+
+
+def ran_before(item, history, ents=None):
+    """The most recent recent-edition appearance of the same story, or None.
+
+    Compares prose, not URLs, which is the entire point: Right To Life's 25.08 piece came
+    back on 27.08 at the same slug with "-2" on the end and no URL-keyed store could see it.
+
+    Three guards, each earning its place:
+      - same section, as in same_story. Two sections means two concerns.
+      - is_development_of, so a running story that has MOVED is not called a repeat. "MPs
+        vote down the Bill" after "MPs to vote on the Bill" is the news, not an echo.
+      - the word-overlap arm only. The entity arm of same_story leans on ENTITY_MIN_DF, a
+        document frequency measured across ONE day's corpus; there is no honest way to
+        compute it across two, and faking it would quietly drop the floor to "shares any
+        rare-ish name", which is the precision loss that was measured and rejected on
+        19.08.2026.
+    """
+    headline = item.get("headline") or ""
+    wa = sig_words(headline)
+    if not wa:
+        return None
+    ta = ent_tokens(headline) if ents else set()
+    section = item.get("_section")
+    best = None
+    for past in history:
+        if section and past.get("section") and past["section"] != section:
+            continue
+        wb = sig_words(past.get("headline") or "")
+        if not wb:
+            continue
+        shared = wa & wb
+        ratio_ok = (min(len(wa), len(wb)) >= CROSSDAY_MIN_WORDS
+                    and len(shared) / max(1, min(len(wa), len(wb))) >= CROSSDAY_OVERLAP)
+        linked = ratio_ok or len(shared) >= CROSSDAY_WORDS
+        if not linked and ents:
+            shared_ents = {e for e in (ta & ent_tokens(past.get("headline") or ""))
+                           if e in ents}
+            if shared_ents and len(shared) >= CROSSDAY_ENTITY_WORDS:
+                # A distinctive name in common, plus real topical overlap. Same two-part test
+                # the within-day clusterer uses, at a higher word floor: the cost asymmetry is
+                # worse here, because a wrong cross-day link invites dropping a story that
+                # never ran.
+                linked = True
+            elif any(len(phrase_tokens(p)) >= CROSSDAY_ENTITY_TOKENS
+                     and all(t in ents for t in phrase_tokens(p))
+                     for p in (entities(headline)
+                               & entities(past.get("headline") or ""))):
+                # ...or the two headlines share a multi-word NAME intact, every token of which
+                # is distinctive over the union corpus. Both halves of that are load-bearing,
+                # and each was learned by watching the other one fail on 28.08.2026:
+                #
+                #   phrases without the DF gate -> merged five unrelated Pope Leo stories, the
+                #     White House, Dolly Parton and Our Lady. A multi-word name is not
+                #     distinctive by construction.
+                #   the DF gate without phrases -> merged "Virginia's Catch-22 for Military
+                #     Chaplains" into "Canada Bars Military Chaplains", on the loose tokens
+                #     "military" and "chaplain" drawn from DIFFERENT phrases in each headline.
+                #
+                # Together they are exact: "paivi rasanen" survives intact in both headlines
+                # AND both its tokens clear the gate, while the chaplains pair shares no
+                # phrase at all and Pope Leo's tokens are far above ENTITY_MAX_DF.
+                # Chris, 28.08.2026: BGEA's "UK Drops Travel Ban for Päivi Räsänen" against
+                # Christian Today's "Päivi Räsänen granted UK visa" three days earlier - one
+                # event, reported late. "drops"/"granted" and "travel ban"/"visa" share no
+                # words, so the pair carries her name and nothing else and dies on the
+                # three-word floor above.
+                #
+                # Safe only because the index is the UNION of today and the history. Tried
+                # without a frequency gate and it merged five unrelated Pope Leo stories, the
+                # White House, Dolly Parton and Our Lady - a multi-word name is NOT
+                # distinctive by construction. Over the union corpus every one of those tokens
+                # is above ENTITY_MAX_DF and excluded, while "paivi"/"rasanen" reach DF 2 -
+                # once today, once in history - and pass. Today's corpus alone cannot see
+                # that: the token is rare today precisely because its other use is in the
+                # past, which is what MIN_DF=2 was rejecting.
+                linked = True
+        if not linked:
+            continue
+        if is_development_of(item, past):
+            continue
+        if best is None or past["date"] > best["date"]:
+            best = past
+    return best
 
 
 def is_comment_piece(item):
@@ -1612,7 +2121,13 @@ def corroborate(rows):
             if len(wa & wb) / max(1, min(len(wa), len(wb))) >= 0.55 or len(wa & wb) >= 5:
                 group.append(b)
                 seen.add(id(b))
-        group.sort(key=lambda it: -rank_score(it))
+        # Relaying items sort LAST, whatever they score. This is the selection that decides
+        # the one line the sheet prints per story, and it is NOT cluster_rank: rank_score has
+        # no PRIMARY_SOURCE term, so on 31.08.2026 SPUC's relay of "Burnham to abstain" beat
+        # the Telegraph's own report on keyword score alone - both are in SOURCE_TIER and
+        # neither matched ACTION - and six national reports were invisible to the curator.
+        # Fixing cluster_rank alone did not touch this path; see run_tests for both.
+        group.sort(key=cluster_lead_key)
         # How many of the outlets on this story are ones Chris actually reads. Raw counts
         # measure general news bigness: an FBI visa-fraud sweep draws eight mainstream
         # outlets, while a Nigerian court freeing a Christian woman draws two movement
@@ -1898,11 +2413,66 @@ def stamp_corroboration(rows):
     return rows
 
 
+def source_tier_pos(outlet):
+    """Index of the SOURCE_TIER entry this outlet matches, or None.
+
+    SOURCE_TIER is matched by SUBSTRING, and "the times" is a substring of other mastheads:
+    on 31.08.2026 "The Times of India" and "The Times of Israel" were both being scored as
+    The Times of London - TIER_BUMP plus its tier_pos - 29 items on that one sweep. It
+    surfaced while chasing why the Burnham-abstain cluster would not lead with the Telegraph:
+    once SPUC's relay was demoted the lead went to The Times of India, which had beaten the
+    Telegraph on a bump it was never entitled to.
+
+    A tier entry followed by " of " is a different masthead. Kept as one helper so the score
+    path and the cluster path cannot drift on the answer.
+    """
+    ol = (outlet or "").lower()
+    for i, t in enumerate(SOURCE_TIER):
+        j = ol.find(t)
+        if j < 0:
+            continue
+        if ol[j + len(t):].lstrip().startswith("of "):
+            continue
+        return i
+    return None
+
+
+def _link_is_unreadable(item):
+    """True if this item's link is a Google News redirect rather than a publisher URL.
+
+    Evaluated at CLUSTER time, before compose.py's resolver runs, so some of these would
+    have resolved later. That is the right trade anyway: when a sibling already has a direct
+    publisher URL for the same story, betting on the sibling costs nothing and betting on
+    the redirect can cost the reader a dead link.
+    """
+    return "news.google.com" in (item.get("url") or "")
+
+
+def cluster_lead_key(item):
+    """Sort key choosing which member of a cluster becomes the line the sheet prints.
+
+    Named and lifted out of corroborate() so a test can reach it. Three terms, in order:
+
+    1. RELAYING SORTS LAST. Provenance beats everything: an advocacy body's own release
+       leads over a newsroom's write-up of it. Added 31.08.2026 after SPUC's relay of
+       "Burnham to abstain" beat the Telegraph's own report and hid six national reports.
+    2. AN UNREADABLE LINK SORTS AFTER A READABLE ONE. rank_score is _score + TIER_BUMP +
+       ACTION_BUMP and has no URL term at all, so an undecodable Google News redirect
+       sorted level with a clean publisher URL. On 01.09.2026 that made Japan Today's
+       redirect - resolve() returns None for it - the lead of a cluster whose other member,
+       The Japan Times, had a direct URL and was supplying the text the sheet printed.
+       Ranked BELOW relay deliberately: provenance is a question about who published the
+       document, this is only about whether the reader can open it.
+    3. Then rank_score, as before.
+    """
+    return (relays_another_outlet(item), _link_is_unreadable(item), -rank_score(item))
+
+
 def rank_score(item):
     """Higher ranks earlier. Section assignment is unaffected."""
     bump = 0
     outlet = (item.get("outlet") or "").lower()
-    if any(t in outlet for t in SOURCE_TIER):
+    if source_tier_pos(item.get("outlet")) is not None:
         bump += TIER_BUMP
     if ACTION.search(item["headline"]):
         bump += ACTION_BUMP
@@ -1997,7 +2567,28 @@ OUTCOME = re.compile(OUTCOME.pattern +
     r"|detenid|arrestad|encarcelad|dimiti[oó]|destituid|absuelt|sentenci[oó]|\bfall[oó]\b"
     r"|anul[oó]|derog[oó]|rechaz[oó]|admiti[oó] a tr[aá]mite|entra en vigor|muri[oó]|asesinad"
     r"|aprovat|approv[oò]|promulgat|\bfirmat|vietat|proibit|condannat|arrestat|incarcerat"
-    r"|dimess|assolt|sentenziat|annullat|abrogat|respint|entra in vigore|mort[oa]\b|uccis",
+    r"|dimess|assolt|sentenziat|annullat|abrogat|respint|entra in vigore|mort[oa]\b|uccis"
+    # The persecution beat's own outcome verbs, missing until 31.08.2026. OUTCOME already had
+    # killed/murdered/abducted/jailed, but not the words those stories actually use: a pastor
+    # "martyred" and a state that "destroys" a church both scored ZERO outcome credit, so
+    # "Baptist Pastor Martyred in Myanmar" ran at i2 while a court order about two dogs
+    # ("euthanasia order ... dismissed") ran at i10 and an eagle's at i13. 25 verbs were
+    # absent. Deliberately NOT added: "stabbed", which LOCAL_INCIDENT already handles and
+    # which would inflate ordinary crime - the same trap as bare "freed" matching "freedom".
+    # Finite/past forms only, and \b-anchored where a longer word reverses the meaning:
+    # bare "criminalis" matched "deCRIMINALISes" and handed outcome credit to "Campaigners
+    # call on Ireland to decriminalise blasphemy", flipping an 18.08.2026 ABOVE pair on its
+    # first run. Bare infinitives are out for the same reason "legalising" is - "vows to
+    # destroy" is a threat, not an event.
+    # VERB FORMS ONLY - no nouns. "destruction" and "demolition" were both tried and both
+    # broke a pair on the first run: "Bishop laments the destruction of Christian heritage"
+    # is a said, not a happened, and "Council SEEKS approval for church demolition" scored
+    # level with "Council WINS approval" once the noun matched. A noun names the event
+    # without asserting it occurred, which is the whole distinction this regex exists for.
+    r"|martyr|destroys|destroyed|demolished|razed|torched|bulldozed|beheaded|\bexecuted\b"
+    r"|massacred|massacres|lynched|lynching|desecrat|vandalis|vandaliz|seized|seizes"
+    r"|confiscat|outlaws\b|outlawed|\bcriminalis|\bcriminaliz|evicted|expropriat"
+    r"|forcibly (convert|remov)",
     re.I)
 PROCESS = re.compile(PROCESS.pattern +
     # Word boundaries added 18.08.2026, same disease as OUTCOME's: bare es/it tokens fired
@@ -2339,6 +2930,46 @@ LEAD_DECISIVE_BY = 3
 LEAD_TIEBREAK_SKIP = {frozenset(("Religious Freedom & Persecution", "Church & Religion"))}
 
 
+# An animal being put down is not a Life story. Chris, 31.08.2026: all three of these
+# classified as ('Life', 6) - the same section and weight as a genuine assisted-dying story -
+# because the end-of-life rule matches "euthanas" and nothing asked WHOSE death it is:
+#
+#   Appeal of euthanasia order for 'Bubba,' 'Stewie,' dismissed by judge      (two dogs)
+#   Tennessee mayor helps halt federal euthanasia order for rescued bald eagle
+#   Frost Fund helps save animals from euthanasia with shelter transport trips
+#
+# That is how a dog and an eagle came to outrank a martyred pastor on the 31.08 sheet. It is
+# a CLASSIFICATION defect, not a ranking one - the ABOVE pairs for it were tried and removed,
+# see testcases.txt - and the fix belongs here, where the section is decided.
+#
+# Both halves are required, and the animal noun is looked for in the TEXT as well as the
+# headline: "Appeal of euthanasia order for 'Bubba,' 'Stewie,'" names two dogs without using
+# the word, which is exactly the case a headline-only rule would miss.
+_EOL_WORDS = r"euthanas|put (?:down|to sleep)|\bcull(?:ed|ing)?\b"
+_ANIMAL_WORDS = (r"\b(?:dogs?|cats?|puppy|puppies|kitten|pets?|animals?|horses?|eagle|"
+                 r"terrier|shepherd|livestock|cattle|sheep|kennel|zoo|wildlife|raptor|"
+                 r"veterinar|shelter (?:animal|pet|dog|cat)|bald eagle)\b")
+
+
+_APOS = {0x2019: "'", 0x2018: "'", 0x02BC: "'", 0xFF07: "'",
+         0x201C: '"', 0x201D: '"'}
+
+
+def _norm_apos(s):
+    """Fold typographic quotes to ASCII so keyword patterns match real newspaper copy.
+
+    For MATCHING only - never write the result back onto an item, because compose.py
+    copies the headline into the document verbatim.
+    """
+    return (s or "").translate(_APOS)
+
+
+def is_animal_euthanasia(headline, text=""):
+    """True if this is an animal being put down, not a human end-of-life story."""
+    blob = "%s %s" % (headline or "", text or "")
+    return bool(re.search(_EOL_WORDS, blob, re.I) and re.search(_ANIMAL_WORDS, blob, re.I))
+
+
 def classify(headline, outlet, categories=None, text=""):
     # Sham-marriage and marriage-fraud stories stay in Marriage, Family & Education. I had
     # routed them out to Other as off-topic; Chris overruled that on 13.08.2026 - fraud
@@ -2373,6 +3004,22 @@ def classify(headline, outlet, categories=None, text=""):
     # Chris, 24.08.2026 (TEST 20260824 draft). Two corrections keyword scoring cannot reach,
     # because the deciding word is present but is not what the piece is about. Both sit ahead
     # of the publisher tag: they are his explicit judgement, not a tie-break.
+    # Checked FIRST, before any keyword scoring: an animal being put down must not reach a
+    # section at all. See is_animal_euthanasia above for why this is a classifier fix and not
+    # a ranking one.
+    if is_animal_euthanasia(headline, text):
+        return None, 0
+    # Typographic apostrophes are normalised for MATCHING ONLY - the caller's headline is
+    # untouched, because the doc copies it verbatim. Every possessive in the keyword tables
+    # was written with a straight apostrophe, and British newspapers publish U+2019, so
+    # women'?s could never match women’s. Found by the 01.09.2026 pre-run test: the
+    # Telegraph's "Give biological men legal right to compete in women’s sport, say Greens"
+    # scored (None, 0) and was dropped entirely, and LifeSiteNews' men-in-women's-sports poll
+    # landed in Politics. Normalising here rather than editing each pattern fixes the ones
+    # nobody has thought of yet; it is safe because the only two curly apostrophes in this
+    # file are inside _RELAY_ATTRIB's [\w’'&.\-] class, which accepts both forms already.
+    headline = _norm_apos(headline)
+    text = _norm_apos(text)
     if FAMILY_VOTING.search(headline):
         return "Politics, Government & Society", 6
     if ISLAMISM_POLITICAL.search(headline) and not RELIGION_PRACTICE.search(headline):
@@ -2578,10 +3225,43 @@ def main():
         # reading order was quietly false. With TEXT_SIGNAL_WEIGHT at 4 the two differ by up
         # to 8 points, so this moves real stories, not just the numbers beside them.
         leads.sort(key=lambda i: (-importance(i), -i["_corr"], i["age_h"] or 0))
-        if fetched or previewed or borrowed:
+        # COVERAGE, not work done. Until 01.09.2026 this line reported `fetched`,
+        # `previewed` and `borrowed` - the three counters for what this RUN had to go and
+        # get - and silently omitted `opened`, which is the main text route and was assigned
+        # to a variable nothing ever read. The brief tells the morning run to report this
+        # line and treat a sharp drop as "the day was ranked on headlines", so it has to
+        # mean readability. It did not: on a warm cache (01.09.2026, a 36h window over the
+        # ground the 84h Monday sweep already covered) it read 176 of 929 = 19% while true
+        # coverage was 89%, and it raised a false alarm. Worse in the other direction - if
+        # attach_openings failed outright, `opened` would be 0 and this line would look
+        # unchanged, hiding the exact failure it exists to surface.
+        #
+        # The branch order below MIRRORS the sheet's own (text -> preview -> feed -> page
+        # -> sibling -> nothing). If you change one, change both, or this reports a
+        # readability the sheet does not print.
+        def _text_route(it):
+            if it.get("_opening"):  return "text"
+            if it.get("_preview"):  return "preview"
+            if real_summary(it):    return "feed"
+            if it.get("_lede"):     return "page"
+            if it.get("_sibtext"):  return "sibling"
+            return None
+
+        routes = collections.Counter(_text_route(it) for it in leads)
+        have = sum(v for k, v in routes.items() if k)
+        total = len(leads) or 1
+        sys.stderr.write(
+            "text coverage: %d/%d leads readable (%.0f%%) - %d article text, %d paywalled "
+            "preview, %d feed summary, %d shallow page, %d via another outlet, %d NO TEXT\n"
+            % (have, len(leads), 100.0 * have / total, routes["text"], routes["preview"],
+               routes["feed"], routes["page"], routes["sibling"], routes[None]))
+        sys.stderr.write(
+            "  fetched this run (rest came from cache): %d opening(s), %d lede(s), "
+            "%d preview(s), %d sibling(s)\n" % (opened, fetched, previewed, borrowed))
+        if 100.0 * have / total < 70:
             sys.stderr.write(
-                "text: %d lede(s), %d paywalled preview(s), %d read via another outlet "
-                "on the same story\n" % (fetched, previewed, borrowed))
+                "  TEXT COVERAGE DEGRADED - under 70%. The day is being ranked on headlines; "
+                "say so prominently in the final message.\n")
 
         def lead_text(it):
             return it.get("_opening") or it.get("_preview") or it.get("_sibtext")
@@ -2610,6 +3290,31 @@ def main():
                 "--new-only: %d of %d lead(s) need judging (%d already decided on the same "
                 "text)\n" % (len(leads), total, total - len(leads)))
 
+        # Cross-day repeats (Chris, 27.08.2026). Attached AFTER --new-only has narrowed the
+        # list, so a re-run costs nothing extra, and reported on stderr because a history that
+        # silently came back empty would leave the check looking like it ran. If the archive
+        # is missing - a fresh machine, or a restore that has not happened yet - this is a
+        # no-op, and the line below is the only thing that would say so.
+        stamp = history.edition_date(data)
+        past = history.load_history(before=stamp)
+        seen_editions = history.editions_loaded(before=stamp)
+        # The entity arm needs a document frequency measured over ONE corpus, so the index is
+        # built over today's leads AND the recent editions together. Without this argument
+        # ran_before falls back to word overlap alone, which is what run_tests' two-item
+        # calls want and is NOT what a real edition wants: measured 27.08.2026, the arm takes
+        # same-story recall from 0.540 to 0.736.
+        past_ents = union_entity_index(leads, past)
+        repeats = 0
+        for it in leads:
+            hit = ran_before(it, past, ents=past_ents)
+            if hit:
+                it["_ran_story"] = hit
+                repeats += 1
+        sys.stderr.write(
+            "cross-day: %d lead(s) match a story from the last %d edition(s) [%s]%s\n"
+            % (repeats, len(seen_editions), ", ".join(seen_editions) or "none",
+               "  -- NO ARCHIVE READ, repeat check is inactive" if not seen_editions else ""))
+
         out.write("RANKING SHEET - %d stories from %d candidates, %s sources\n"
                   % (len(leads), len(all_rows), data.get("sources", "?")))
         out.write("one line per story; xN = N outlets carrying it (the only free measure of "
@@ -2631,7 +3336,13 @@ def main():
                   "★ = a primary source (advocacy body's own release, court filing, etc). "
                   "These are x1 by definition and sink in a corroboration-ordered sheet, so "
                   "read every ★ line before tiering - compose.py warns if a ★ source filed "
-                  "today and nothing of theirs was picked.\n\n")
+                  "today and nothing of theirs was picked.\n"
+                  "'[ran DD]' means this exact URL ran in an earlier edition. "
+                  "'[SAME STORY ran DD: ...]' is the stronger warning: the same story under "
+                  "a DIFFERENT url, which is how Right To Life's 25.08 piece came back on "
+                  "27.08 unflagged. Neither is a veto - a running story can legitimately "
+                  "run again - but the second one means read the past headline before you "
+                  "pick it.\n\n")
         # ★ marks a PRIMARY_SOURCE item. The sheet is ordered by corroboration, which is the
         # right order for judging how big a story is and the WRONG one for finding the stories
         # Chris cares most about: an advocacy body's own release is x1 by definition - nobody
@@ -2651,7 +3362,12 @@ def main():
                 (" £" if it["paywalled"] else "") +
                 (" ↗" if "news.google.com" in it["url"] else ""),
                 "new" if it["age_h"] is None else "%sh" % it["age_h"],
-                "  [ran %s]" % it["seen_on"][5:] if it.get("seen_on") else ""))
+                ("  [ran %s]" % it["seen_on"][5:] if it.get("seen_on") else "")
+                + ('  [SAME STORY ran %s: "%s" - %s]'
+                   % (it["_ran_story"]["date"][4:6] + "-" + it["_ran_story"]["date"][6:],
+                      it["_ran_story"]["headline"][:70],
+                      it["_ran_story"]["outlet"])
+                   if it.get("_ran_story") else "")))
             flags = textsignals.flag_string(it.get("_sig"))
             if flags:
                 out.write("    > is: %s\n" % flags)

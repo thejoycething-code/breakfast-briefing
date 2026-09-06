@@ -205,7 +205,32 @@ BATCHEXECUTE = "https://news.google.com/_/DotsSplashUi/data/batchexecute"
 _SG_RE = re.compile(r'data-n-a-sg="([^"]+)"')
 _TS_RE = re.compile(r'data-n-a-ts="([^"]+)"')
 _AID_RE = re.compile(r'data-n-a-id="([^"]+)"')
-_GARTURL_RE = re.compile(r'\[\\"garturlres\\",\\"(https?:[^\\"]+)')
+# Google escapes characters inside the batchexecute payload as \uXXXX, and the escape arrives
+# double-backslashed because this JSON string is nested inside another one. "=" is the one
+# that matters: every query value in every URL begins with one, so the original class -
+# [^\\"]+ - stopped dead at the backslash and cut every decoded URL at its first parameter:
+#
+#     https://www.legacy.com/us/obituaries/name/james-rushton-obituary?id
+#                                          ...for  ?id=62306633
+#
+# Chris, 31.08.2026. This never published a wrong link, because _looks_truncated below plus
+# the title check caught the wreckage and fell back to keeping the redirect. That is exactly
+# what made it invisible: the cost was counted as "could not be resolved" - redirects reported
+# as undecodable that Google had in fact decoded correctly, each one a story the ranker then
+# read on its headline alone. It surfaced only because two of the affected items were porn
+# spam injected into a compromised Smithsonian host and reached a live section.
+#
+# The fix does NOT make _looks_truncated redundant: Google still returns genuinely truncated
+# payloads of its own, and the ABC News case documented there also had the wrong host.
+_GARTURL_RE = re.compile(
+    r'\[\\"garturlres\\",\\"((?:[^\\"]|\\{1,2}u[0-9a-fA-F]{4}|\\{1,2}/)+)')
+_GARTURL_ESC = re.compile(r'\\{1,2}(?:u([0-9a-fA-F]{4})|(/))')
+
+
+def _unescape_garturl(s):
+    r"""Decode the \uXXXX and \/ escapes Google puts in the garturlres payload."""
+    return _GARTURL_ESC.sub(
+        lambda m: m.group(2) or chr(int(m.group(1), 16)), s)
 
 # The inner request Google's own page sends. Opaque on purpose: the "X" placeholders
 # are locale/consent fields it does not read for a URL lookup.
@@ -242,7 +267,7 @@ def decode_gnews(url):
         if isinstance(raw, bytes):
             raw = raw.decode("utf-8", "replace")
         m = _GARTURL_RE.search(raw)
-        return m.group(1).rstrip("/") if m else None
+        return _unescape_garturl(m.group(1)).rstrip("/") if m else None
     except Exception:  # noqa: BLE001
         return None
 
@@ -274,6 +299,48 @@ def _looks_truncated(url):
     return False
 
 
+# Google's decode is not always an article. For some feeds it returns a paginated CATEGORY
+# INDEX - on 31.08.2026 nine Premier Christian News stories all decoded to
+# "/category/uk-news?page=<n>" and two Desiring God ones to "/articles/all?page=271".
+#
+# Until the \uXXXX truncation above was repaired these arrived as "...?form" and "...?page",
+# so _looks_truncated flagged them, the title check ran, an index page failed it and the
+# redirect was kept. Correct outcome, reached by accident: fixing the truncation made them
+# structurally clean, and resolve_one() would then have returned all nine unverified - one
+# listing page published as the link for nine different stories.
+#
+# So index-shaped decodes take the same route truncated ones do: confirm against the headline
+# or be dropped. The test is deliberately SYNTACTIC - a real article URL from a publisher that
+# blocks the verification fetch (the Telegraph, The Times) must never be discarded, which is
+# the whole reason decode_gnews is trusted by default.
+_INDEX_PATH = re.compile(
+    r"/(category|categories|tag|tags|topic|topics|author|authors|archive|archives"
+    r"|section|sections|feed|rss|search|page)(/|$)"
+    r"|/(all|latest|index)(\.\w+)?$", re.I)
+
+
+def _looks_like_index(url):
+    """True if a decoded URL is a listing page rather than a single article."""
+    try:
+        p = urllib.parse.urlsplit(url)
+    except ValueError:
+        return True
+    path = p.path or "/"
+    if path in ("", "/"):
+        return True
+    if _INDEX_PATH.search(path):
+        return True
+    # A pagination parameter is the single cleanest signal: every one of the eleven real
+    # cases carried one and none of the genuine article decodes did. Value must be numeric,
+    # so a slug like "?page=my-story" is not caught.
+    for kv in (p.query or "").split("&"):
+        if "=" not in kv:
+            continue
+        k, v = kv.split("=", 1)
+        if k.lower() in ("page", "paged", "pg", "p") and v.isdigit():
+            return True
+    return False
+
 def resolve_one(headline, publisher, when=None, gnews_url=None):
     """Best-effort publisher URL for a Google News item, or None."""
     if gnews_url:
@@ -281,7 +348,8 @@ def resolve_one(headline, publisher, when=None, gnews_url=None):
         # A well-formed decode is authoritative and is NOT verified (see decode_gnews). A
         # malformed one falls through to the other routes, and if they fail too the caller
         # keeps the redirect - an ugly link beats a wrong one.
-        if hit and _looks_truncated(hit) and not confirms(hit, headline):
+        if (hit and (_looks_truncated(hit) or _looks_like_index(hit))
+                and not confirms(hit, headline)):
             hit = None
         if hit:
             return hit
