@@ -492,6 +492,16 @@ def run(verbose=False):
                        % (len(self_blocked),
                           ", ".join(sorted({b for b, _ in self_blocked})))))
 
+    # No health record may outlive its feed. See test_no_orphaned_health_records.
+    orphans = test_no_orphaned_health_records()
+    if not orphans:
+        passed += 1
+    else:
+        failed.append(("smoke", "%d orphaned record(s) in source_health.json for feeds "
+                                "check_sources.py no longer probes, so their state is frozen "
+                                "and the file misreports them: %s"
+                       % (len(orphans),
+                          "; ".join("%s (%dd)" % (n, f) for n, _u, f in orphans[:6]))))
 
     # The gnews decoder must not truncate a URL at its query value. See the function below.
     trunc = test_gnews_decode_unescape()
@@ -710,6 +720,41 @@ def test_no_self_blocked_feed():
             if b and b in blob:
                 bad.append((b, blob[:90]))
     return bad
+
+def test_no_orphaned_health_records():
+    """Every record in source_health.json must be a feed check_sources.py still probes.
+
+    Added 06.09.2026. check_sources.py probes only the URLs currently in load_feeds()[0], and
+    it never removes a record for a URL that has since left that list. So a retired feed's
+    last state is frozen in the file forever. Sixteen such records had accumulated, three of
+    them stuck at fails=3 - including Live Action News on its old liveaction.org/news/feed
+    route, which is the exact source whose silent death this whole tool was built to catch.
+
+    They are inert: never re-probed, never reported, never in the exit code. The damage is to
+    the reader. Reading the file by hand shows three sources apparently three days dead when
+    all three are fine on a different route - so the one file you would open to answer "has a
+    source gone quiet?" is the file that misleads you about it. That misreading happened on
+    06.09.2026 and took four commands to unpick.
+
+    Pruning discards a retired feed's history. That is the right trade: a record nothing
+    probes is not history, and if the URL ever returns to the list it rebuilds from fails=0
+    on the next check.
+
+    Static assertion, no network. Returns a list of problems; empty means pass.
+    """
+    import json as _json
+    import fetch_feeds as _ff
+    health = os.path.join(HERE, "source_health.json")
+    if not os.path.exists(health):
+        return []
+    try:
+        with open(health) as fh:
+            hist = _json.load(fh)
+    except Exception as exc:  # noqa: BLE001
+        return [("source_health.json", "could not be read: %s" % exc, 0)]
+    live = {f[2] for f in _ff.load_feeds()[0]}
+    return [(rec.get("name") or "?", url, rec.get("fails", 0))
+            for url, rec in sorted(hist.items()) if url not in live]
 
 def test_cluster_lead_prefers_a_readable_link():
     """The one line the sheet prints must not be the cluster member with a dead link.
