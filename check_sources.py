@@ -131,6 +131,22 @@ def main():
         rec["last_checked"] = today
         hist[url] = rec
 
+    # Drop records for feeds that have left the list.
+    #
+    # Added 06.09.2026. This probes only the URLs load_feeds() returns today, so a record for
+    # a retired URL is never updated, never reported and never in the exit code - it just
+    # sits at whatever it last was. Sixteen had built up, three frozen at fails=3, including
+    # Live Action News on its old liveaction.org/news/feed route. All three were fine on a
+    # new route, but reading the file by hand said they were three days dead: the one file
+    # you open to ask "has a source gone quiet?" was misreporting exactly that.
+    #
+    # This discards a retired feed's history, which is the right trade - a record nothing
+    # probes is not history, and it rebuilds from fails=0 if the URL ever comes back.
+    probed = {r[1] for r in results}
+    pruned = sorted((hist[u].get("name") or "?", u) for u in set(hist) - probed)
+    for _name, url in pruned:
+        del hist[url]
+
     try:
         with open(HISTORY, "w") as fh:
             json.dump(hist, fh, indent=1, sort_keys=True)
@@ -156,6 +172,12 @@ def main():
         print("\nRECOVERED since the last check:")
         for name, was in recovered:
             print("  %-32s (had been failing %d day(s))" % (name, was))
+    # Unconditional, like walled/broken/recovered above: a record leaving the health file is
+    # a change to the file you would check for a silent source, so it must not be silent.
+    if pruned:
+        print("\nPRUNED - %d record(s) for feed(s) no longer in the list:" % len(pruned))
+        for name, url in pruned:
+            print("  %-32s %s" % (name[:32], url[:70]))
     if not (walled or broken) and not args.quiet:
         print("\nNo source has been failing for %d+ days." % args.days)
 
