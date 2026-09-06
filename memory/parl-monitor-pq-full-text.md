@@ -26,4 +26,13 @@ never opens the store, resumable, ~4,029 questions at 0.2 s each.
 coverage (`pq_detail_coverage`). Re-derivation is authoritative only when it
 reads at least what the ingest read.
 
+**Recall limit, noted 6 Sept:** the ingest filter runs on the SEARCH STUB before
+the detail fetch, so a question whose only matching phrase lies past the
+~255-char cut is never fetched or stored. Fixing it means fetching detail for
+every search result (~240 calls/week, under a minute) — a decision, not made.
+
+**Dispatch trap:** `gh workflow run sunday-pull.yml` after the scheduled Sunday
+run is a NO-OP ("already pulled … use --force"); it proves nothing. The
+workflow has no force input. Pin ingest changes with unit tests instead.
+
 Related: [[parl-monitor-store-guard]], [[taxonomy-v16-areas]].
