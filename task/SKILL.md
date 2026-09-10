@@ -514,8 +514,8 @@ only expected_urls.txt catches an *invented* one that compose.py never emitted. 
 was written 1 byte long, i.e. empty, so that check was silently unavailable. Check its size
 before trusting it, and report it if it is empty.
 
-Read the new doc back with read_file_content (its text export contains every URL, headline and
-source), then:
+Read the new doc back with read_file_content (its markdown contains every URL as a real
+`[title](url)` link, so the regex below finds all of them), then:
 
   python3 - <<'EOF'
   import json,re,html,sys
@@ -531,6 +531,19 @@ source), then:
 If a large result is written to a file instead of returned, run the diff against that file rather
 than pasting it back into context. Also confirm every headline and source string appears
 (`Word\&Way` mismatches are a false positive — the export escapes `&`).
+
+**Use read_file_content, not a plain-text export, and do not "improve" this recipe into one.**
+A `text/plain` export of a Google Doc keeps the visible link text and discards every href, so
+the diff finds zero URLs in the doc and reports every link corrupted on a doc that is
+byte-perfect. publish.sh hit this on 17.08.2026 (0 of 246) and exports `text/html` for exactly
+this reason; on 10.09.2026 the same trap was walked into again from the other direction — a
+hand-rolled `export?mimeType=text/plain` diff was run *instead of* this recipe, reported
+`0/304 ok, 304 corrupted`, and that was briefly written up as a flaw in Step 6 rather than in
+the substitute. The recipe as printed above is correct and returned 304/304 on that same doc.
+If you do diff outside the connector, use `mimeType=text/html` and unwrap Docs' redirector
+(`https://www.google.com/url?q=…`) the way publish.sh does — but note that an authenticated
+export is not available on this path anyway, because the fallback only runs when publish.sh
+reported no credential. So: run the recipe as written.
 
 Then the structural checks: a heading for every section you picked for, item count per section
 matches your picks,
