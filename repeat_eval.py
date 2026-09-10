@@ -213,8 +213,15 @@ def crossday_suspects(limit=30000, cross_section=False):
     real on 10.09.2026, when ran_before stopped guarding on the section, and until then it
     was unreachable by construction: the matcher skipped a differing section outright, so a
     pair like this could never be flagged and sampling it would have measured nothing.
-    Sampled separately rather than folded into XDAY, so the XDAY figures already in
-    repeat_eval_log.txt stay comparable with each other.
+    Sampled separately rather than folded into XDAY, so XDAY keeps measuring the population
+    it always did.
+
+    But note what the reservoir switch below cost, because it is easy to misread: with the
+    same seed, shuffle-then-slice and reservoir sampling draw DIFFERENT 30,000 pairs. So XDAY
+    is NOT comparable across the 10.09.2026 entries in repeat_eval_log.txt - it reads 0.0002
+    (6/30000) in the later one against 0.0003 (10/30000) in the earlier one, with no change
+    to the matcher between them. Comparability resumes after that entry. A rate this low
+    invites reading noise as movement, which is the whole reason to say so here.
 
     Deliberately NOT called a negative set, because it cannot be one. Some of these pairs
     genuinely ARE the same running story - that is the whole thing being detected - so the
