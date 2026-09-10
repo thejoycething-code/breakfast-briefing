@@ -43,6 +43,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 OPML = os.path.join(HERE, "sources.opml")
 EXTRA = os.path.join(HERE, "extra_feeds.txt")
 SEEN_DB = os.path.join(HERE, "seen.json")
+FIRSTSEEN_DB = os.path.join(HERE, "firstseen.json")
 CUT_DB = os.path.join(HERE, "cut.json")
 
 UAS = [
@@ -743,7 +744,15 @@ def _strip_one_suffix(title, source="", allow_lowercase=True):
     # still resolves on " - " first and never reaches the dash forms. Chris spotted
     # "...persecution of believers – EWTN Great Britain" in the 20.08 edition; an en dash is
     # what EWTN's own feed uses, and no dash form was in this list.
-    for sep in (" - ", " | ", " – ", " — "):
+    # Middot added 08.09.2026, again appended so nothing already resolving changes. Chris:
+    # "just the headline which is 'The erosion of free speech in Hong Kong'". The raw title
+    # was "... – The Lilypad · DKU's Independent Student-led Publication": the en-dash pass
+    # DID find that suffix and rejected it for being 54 chars against the 45 cap, because the
+    # tail is a masthead AND its tagline. Splitting on the middot first leaves "... – The
+    # Lilypad", which the en-dash pass then takes on the stacking loop's second turn - so this
+    # relies on the stacking fixed 20.08.2026 rather than on widening the cap, which would
+    # have let genuine prose tails through everywhere else.
+    for sep in (" - ", " | ", " – ", " — ", " · "):
         head, found, tail = t.rpartition(sep)
         if not found:
             continue
@@ -1109,6 +1118,51 @@ def save_seen(seen):
     os.replace(tmp, SEEN_DB)
 
 
+# --- first-seen store ------------------------------------------------------
+# Genuinely undated scrapesrc cards used to be stamped published=now, which put a source's
+# whole index permanently inside the window: the only brake was seen.json, and that records
+# PUBLISHED items, so anything offered and passed over came back every single day. The
+# Spectator's surrogacy piece was in every sweep from 18.08 to 08.09.2026 that way.
+# Keyed on url_key so it survives tracking-parameter churn, and pruned on the same retention
+# as seen.json - a link that has aged out of both is genuinely new again, which is the
+# behaviour a re-run months later should have.
+def load_firstseen():
+    try:
+        with open(FIRSTSEEN_DB) as fh:
+            return json.load(fh)
+    except (ValueError, OSError):
+        return {}
+
+
+def save_firstseen(firstseen):
+    cutoff = (dt.datetime.now(dt.timezone.utc)
+              - dt.timedelta(days=SEEN_RETENTION_DAYS)).isoformat()
+    pruned = {k: v for k, v in firstseen.items() if v >= cutoff}
+    tmp = FIRSTSEEN_DB + ".tmp"
+    with open(tmp, "w") as fh:
+        json.dump(pruned, fh)
+    os.replace(tmp, FIRSTSEEN_DB)
+
+
+def dateless_is_new(link, firstseen, cutoff):
+    """Is an undated item still new? False once we first saw it before the cutoff.
+
+    An unknown link is new by definition - that is the "new link = new story" rule the
+    scrapesrc path always intended. What changes is that being offered now COUNTS as having
+    seen it, so tomorrow the same link is no longer new.
+    """
+    stamp = firstseen.get(url_key(link))
+    if not stamp:
+        return True
+    try:
+        first = dt.datetime.fromisoformat(stamp)
+    except (TypeError, ValueError):
+        return True
+    if first.tzinfo is None:
+        first = first.replace(tzinfo=dt.timezone.utc)
+    return first >= cutoff
+
+
 # --- cut store -------------------------------------------------------------
 # Stories that were picked but did not survive a section cap. These are DROPPED from
 # later sweeps outright, not kept and flagged like published ones.
@@ -1171,6 +1225,8 @@ def main():
 
     feeds, scrapes, blocked = load_feeds()
     seen = {} if args.include_seen else load_seen()
+    firstseen = {} if args.include_seen else load_firstseen()
+    firstseen_add = {}
 
     link_index = {} if args.no_resolve else build_link_index(scrapes)
     items, errors = [], []
@@ -1249,6 +1305,13 @@ def main():
                 if mode in FILTERED_MODES and not KEYWORD_RE.search(headline):
                     continue
                 link = clean_url(unwrap_link(e["link"]))
+                # An undated card is new only until we have seen it once. Recording the
+                # sighting here - not at publish time - is the whole fix: seen.json only
+                # ever knew about items that made an edition.
+                if dateless and e["date"] is None:
+                    if not dateless_is_new(link, firstseen, fcutoff):
+                        continue
+                    firstseen_add.setdefault(url_key(link), now.isoformat())
                 outlet = (e["source"] or (suffix if is_g else "")
                           or ftitle or outlet_from_url(link))
                 outlet = re.sub(r"\s+", " ", outlet).strip()[:44]
@@ -1264,8 +1327,12 @@ def main():
                     "url": link, "outlet": outlet,
                     "author": re.sub(r"\s+", " ", e["author"] or "").strip()[:40],
                     "paywalled": is_paywalled(link, fdom),
+                    # age_h stays None for undated items - we still do not know when the
+                    # publisher ran it - but "published" now carries the first sighting so
+                    # the sort is not "every dateless item is this instant".
                     "published": (e["date"].astimezone(dt.timezone.utc).isoformat()
-                                  if e["date"] else now.isoformat()),
+                                  if e["date"]
+                                  else firstseen.get(url_key(link)) or now.isoformat()),
                     "age_h": (None if dateless else
                               round((now - e["date"]).total_seconds() / 3600, 1)),
                     # Publisher topic labels, carried through for the classifier.
@@ -1377,6 +1444,14 @@ def main():
         with open(args.json, "w") as fh:
             json.dump({"generated": now.isoformat(), "window_hours": hours,
                        "items": kept, "errors": errors}, fh, indent=1)
+
+    # Unconditional, and deliberately NOT under --mark. Marking records what was PUBLISHED
+    # and happens later in the pipeline (mark_published.py); a first sighting has to be
+    # recorded even for the items no edition ever uses, which is exactly the population that
+    # used to come back for ever. --include-seen stays a true dry run and persists nothing.
+    if firstseen_add and not args.include_seen:
+        firstseen.update(firstseen_add)
+        save_firstseen(firstseen)
 
     if args.mark:
         stamp = now.isoformat()

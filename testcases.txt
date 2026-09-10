@@ -1193,3 +1193,81 @@ SECTION Free Speech & Civil Liberties | Charlotte Gill | From Hacked Off to Exti
 # Word-bounded, per the FireRescue1/FIRE bug the docstring records: a longer name that merely
 # contains hers must not inherit her section.
 SECTION None | Charlotte Gillingham Associates | Quarterly results announced for the partnership
+
+# --- Chris, 08.09.2026: "add the six repeats to testcases.txt as failing cases" ------------
+# The six were: First Liberty's "7 First Liberty Cases Are Now at the U.S. Supreme Court"
+# (ran 02.09), FoRB in Full's Sudan piece (04.09), the Spectator's "Texas was right to save
+# baby Gabriel-Rumi", "The young men of Middlesbrough just don't care" and "Smarter machines
+# are going to need wiser humans" (07.09, 07.09, same URL 26.08), and the Christian Post's
+# write-up of the dehydration case Christian Concern had run on 07.09.
+#
+# FIVE OF THE SIX ARE NOT WRITTEN HERE, on purpose. ran_before already returns RANBEFORE for
+# every one of them - checked before writing this - so as cases they would pass on arrival.
+# Six passing cases in a set that has VETO over repeat_eval.py is not a record of a
+# correction, it is dilution: the next matching change would have to keep them green while
+# they assert nothing that was ever broken. The matcher saw all six. The edition shipped them
+# anyway, and the two reasons are below.
+#
+# 1. THE ONE REAL DEFECT, asserted. ran_before is section-gated, so a story that changes
+#    section between editions loses its flag. Christian Concern's version was filed one way
+#    on 07.09; the Christian Post's wording classified into Marriage, Family & Education on
+#    08.09, and the ranking sheet therefore showed NO repeat flag against it. compose caught
+#    it later by a path that does not apply the guard - which is why the same matcher gave
+#    two different answers on one story in one morning. The section default in run_tests.py
+#    used to be justified as "asserting the cross-section rejection would only be re-testing
+#    same_story's guard"; that assumed the guard was right. Sections are settable now.
+RANBEFORE | Mother pleads for brain-damaged son to be spared from death by dehydration ::was:: Mother pleads for son not to be dehydrated to death ::sections:: Marriage, Family & Education >> Life
+#    The same pair inside one section already passes. Kept as the contrast, so a future
+#    reader can see the section is the only difference between red and green.
+RANBEFORE | Mother pleads for brain-damaged son to be spared from death by dehydration ::was:: Mother pleads for son not to be dehydrated to death ::sections:: Life >> Life
+#    Asserted in both directions, per the 27.08 block: the fix must not be "drop the guard".
+#    Two different surrogacy stories across two sections must stay unlinked - dropping the
+#    section check wholesale would start collapsing pairs like this one, and losing a story
+#    that never ran is the expensive error.
+NOTRANBEFORE | Middle-aged men ‘buying babies’: Concerns raised over UK surrogacy applicants ::was:: Surrogacy magnate to bring child trafficking to Poland ::sections:: Marriage, Family & Education >> Life
+#
+# 2. NOT ASSERTABLE IN THIS FILE, recorded so it is not lost. The other five all came from
+#    the two SUPPRESSED blocks, which print bare "N | headline | outlet" lines and run no
+#    cross-day check at all - so at the point of decision there is no flag to ignore. This is
+#    the trap already recorded once: the one block you must pick from is the one block with no
+#    [ran] history. There is no assertion kind for "the printed sheet carries a flag", and
+#    inventing one to cover a display gap would be a fixture testing its own output format.
+#    The fix belongs in shortlist.py's suppressed-block printer, and it needs its own
+#    measurement of how many flags that adds to a 356-line block before it is worth reading.
+
+# --- Chris, 08.09.2026: markup on the 08.09 edition -----------------------------------------
+# OUTLET NAMING. Four corrections, and all four sources reach us through Google News search
+# feeds, which is why they arrive as a bare hostname or as the hosting platform's name rather
+# than the masthead a reader would recognise. That is the pattern to watch, not four unrelated
+# renames: anything arriving from a "<country> <beat>" query feed is liable to it.
+OUTLET Decision Magazine | billygraham.org
+# "FoRB in Full should always be read as Christian Solidarity Worldwide." Corroborated by the
+# feed itself - the author field on their Sudan piece is the literal string "cswpress" - so
+# this is CSW's own outlet and the credit was pointing readers at a masthead CSW does not use.
+OUTLET Christian Solidarity Worldwide | FoRB in Full
+# The Lilypad, three separate faults on one item. Chris: "This source should always be called
+# The Lilypad and include the author's name and just the headline".
+OUTLET The Lilypad | Sites@Duke Express
+# ...the publisher stacks its own suffix with an en-dash AND a middot, and strip_outlet_suffix
+# cuts on neither today. Asserted in the source's own capitalisation, not the sentence case
+# Chris typed: headlines are copied verbatim and nothing in the pipeline recases them.
+HEADCLEAN The Erosion of Free Speech in Hong Kong | The Erosion of Free Speech in Hong Kong – The Lilypad · DKU's Independent Student-led Publication
+# ...and the byline is dropped even when credit() is handed one. Two layers here: authors.py
+# cannot extract it (the page carries it in an Elementor author block, byline() returns None),
+# and credit() would suppress it anyway. This case pins the second; the first needs the
+# extractor to learn that block, and the name on this article is Roy Liu.
+BYLINE shown | The Lilypad | Roy Liu | https://sites.duke.edu/thelilypad/2026/09/07/the-erosion-of-free-speech-in-hong-kong
+# Sydney Morning Herald: the masthead already tidies correctly, so the only fault was the
+# missing paywall mark ("As a paid source this should be Sydney Morning Herald (£)"). Stated
+# as PAYWALL, with the naming pinned alongside it so it cannot regress while that table is
+# edited - the two are set by different tables, per the 27.08 note.
+PAYWALL yes | SMH.com.au
+OUTLET Sydney Morning Herald | SMH.com.au
+#
+# TWO MISSES THAT WERE IN THE SWEEP, so these are classification failures and not coverage
+# ones. CBN's piece classified to Church & Religion and I passed over it; the NSS piece
+# reached no section at all, and I rescued it into Life by hand - which is why it appeared in
+# the wrong section rather than not at all. Both belong in Religious Freedom & Persecution:
+# a conversion story out of the Middle East, and an MP legislating on a religious rite.
+SECTION Religious Freedom & Persecution | cbn.com | Visions of Jesus: Many Muslims Turning to Christ Amid Middle East Conflict
+SECTION Religious Freedom & Persecution | NSS | MP acts to regulate circumcision following child deaths

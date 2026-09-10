@@ -42,6 +42,13 @@ PATTERNS = [
     r'<meta[^>]+?property=["\']article:author["\'][^>]+?content=["\']([^"\']{2,60})["\']',
     r'"author"\s*:\s*"([^"]{2,60})"',
     r'\brel=["\']author["\'][^>]*>\s*([A-Z][\w.\'-]+(?: [A-Z][\w.\'-]+){1,3})\s*<',
+    # schema.org microdata. Added 08.09.2026 for The Lilypad, whose byline Chris asked for:
+    # the name sits inside itemprop="author" but behind an <a> and a <span>, so neither the
+    # rel="author" pattern above nor any of the JSON-LD ones reach it. Tags and whitespace are
+    # skipped rather than matched exactly, because the wrapper depth is a theme's choice -
+    # this is Elementor here, and the same markup is what every schema.org CMS emits.
+    r'itemprop=["\']author["\'][^>]*>(?:\s|<[^>]+>)*'
+    r'([A-Z][\w.\'-]+(?: [A-Z][\w.\'-]+){1,3})',
 ]
 
 # Things that look like a byline but are not one. Without this the Cosmos Institute feed

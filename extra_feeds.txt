@@ -886,3 +886,19 @@ filter | Media: UK Mainstream     | The Independent (Asia)      | https://www.in
 # else's story. Publishes 2-3 times a week, so window=168h: at the default 36h the sweep
 # would see her most days as silence, which is the failure check_sources.py exists to stop.
 pass   | Issues: Gender & Identity | Charlotte Gill              | https://www.charlottecgill.co.uk/feed | window=168h
+
+# --- Chris, 08.09.2026: "You missed some big stories" (Free Speech) ------------------------
+# Three misses, three different coverage holes, none of them a ranking or classification
+# fault - the stories were never in the sweep to be judged. Each feed below was checked to
+# carry the specific piece Chris flagged before being added.
+#
+# The Economist was already subscribed, but only its BRITAIN feed - so "Speech in China is in
+# the deep freeze" could never have arrived. Its China feed carries it.
+filter | Media: UK Periodicals   | The Economist               | https://www.economist.com/china/rss.xml
+# The Herald (Scotland) reaches us only through a Bing site search, which this file's own
+# header calls thin (~14 items), and its viewpoint columns are not in it. The opinion feed
+# carries the 60,000-arrests column; /politics/viewpoint/rss/ and /comment/rss/ carry it too,
+# and appear to be the same aggregate, so only the broadest is added.
+filter | Media: UK Mainstream    | The Herald (Scotland)       | https://www.heraldscotland.com/opinion/rss/
+# Troy Media was not covered at all.
+filter | Media: Alternative      | Troy Media                  | https://troymedia.com/feed/

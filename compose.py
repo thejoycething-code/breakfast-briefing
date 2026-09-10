@@ -130,6 +130,18 @@ OUTLET_FIXES = {
     # when the source list genuinely has no host to resolve against - that, and renaming a
     # masthead we simply want to read differently, is what is left for this map to do.
     "breitbart.com": "Breitbart",
+    # Chris's markup on the 08.09.2026 edition. All three reach us through Google News SEARCH
+    # feeds, which hand over a bare host or the hosting platform's name rather than a
+    # masthead - so this is one fault with three faces, not three unrelated renames.
+    # "'- billygraham.org' should always read as 'Decision Magazine'" - and the article's own
+    # path says so too: /decision-magazine/articles/...
+    "billygraham.org": "Decision Magazine",
+    # "FoRB in Full should always be read as Christian Solidarity Worldwide." The feed agrees:
+    # the author field on their Sudan piece is the literal string "cswpress".
+    "FoRB in Full": "Christian Solidarity Worldwide",
+    # "This source should always be called The Lilypad" - Sites@Duke Express is Duke's blog
+    # PLATFORM, so it is the publisher of nothing and would relabel every Duke title alike.
+    "Sites@Duke Express": "The Lilypad",
     # The OPML calls it "NSS", which reads as an unexplained acronym in the credit line.
     "NSS": "National Secular Society",
     # The feed titles itself in Arabic; the organisation's own English name is this.
@@ -237,6 +249,10 @@ PAYWALLED_OUTLETS = re.compile(
     # Chris, 27.08.2026: "have a paywalled (£) with it". Keyed on the RENAMED form, which is
     # what tidy_outlet has produced by the time credit() tests this.
     r"|premier christianity"
+    # Chris, 08.09.2026: "As a paid source this should be Sydney Morning Herald (£)". The
+    # masthead already resolved correctly, so this table was the only gap - which is exactly
+    # why the fixture states naming and paywall as separate cases.
+    r"|sydney morning herald|the sydney morning herald"
     r"|the scotsman|scotsman)$", re.I)   # Chris, 17.08.2026
 
 
@@ -287,6 +303,10 @@ COMMENTARY_OUTLETS = re.compile(
     # dropped at the credit line, so six essays ran as a bare "- RealClearPolicy" with no
     # author and no sign of where they first appeared. Matched on the family, not the one
     # title, because RCI and RealClearPolitics file the same shape.
+    # Chris, 08.09.2026: "This source should always be called The Lilypad and include the
+    # author's name". A student publication files analysis, not wire copy, so the byline is
+    # the point of it - same fault as Statement and RealClear above.
+    r"|the lilypad"
     r"|realclear", re.I)
 # Section names that mean "this is a column". Anchored, so "culture-war" and "news-analysis"
 # do not match on a substring - the Brussels Signal report whose section is "culture-war" is
@@ -310,7 +330,17 @@ COMMENTARY_URL = re.compile(
 def is_commentary(item):
     if COMMENTARY_URL.search(item.get("url") or ""):
         return True
-    if COMMENTARY_OUTLETS.search(item.get("outlet") or ""):
+    # Test the RAW name and the tidied one. This list is written in mastheads, but the outlet
+    # field often holds a bare host or a platform name ("Sites@Duke Express" for The Lilypad,
+    # "billygraham.org" for Decision Magazine), so an entry keyed on the masthead alone never
+    # fired for exactly the sources whose aliases OUTLET_FIXES exists to resolve. Adding the
+    # tidied form can only ADD matches, so no byline that prints today stops printing. Found
+    # 08.09.2026 while fixing The Lilypad: an entry for the masthead would have made the
+    # fixture case pass while the pipeline stayed broken, which is the FIRE trap recorded in
+    # tidy_outlet and in testcases.txt.
+    raw_outlet = item.get("outlet") or ""
+    if (COMMENTARY_OUTLETS.search(raw_outlet)
+            or COMMENTARY_OUTLETS.search(tidy_outlet(raw_outlet))):
         return True
     # The article's own opening, when we have one. Chris, 28.08.2026: Brussels Signal's "From
     # Pakistan to Nigeria" is a comment piece and should have carried Konstantinos Bogdanos's
