@@ -49,3 +49,20 @@
 - [Devolved judge placement](parl-monitor-devolved-judge.md) — runs in Monday publish with an 8-min budget; secrets.yaml fallback means unsetting the env var is not a dry run
 - [Devolved editions decision](parl-monitor-devolved-editions-decision.md) — sections not standalone; heading renamed; revisit mid-Oct on volume
 - [PQ full text](parl-monitor-pq-full-text.md) — search endpoint truncates at ~255 chars, no answer; detail endpoint archived since 6 Sept; retag PQs only at ≥95% coverage
+- [NI verdicts](parl-monitor-ni-verdicts.md) — Amdt 97 and Amdt 5 signed for, blasphemy repeal unsigned, four struck; former MLAs listed from the vote record
+- [Week ahead table](parl-monitor-week-ahead-table.md) — option C since 7 Sept; whatson keyed on Parliament Id; Bill links via the board; legacy rows backfilled
+- [Division brief and Who spoke](parl-monitor-division-brief-and-spoke.md) — same-day DM brief with no verdict; Deploy tracker workflow; per-debate stance tables; Hansard window bug; both-lobbies abstention trap
+- [Petitions early warning](parl-monitor-petitions.md) — collated only, NOT in the edition; own table + snapshots; companion page petitions.html; gate = tier 1 or watchlist, tier 2 only past 10,000
+- [Raw archive as release assets](parl-monitor-raw-archive.md) — data/raw left git 7 Sept; one tar per day folder; pull fetches changed folders only; push union-merges, never clobbers
+- [Decisions block](parl-monitor-decisions-block.md) — config/decisions.yaml owner+decide_by; under Top lines; unlogged "open decision" why-lines are named, never quietly accepted
+- [Six sources (7 Sept)](parl-monitor-six-sources.md) — amendments, committee reports, judgments, regulators (Ofcom/GMC/EHRC blocked), oral statements/UQs, devolved petitions; APIs, gates, sections
+- [Judge evaluation corpus](parl-monitor-judge-eval.md) — verdict bank + weekly JSONL; ten-item sample checklist; docs/judge-eval.md agreement; rescore asks before spending
+- [Followers per post](meta-followers-per-post.md) — collected for IG FEED only; FB has none; null ≠ zero
+- [Debate pack](parl-monitor-debate-pack.md) — roundup/checklist/quotes/shotlist per debate; clips by wall-clock window from parliamentlive.tv; onside is the human check
+- [Issue pages](parl-monitor-issue-pages.md) — issues.html + one page per area from the ledger; six-month window; board areas are CSV not JSON
+- [Graph error #1 is deterministic](meta-graph-error-1-deterministic.md) — "reduce the amount of data" needs a smaller request, not a retry
+- [Social cut and article defaults](parl-monitor-social-cut-defaults.md) — sequence.md drives tools/social_cut.py; spoken-word captions on one fixed point; 1080p found by words not offsets; article 800 words, no subheads, no org quote
+- [No Sheet mirror](meta-no-sheet-mirror.md) — retired 8 Sept 2026; connector + Supabase is the delivery path, exports are on demand
+- [X source groundwork](x-source-groundwork.md) — scoped 8 Sep 2026; dormant on branch x-source (not pushed); sealed refresh tokens, 7+1 schedule, budget guard; start go-live at the probe
+- [Westminster backfill depth](parl-monitor-westminster-backfill.md) — ledger to June 2017; 2020-21 thinness is real; divisions need the candidate finder; backfills one at a time
+- [Page vs post numbers](meta-page-vs-post-numbers.md) — Business Suite = page_media_view incl. ads; metric_date is off by one day

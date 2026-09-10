@@ -418,9 +418,9 @@ publish.sh --verify diffs the Doc byte-exact, but the five links in Slack are co
 hand afterwards and `URLs N/N verified` says nothing about them. On 31.08.2026 four of five
 were typed from memory and were fabricated — an invented BBC article ID, an invented domain
 for Decision Magazine, and two wrong path segments — and a correction had to be posted to
-the channel. Build that list by looking each index up in /tmp/today.json and pasting the
-`url` field verbatim. Never reconstruct a URL from an outlet and a headline slug, however
-obvious the pattern looks.
+the channel. **Since 10.09.2026 you do not build that list by hand at all — `slack_five.py`
+does, and Step 10 says how.** Never reconstruct a URL from an outlet and a headline slug,
+however obvious the pattern looks.
 
 compose.py resolves what it can and prints
 `KEEP AS-IS` beside every Google News redirect it could not convert. Keep those redirects.
@@ -650,8 +650,27 @@ Only for an edition that reached Step 7 — a verified doc that was marked. No v
 no Slack post, for the same reason it means no marking: an announcement pointing at a briefing
 that does not exist is worse than silence.
 
+**Do not compose the message by hand. `slack_five.py` builds it** (10.09.2026). Write your
+choices to a spec — a list of slots, each a lead index plus optional nested indexes, with
+`note` for your own prose — then:
+
+  cd ~/Downloads/breakfast-briefing && python3 slack_five.py --history          # what the last fives ran
+  cd ~/Downloads/breakfast-briefing && python3 slack_five.py --spec /tmp/five.json \
+      --doc-url "<the published Doc URL>"
+
+It refuses a pick that did not actually publish (a cap loser included — on 10.09.2026 it
+caught index 921, which was in the picks and then retired by the Church cap, so the link
+would have pointed at a story absent from the Doc), refuses a URL that is not in
+`expected_urls.txt`, refuses a URL smuggled into a note, warns on anything over 36h, and
+refuses a story that already ran in one of the last 10 fives unless you pass
+`--allow-repeat`. It writes `five/<date>.json`, which is the only record of this list that
+has ever existed — the Doc gets tiers.json, archive/ and rank_eval; the five got nothing, so
+Chris replacing three of five on 25.08 and cutting a repeat on 31.08 taught the pipeline
+nothing. **Post the emitted text VERBATIM.** Retyping any part of it restores the exact
+hand-copying that fabricated four links on 31.08.2026.
+
 Post to **#campaigns-en-gb** (`C9RH217PZ`) with `slack_send_message`. The message is short and
-has a fixed shape:
+has a fixed shape, which is the shape the script emits:
 
 - one line saying the briefing is out, that it is automated, and linking the Doc
 - **the top five stories**, each as a headline link with the outlet after it

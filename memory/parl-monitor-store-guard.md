@@ -35,4 +35,17 @@ not an outage. Feeds written once per item (`ni_sittings`, `ni_sponsors`,
 `eu_speeches`) are listed, never failed. A paused pipeline is named with its
 reason, because a pause nobody records reads as health.
 
+**Sequencing rule, paid for 6 Sept:** a dry-run Monday publish PUBLISHES the
+store and commits the sidecar (only Slack/Asana are held back). So: (1) never
+dispatch a dry run while a local store push is pending — it moves the pointer
+and the guard will (correctly) refuse you; (2) never dispatch anything until
+`git push` has actually succeeded — a stuck rebase on the sidecar left origin
+pointing at an old sha while the asset was new, the next run refused the store
+with SHA MISMATCH, and the failure alert fired. Order is always: pull → work →
+push store → commit → push git (verify) → dispatch → live. Gate each step on
+the previous one's exit status; `for attempt … done` without a success check
+is how the cascade started.
+
+**The pointer file merges itself (7 Sept 2026):** `tools/merge_sidecar.py` is a git merge driver for `data/parl-monitor.db.json`. Rule: the side that names the asset the release ACTUALLY holds wins (GitHub exposes the asset digest via the API, no download); fallback: later `published_utc` (safe because the lineage guard forbids publishing an older store); neither: exit 1, human resolves. "Take mine" was right three times and is wrong in general. `--pull` installs the driver in local config on every clone/runner because `.gitattributes` alone is not enough.
+
 Related: [[parl-monitor-store-artifact]], [[parl-monitor-store-divergence]].
