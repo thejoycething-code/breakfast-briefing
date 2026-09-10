@@ -1,0 +1,20 @@
+# Fixture failures that are red ON PURPOSE, one substring of the failure message per line.
+#
+# Read by run_tests.py --known-red (hooks/pre-commit passes it). Matched on the MESSAGE, not
+# the line number, because a line number moves as soon as anyone edits testcases.txt above it.
+# A waiver that matches nothing FAILS the run: the case it covered is fixed, and an entry
+# nobody deleted is standing permission for that failure to come back unnoticed.
+#
+# This file is not a way to make a red test go away. It is a way to keep the fixture honest
+# while a failing-first correction waits for its fix - which is the normal state here, because
+# testcases.txt is written red before the rule is edited. Every entry needs the date, who is
+# waiting on it, and what has to be true before it can be deleted.
+#
+# 10.09.2026 - cross-section repeat, open since 08.09.2026.
+#   same_story's same-section guard rejects a pair that moved section between editions, so a
+#   running story that changes section comes back unflagged. It cost a real repeat on
+#   08.09.2026. run_tests.py was extended that day to make the sections settable and the case
+#   was added to testcases.txt red-first; the guard in shortlist.py is still unfixed, so the
+#   09.09 and 10.09 editions both shipped with the gap open.
+#   DELETE THIS when ran_before matches across sections and line ~1219 goes green.
+RANBEFORE expected

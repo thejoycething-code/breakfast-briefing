@@ -74,7 +74,7 @@ def parse(path=CASES):
             yield n, kind, expected, parts, rest.strip()
 
 
-def run(verbose=False):
+def run(verbose=False, known_red=None):
     passed, failed = 0, []
     for n, kind, expected, parts, rest in parse():
         try:
@@ -620,8 +620,77 @@ def run(verbose=False):
         # harness exists for. Found by deliberately breaking the new self-block assertion.
         print("  FAIL  %-9s %s" % ("line %d" % n if isinstance(n, int) else n, msg))
 
+    if known_red is not None:
+        return _known_red_verdict(failed, known_red)
     return 1 if failed else 0
 
+
+def _known_red_verdict(failed, path):
+    """Exit 0 if every failure is a WAIVED one, 1 otherwise. Opt-in, via --known-red.
+
+    Chris, 10.09.2026. Why this exists. testcases.txt works failing-first: a correction is
+    written as a red case BEFORE the rule is edited, which is what stops the fix being a
+    special case for one headline. The cost is that the fixture is legitimately red for as
+    long as the fix takes - the cross-section RANBEFORE case sat red from 08.09 to 10.09 -
+    and hooks/pre-commit gates on the fixture. So for those two days EVERY commit needed
+    --no-verify, which also skipped the step BEFORE the fixture: the drift check on
+    SKILL.md and memory/, the two least replaceable files in the setup. A deliberate red
+    case was silently disarming an unrelated backup guarantee. Splitting the two gates is
+    not enough on its own, because the thing you actually want is for a NEW red to keep
+    blocking while a KNOWN one does not.
+
+    Two properties make the waiver safe to have at all:
+
+      - it is matched on the failure MESSAGE, not the line number, because a line number
+        moves the moment anyone edits testcases.txt above it and a waiver that drifts onto
+        a different case is worse than no waiver;
+      - a waiver that matches nothing is itself a failure. Otherwise the fix lands, nobody
+        removes the entry, and the allowlist quietly grows into permission for that whole
+        class of failure to come back unnoticed.
+    """
+    patterns = []
+    try:
+        for raw in open(path, encoding="utf-8"):
+            line = raw.split("#", 1)[0].strip()
+            if line:
+                patterns.append(line)
+    except IOError as exc:
+        print("\n  known-red list %s could not be read: %s" % (path, exc))
+        return 1
+    if not patterns:
+        return 1 if failed else 0
+
+    waived, unexpected, used = [], [], set()
+    for n, msg in failed:
+        hit = next((p for p in patterns if p in msg), None)
+        if hit:
+            waived.append((n, msg))
+            used.add(hit)
+        else:
+            unexpected.append((n, msg))
+
+    if waived:
+        print("\n  %d WAIVED failure(s) - known red, see %s:" % (len(waived), path))
+        for n, msg in waived:
+            print("    %-9s %s" % ("line %d" % n if isinstance(n, int) else n, msg[:96]))
+        print("  These are red on purpose. They do not block, and they are the reason the")
+        print("  fixture must not be the only thing standing between you and a commit.")
+
+    stale = [p for p in patterns if p not in used]
+    if stale:
+        print("\n  %d STALE waiver(s) in %s - they match no current failure, so the case they"
+              % (len(stale), path))
+        print("  covered is fixed. Delete them; a waiver nobody removed is permission for")
+        print("  that failure to come back unnoticed:")
+        for p in stale:
+            print("    %s" % p[:96])
+
+    if unexpected:
+        print("\n  %d UNEXPECTED failure(s) - these block:" % len(unexpected))
+        for n, msg in unexpected:
+            print("    %-9s %s" % ("line %d" % n if isinstance(n, int) else n, msg[:96]))
+
+    return 1 if (unexpected or stale) else 0
 
 
 
@@ -1286,4 +1355,10 @@ def test_all_data_files_backed_up():
 
 
 if __name__ == "__main__":
-    sys.exit(run(verbose="-v" in sys.argv))
+    # --known-red FILE softens the exit code for failures the file waives, and ONLY those.
+    # Without the flag the behaviour is exactly what it always was: any red exits 1.
+    kr = None
+    if "--known-red" in sys.argv:
+        i = sys.argv.index("--known-red")
+        kr = sys.argv[i + 1] if i + 1 < len(sys.argv) else "known_red.txt"
+    sys.exit(run(verbose="-v" in sys.argv, known_red=kr))
