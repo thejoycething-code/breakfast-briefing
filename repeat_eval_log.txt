@@ -123,3 +123,13 @@ DEV COLLISIONS - 11 pair(s) that word overlap would merge and is_development_of 
     1x  lost                     vs resign                  
         ABVP carries out ‘Student Safety March’ at Delhi University; demand MCD Co
         Satya Niketan Tragedy: ABVP holds candle march at South Campus to pay trib
+
+=== 2026-09-10  10.09.2026 XSEC added - the surface the section guard hid. XSEC 0.0000 (0/30000) on cross-day DIFFERENT-section pairs: the guard was buying NO precision while costing real recall (49 genuine repeats missed on 10.09's own sweep alone). Zero verified not-broken: _match flags a known cross-section repeat both identical-headline and differently-worded, and the sampled population is genuinely cross-section. CAVEAT: XDAY here is 0.0002 (6/30000) against 0.0003 logged earlier today - NOT a change in the matcher. crossday_suspects switched from shuffle-then-slice to reservoir sampling (the cross-section product is ~9.5M pairs, minutes and GBs to materialise), so the same seed now draws a DIFFERENT 30000. XDAY is not comparable across this entry. Also die/dies/died grouped: last synonym miss gone.
+GOLD    14/14 testcases pairs agree
+URL     117/126  same-URL cross-day repeats recovered  (recall 0.929)
+CLUSTER recall 0.670 (3177/4742)   false-positive rate 0.000 (0/63748)
+CLUSTER precision 1.000   F1 0.802
+XDAY    flag rate 0.0002 (6/30000) on real cross-day same-section pairs
+XSEC    flag rate 0.0000 (0/30000) on cross-day DIFFERENT-section pairs - the surface the section guard used to hide (10.09.2026)   -- an upper bound on FP, not an FPR: some are genuine repeats
+thresholds: overlap>=0.55  words>=5  min-words>=4  entity-words>=3
+entity index: 4598 distinctive token(s), MIN_DF=2 MAX_DF=12
