@@ -61,7 +61,17 @@ AlsoOnRecordTests failed (342 rows with no source link). Recovery is offline:
 `python3 tools/backfill_pq_links.py` reads uin + dateTabled from the raw archive
 (`raw_state.py --pull` first), no API call, 100% resolved.
 
-**How to apply:** after ANY store rebuild, run the full suite against the store before
-pushing it, and compare `SELECT count(*)` per table in `src/db.py` TABLES against the
-sidecar's previous row counts; a table at 0 is the tell. The 24 Aug copy predates
-several tables' backfills, so `.recover` output cannot be trusted to be complete.
+The full audit (10 Sept, against the 24 Aug git blob): nothing SHRANK, but every table
+created after 24 Aug that `.recover` did not carry came back empty -- pq_link,
+appg_officers, judge_verdicts, member_interest, committee_attendance, cv_*/mp_alignment,
+eu_*, petitions/petition_snapshots, hansard_sections, bill_amendments. Most self-heal:
+Sunday's pull re-runs interests/attendance/rolls/appgs/weekly, Saturday's EU job the eu_*
+tables. Offline restores: `tools/backfill_pq_links.py`, `tools/load_appgs.py`,
+`tools/judge_eval.py restore` (from data/eval/*.jsonl). Lost for good: two weeks of
+petition snapshots (30 Aug, 6 Sept).
+
+**How to apply:** `tools/db_state.py --push` now records per-table counts in the sidecar
+and REFUSES when a table that had rows is empty (`--accept-loss` to override, `--check`
+to compare without publishing). After any rebuild, run `--check` and the full suite
+before pushing. The 24 Aug copy predates several tables' backfills, so `.recover`
+output cannot be trusted to be complete.
