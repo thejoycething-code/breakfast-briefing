@@ -140,6 +140,25 @@ SECTIONS = [
             r"|house church|bible (ban|smuggl)|missionar"
             r"|religious exemption|(fired|sacked|dismissed|disciplin)\w*.{0,40}"
             r"(refus\w+|conscience|belief|religio|faith)"),
+        # Chris, 08.09.2026: two stories he listed under "You should have included", both
+        # placed by him in this section.
+        #
+        # 1. Conversion AWAY from Islam. Everything above covers a convert who is arrested,
+        #    jailed or awaiting a verdict, and "apostas" covers the charge - but nothing
+        #    covered the act, which in much of the world is what puts a person in danger in
+        #    the first place. CBN's "Many Muslims Turning to Christ Amid Middle East
+        #    Conflict" scored nothing here and fell to the Church & Religion catch-all.
+        (4, r"(muslim|hindu|buddhist|sikh)s?\b.{0,30}"
+            r"(turning|turn|converting|convert|coming|came) to (christ|christianity|jesus)"
+            r"|(leaving|left|renounc\w+) islam|ex-muslims?\b|former muslims?\b"),
+        # 2. Legislating a religious rite. Circumcision is a Jewish and Muslim obligation
+        #    before it is a medical procedure, so an MP moving to regulate it is a religious
+        #    liberty question - and it reached NO section at all. Guarded against "female
+        #    circumcision", which is FGM under a euphemism and belongs with the safeguarding
+        #    and family beats rather than here. Deliberately NOT widened to ritual slaughter
+        #    or shechita: nothing in this sweep declared them, and this file's own rule is to
+        #    add vocabulary when a real miss asks for it, not in anticipation.
+        (4, r"(?<!female )(?<!women's )circumcision"),
         (2, r"^(?=.*(christ|church|catholic|priest|pastor|bishop|missionar|convert|believer"
             r"|muslim|islam|hindu|sikh|jewish|faith|religio|worship|blasphem|persecut"
             r"|martyr|chapel|mosque|temple|monk|nun\b|preacher|gospel|bible))"
@@ -1815,6 +1834,70 @@ def union_entity_index(rows, past):
     return entity_index(corpus)
 
 
+_FEED_WINDOWS_LOADED = False
+
+
+def source_window_h(item):
+    """The window this item's SOURCE was allowed, or 0 if it just used the sweep's.
+
+    Chris, 10.09.2026. Why the sheet needs this. A handful of sources declare
+    `window=168h` in extra_feeds.txt because they publish two or three times a week and at
+    the default 36h the sweep would miss them entirely - FoRB in Full, Charlotte Gill, ADF
+    International. Their items therefore arrive legitimately old: 63h, 106h, 157h on
+    10.09.2026. The sheet printed those ages with nothing to say they were normal, and the
+    curator read straight past a 63.2h piece and published it as that morning's news.
+
+    The fix is NOT a staleness flag keyed on the sweep window. That would fire on every one
+    of these lines, every day, and the sources it would cry wolf on are exactly the ★
+    primary and low-frequency ones the brief says get missed most - so it would teach the
+    reader to distrust the lines that most need reading. What the age needs is context, not
+    an alarm.
+
+    Read off extra_feeds.txt rather than stamped onto each item by fetch_feeds, deliberately:
+    that keeps the 15-minute 6am sweep path and today.json's shape untouched, so a --new-only
+    re-run against an older today.json still works.
+    """
+    global _FEED_WINDOWS_LOADED
+    if not _FEED_WINDOWS_LOADED:
+        try:
+            fetch_feeds.load_extra()
+        except Exception:
+            pass                      # never a crash in the morning path over a display flag
+        _FEED_WINDOWS_LOADED = True
+    return fetch_feeds.FEED_WINDOWS.get((item.get("feed") or "").strip().lower(), 0)
+
+
+def age_flag(item):
+    """'  [wk src, 168h window]' for a declared-long-window source, else ''.
+
+    Only ever attached to an item whose age has actually run past the sweep window, because
+    that is the only time the printed age misleads. A 4h item from a weekly needs no gloss.
+    """
+    win = source_window_h(item)
+    age = item.get("age_h")
+    if not win or age is None or age <= SWEEP_WINDOW_H:
+        return ""
+    return "  [low-frequency source, %dh window]" % win
+
+
+def outside_own_window(items):
+    """Items older than the window their own source was allowed. Should always be empty.
+
+    This is the leak guard the staleness flag was mistaken for. Nothing here is an editorial
+    judgement: an item outside its own window means fetch_feeds' cutoff or a date parse is
+    wrong, and the sweep has silently reached further back than anything asked it to.
+    """
+    bad = []
+    for it in items:
+        age = it.get("age_h")
+        if age is None:
+            continue
+        allowed = max(source_window_h(it), SWEEP_WINDOW_H)
+        if age > allowed + 1.0:            # 1h of slack for clock skew between fetch and read
+            bad.append((it.get("_i"), it.get("feed"), age, allowed))
+    return bad
+
+
 def ran_before(item, history, ents=None):
     """The most recent recent-edition appearance of the same story, or None.
 
@@ -3255,6 +3338,17 @@ def main():
             "preview, %d feed summary, %d shallow page, %d via another outlet, %d NO TEXT\n"
             % (have, len(leads), 100.0 * have / total, routes["text"], routes["preview"],
                routes["feed"], routes["page"], routes["sibling"], routes[None]))
+        late = outside_own_window(items)
+        if late:
+            # An item outside its OWN source's window means fetch_feeds' cutoff or a date
+            # parse is wrong and the sweep reached further back than anything asked it to.
+            # Empty on 10.09.2026, which is the point: the four suspiciously old items that
+            # day were all inside a declared 168h window, so there was no leak to find.
+            sys.stderr.write("WINDOW LEAK: %d item(s) older than their own source's window - the "
+                      "sweep reached further back than anything asked it to, so a cutoff or "
+                      "a date parse is wrong: %s\n"
+                      % (len(late), "; ".join("%s %s %.0fh>%dh" % (n, f, a, w)
+                                              for n, f, a, w in late[:6])))
         sys.stderr.write(
             "  fetched this run (rest came from cache): %d opening(s), %d lede(s), "
             "%d preview(s), %d sibling(s)\n" % (opened, fetched, previewed, borrowed))
@@ -3342,7 +3436,13 @@ def main():
                   "a DIFFERENT url, which is how Right To Life's 25.08 piece came back on "
                   "27.08 unflagged. Neither is a veto - a running story can legitimately "
                   "run again - but the second one means read the past headline before you "
-                  "pick it.\n\n")
+                  "pick it.\n"
+                  "'[low-frequency source, NNNh window]' explains an age that has run past "
+                  "the sweep window: that source declares its own longer window in "
+                  "extra_feeds.txt because it publishes two or three times a week, so the age "
+                  "is normal and the piece is not a leftover. It is context for the age, not "
+                  "a warning - on 10.09.2026 a 63.2h FoRB in Full piece was published as that "
+                  "morning's news because the bare age read like breaking news.\n\n")
         # ★ marks a PRIMARY_SOURCE item. The sheet is ordered by corroboration, which is the
         # right order for judging how big a story is and the WRONG one for finding the stories
         # Chris cares most about: an advocacy body's own release is x1 by definition - nobody
@@ -3363,6 +3463,7 @@ def main():
                 (" ↗" if "news.google.com" in it["url"] else ""),
                 "new" if it["age_h"] is None else "%sh" % it["age_h"],
                 ("  [ran %s]" % it["seen_on"][5:] if it.get("seen_on") else "")
+                + age_flag(it)
                 + ('  [SAME STORY ran %s: "%s" - %s]'
                    % (it["_ran_story"]["date"][4:6] + "-" + it["_ran_story"]["date"][6:],
                       it["_ran_story"]["headline"][:70],
@@ -3456,6 +3557,7 @@ def main():
                 it["headline"], it["outlet"], flags, it["author"] or "-",
                 "new" if it["age_h"] is None else "%sh" % it["age_h"],
                 ("  [ran %s]" % it["seen_on"][5:] if it.get("seen_on") else "")
+                + age_flag(it)
                 + marks.get(id(it), "")))
         if tail:
             out.write("--- lower-ranked, same section (%d) ---\n" % len(tail))

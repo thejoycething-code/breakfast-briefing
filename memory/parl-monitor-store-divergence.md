@@ -51,3 +51,17 @@ concurrency group, it checks out a sidecar OLDER than the asset that run
 just published, and the fetch refuses. Needs no failure anywhere. Fixed by
 `ref: ${{ github.ref_name }}` on checkout in every parl-monitor-state
 workflow, so state runs always act on the branch tip.
+
+## A rebuilt store can come back missing a whole table (10 Sept 2026)
+
+The store rebuilt after the 9 Sept corruption (24 Aug git copy + `.recover` + captured
+stance JSON) had **pq_link empty**: 0 rows against 5,117 written questions. Nobody
+noticed until the tracker was regenerated and `tests/test_vote_tracker_display.py`
+AlsoOnRecordTests failed (342 rows with no source link). Recovery is offline:
+`python3 tools/backfill_pq_links.py` reads uin + dateTabled from the raw archive
+(`raw_state.py --pull` first), no API call, 100% resolved.
+
+**How to apply:** after ANY store rebuild, run the full suite against the store before
+pushing it, and compare `SELECT count(*)` per table in `src/db.py` TABLES against the
+sidecar's previous row counts; a table at 0 is the tell. The 24 Aug copy predates
+several tables' backfills, so `.recover` output cannot be trusted to be complete.

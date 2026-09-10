@@ -534,6 +534,15 @@ def run(verbose=False, known_red=None):
                        % (len(orphans),
                           "; ".join("%s (%dd)" % (n, f) for n, _u, f in orphans[:6]))))
 
+    # The age gloss must fire only where the printed age actually misleads, and the window
+    # leak guard must stay quiet on a legitimate long window. See the function below.
+    agef = test_age_flag_and_window_leak()
+    if not agef:
+        passed += 1
+    else:
+        failed.append(("smoke", "%d age-flag/window-leak problem(s): %s"
+                       % (len(agef), "; ".join(agef))))
+
     # The gnews decoder must not truncate a URL at its query value. See the function below.
     trunc = test_gnews_decode_unescape()
     if not trunc:
@@ -1025,6 +1034,67 @@ def test_text_coverage_line_counts_openings():
     for route in ("_opening", "_preview", "real_summary", "_lede", "_sibtext"):
         if route not in block:
             bad.append("coverage route %s missing from _text_route" % route)
+    return bad
+
+
+def test_age_flag_and_window_leak():
+    """The age gloss is context, not an alarm, and the leak guard is not the same thing.
+
+    Chris, 10.09.2026. Four items in that day's sweep were older than the 36h window - 63h to
+    157h - and the obvious reading was a leak. It was not: FoRB in Full and Charlotte Gill both
+    declare window=168h in extra_feeds.txt because they publish two or three times a week, so
+    at 36h the sweep would miss them entirely. The mistake was the other way round - the sheet
+    printed a bare "63.2h" with nothing to say that was normal for that source, and the piece
+    got published as that morning's news.
+
+    So two separate things, and this asserts they stay separate:
+
+      - age_flag() glosses an age that has run past the sweep window for a source allowed a
+        longer one. It must NOT fire on a young item from the same source, because there is
+        nothing misleading about "4h", and it must not fire on an ordinary source at all. A
+        flag on every long-window line every day would be noise on exactly the ★ primary and
+        low-frequency sources the brief says get read past.
+      - outside_own_window() is the actual leak guard: older than the item's OWN allowance,
+        which means a cutoff or a date parse is wrong. It was empty on 10.09.2026 and should
+        stay empty.
+    """
+    bad = []
+    try:
+        import shortlist
+        import fetch_feeds
+    except ImportError as exc:
+        return ["could not import: %s" % exc]
+
+    fetch_feeds.load_extra()
+    long_src = next((k for k, v in fetch_feeds.FEED_WINDOWS.items() if v > shortlist.SWEEP_WINDOW_H),
+                    None)
+    if not long_src:
+        return ["no source in extra_feeds.txt declares a window longer than the sweep's, so "
+                "the age gloss has nothing to explain - did a window= line get dropped?"]
+    win = fetch_feeds.FEED_WINDOWS[long_src]
+
+    old_item = {"feed": long_src, "age_h": shortlist.SWEEP_WINDOW_H + 20.0}
+    if "low-frequency source" not in shortlist.age_flag(old_item):
+        bad.append("a %.0fh item from %r (window %dh) got no age gloss" %
+                   (old_item["age_h"], long_src, win))
+
+    young = {"feed": long_src, "age_h": 4.0}
+    if shortlist.age_flag(young):
+        bad.append("a 4h item from %r was glossed; nothing about '4h' misleads" % long_src)
+
+    plain = {"feed": "no such feed declares a window", "age_h": shortlist.SWEEP_WINDOW_H + 20.0}
+    if shortlist.age_flag(plain):
+        bad.append("an ordinary source was glossed as low-frequency")
+
+    # The leak guard: inside its own window is fine, past it is not.
+    inside = {"_i": 1, "feed": long_src, "age_h": win - 1.0}
+    if shortlist.outside_own_window([inside]):
+        bad.append("a %.0fh item inside its own %dh window was called a leak" %
+                   (inside["age_h"], win))
+    beyond = {"_i": 2, "feed": long_src, "age_h": win + 50.0}
+    if not shortlist.outside_own_window([beyond]):
+        bad.append("a %.0fh item past its own %dh window was NOT reported as a leak" %
+                   (beyond["age_h"], win))
     return bad
 
 

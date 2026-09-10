@@ -122,6 +122,18 @@ Each line is:
   N | headline | outlet | author | age    (£ = paywalled, ↗ = Google News redirect link,
                                            "new" = source publishes no dates)
 
+**`[low-frequency source, NNNh window]` after the age is context, not a warning** (added
+10.09.2026). A handful of sources declare their own longer window in `extra_feeds.txt` —
+FoRB in Full, Charlotte Gill, ADF International, all `window=168h` — because they publish
+two or three times a week and at the default 36h the sweep would miss them entirely. Their
+items therefore arrive legitimately old: 63h to 157h on 10.09.2026. The age is normal and
+the piece is not a leftover; **do not treat the flag as a reason to drop the story.** It
+exists because the sheet printed a bare "63.2h" with nothing to say that was normal, and a
+63.2h FoRB in Full piece was published that morning as though it were breaking news. The
+genuine leak — an item older than its *own* source's window, which would mean a broken
+cutoff or date parse — is a separate `WINDOW LEAK:` line on the sweep header, and was empty
+on 10.09.2026.
+
 N is the item's index — you will pass these numbers to compose.py, which copies the fields
 verbatim. Never retype a headline, URL, outlet or author by hand.
 
@@ -598,6 +610,15 @@ header before trusting a number from it** — concordance measures agreement wit
 correctness, and a bug that correlates with a favoured beat can score well (proved on
 18.08.2026). testcases.txt keeps veto power. Do not run rank_eval as part of the morning
 briefing; it is for sessions that change scoring.
+
+**Nor do you need to: `eval_week.sh` runs both scorers every Saturday 08:00** (the
+`briefing-eval-week` scheduled task, added 10.09.2026). Barring them from the morning path
+was right and also meant nothing ever ran them — `rank_eval_log.txt` had not been written
+since 31.08 and `repeat_eval_log.txt` since 28.08, while the corpus grew from 4 archived
+editions to 18. Saturday because the briefing is weekdays only, so the archive is complete
+through Friday and nothing contends. It exits non-zero only on a real crash; `repeat_eval.py`
+exiting 1 on a failing GOLD case is the standing state, because testcases.txt is written
+red-first — see `known_red.txt` for which failures are deliberate.
 
 If archiving fails, the edition is still fine — say so in the final message and move on.
 
