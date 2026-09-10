@@ -28,6 +28,35 @@ epochs:
 
 So: useful as a SECOND OPINION that flags a story the scorer ranked low and past editions
 suggest should be high. Not useful as an authority, and it must never silently reorder a sheet.
+
+MEASURED 10.09.2026, AND IT DID NOT WORK. The second-opinion flag above was built and wired
+into shortlist.py's sheet, then tested against that day's edition, and the wiring was removed
+again. Recorded here so nobody spends the afternoon twice:
+
+  - retrained on 18 editions (it had seen 4): pooled picked precision 0.34, recall 0.46.
+  - on buried leads (sheet rank > 400) it flagged 55 of 1,178, and the curator had tiered 41
+    of those 0. The sample was weak US procedural filler - a Maine Senate race explainer, a
+    SCOTUSblog docket roundup, a Houston immigration attorney's indictment - i.e. stories the
+    0 was right about. 55 markers a day of that is noise on a sheet that is already ~195k
+    tokens, and noise is the specific thing the flag was supposed to cut through.
+  - it MISSED the one case it was designed for. Index 417 that day (FoRB in Full, "How a
+    harmless song reveals the quiet mechanics of India's majoritarian nation-building") sat
+    at rank 1,165 of 1,178, was tiered 3, and the model did not flag it.
+  - narrowing to ★ PRIMARY_SOURCE leads - the population the 24.08.2026 failure was actually
+    about, when 17 of 33 missed stories were in the sweep unpicked - did not rescue it: there
+    were 4 buried ★ leads, 2 of them tiered 0, and the model flagged NONE of them. 417 is not
+    a ★ primary either, so even the right population would not have caught it.
+
+The plumbing is kept: `--save` freezes weights to tier_model.json, `load()` reads them back
+and `second_opinion()` scores buried leads. Nothing calls them. They are here so a future
+attempt starts from a measurement rather than an intuition, and eval_week.sh deliberately
+does NOT retrain, because a weekly job feeding no consumer is the same unwired smell this
+module was criticised for in the first place.
+
+What the evidence actually suggests, if anyone returns to it: the misses are concentrated in
+sources whose text the sweep cannot read and in x1 primaries, and hashed bag-of-words over a
+headline has nothing to work with in either case. The lever is more likely a source route
+than a model.
 """
 
 import argparse
@@ -153,15 +182,95 @@ def predict(w, b, feats):
     return max(scores, key=scores.get), scores
 
 
+MODEL_FILE = os.path.join(HERE, "tier_model.json")
+
+# Only a lead the sheet has already buried is worth a second opinion. Flagging a story the
+# corroboration order already put near the top tells the reader nothing they were not about
+# to read anyway; the failure this is for is the opposite one - 24.08.2026, when Chris listed
+# 33 stories that should have run, 17 were in that day's sweep unpicked, and most were ★
+# primary sources that are x1 by definition and therefore sink in a corroboration-ordered
+# sheet of 2,400 lines.
+BURIED_AFTER = 400
+
+
+def save(w, b, path=MODEL_FILE, note=""):
+    """Freeze the trained weights so the morning path never trains anything.
+
+    Training on 18 editions takes minutes, which has no place in a 6am path with a deadline.
+    So eval_week.sh trains weekly and writes this file, and shortlist.py only ever loads it.
+    A model older than the archive it was trained on is not a correctness problem here - the
+    flag is advisory and the file records its own provenance so a stale one is visible.
+    """
+    keep = {c: {str(k): round(v, 6) for k, v in w[c].items() if abs(v) > 1e-4}
+            for c in CLASSES}
+    json.dump({"classes": CLASSES, "buckets": BUCKETS, "b": b, "w": keep,
+               "trained_on": sorted(d for d, _ in load_days()), "note": note,
+               "buried_after": BURIED_AFTER},
+              open(path, "w", encoding="utf-8"))
+    return path
+
+
+def load(path=MODEL_FILE):
+    """(w, b, meta) or (None, None, None). Never raises: this is advisory, not load-bearing."""
+    try:
+        d = json.load(open(path, encoding="utf-8"))
+        if d.get("buckets") != BUCKETS or d.get("classes") != CLASSES:
+            return None, None, None      # feature space changed under the saved weights
+        w = {c: {int(k): v for k, v in d["w"].get(c, {}).items()} for c in d["classes"]}
+        return w, d["b"], d
+    except Exception:
+        return None, None, None
+
+
+def second_opinion(items, sections, path=MODEL_FILE):
+    """{index: predicted tier} for leads the model rates 1 or 2 that the sheet has buried.
+
+    Deliberately NOT a reordering and deliberately not a filter. tier_model.py's own header
+    says why: it learns MY past tiering including its mistakes, so "agrees with what was done"
+    is not "would have picked the right stories", and it must never silently reorder a sheet.
+    Measured 10.09.2026 over 18 editions: picked precision 0.34, recall 0.46. That is far too
+    weak to decide anything and quite good enough to say "look again at this one".
+
+    `sections` maps index -> section; `items` is index -> item dict.
+    """
+    w, b, meta = load(path)
+    if w is None:
+        return {}, None
+    cutoff = (meta or {}).get("buried_after", BURIED_AFTER)
+    out = {}
+    for rank, (n, it) in enumerate(items):
+        if rank < cutoff:
+            continue
+        pred, _ = predict(w, b, features(it, sections.get(n)))
+        if pred in ("1", "2"):
+            out[n] = pred
+    return out, meta
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--top", type=int, default=0)
+    ap.add_argument("--save", nargs="?", const=MODEL_FILE, default=None,
+                    help="train on ALL editions and freeze the weights to FILE "
+                         "(default %s) for shortlist.py's second-opinion flag" % MODEL_FILE)
+    ap.add_argument("--note", default="", help="provenance note stored in the saved model")
     args = ap.parse_args()
     days = load_days()
     if len(days) < 2:
         print("need at least 2 archived editions; found %d" % len(days))
         return 1
     print("editions: %s\n" % ", ".join(d for d, _ in days))
+
+    if args.save:
+        # Trained on EVERY edition, which is right for the saved model and wrong for the
+        # report below: the report holds a day out so a day is never scored by a model that
+        # saw it. Both are printed so the two numbers are never confused for each other.
+        w, b = train([r for _d, rs in days for r in rs])
+        path = save(w, b, args.save, args.note)
+        print("saved %s trained on all %d edition(s)" % (path, len(days)))
+        print("It is a SECOND OPINION, not an authority - see this module's docstring. The "
+              "leave-one-day-out report below is what says how much to trust it.\n")
+
     print("%-10s %7s %7s %9s %9s %9s" % ("held-out", "rows", "picked", "picked-P", "picked-R",
                                          "tier1-R"))
     agg = [0, 0, 0, 0]

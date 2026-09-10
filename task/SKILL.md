@@ -88,7 +88,17 @@ Identity & Sexuality" are part of the key.** Both were written here without them
 as misfiled ("classifier says Marriage, Family & Education"), so 49 of the 55 lines looked
 like transposed indexes when the only fault was one missing comma in the section name.
 
-Four caps apply and are enforced by compose.py, so do not hand-trim to hit them:
+**Six SOFT caps also apply, and they only ever warn** (10.09.2026): Life 50, Marriage 42,
+Religious Freedom 32, Gender 30, Other 28, Free Speech 24. They exist because the hard caps
+bite in three sections and in the other six nothing had an opinion at all — on 10.09.2026 the
+picks came to 334 and the only thing that brought them to 304 was noticing and hand-culling
+thirty. A section over its soft cap is told so and **publishes anyway**: nothing is trimmed,
+because "there is no overall volume cap, do not trim to a number" is settled. Treat it as
+"check the tail of this section is worth running rather than filler with nowhere else to go".
+The numbers are each section's own 90th percentile across the 18 archived editions, not
+invented; at that setting they flagged Free Speech, Marriage and Other on 10.09.2026.
+
+Four HARD caps apply and are enforced by compose.py, so do not hand-trim to hit them:
 **Politics, Government & Society is capped at 40** (Chris, 15.08.2026), **Church & Religion at
 30** (Chris, 23.08.2026), **Immigration & Asylum at 30** (Chris, 27.08.2026, after an edition
 ran 45 of them), and **US stories may not exceed 30% of any section** — the figure
@@ -619,6 +629,23 @@ editions to 18. Saturday because the briefing is weekdays only, so the archive i
 through Friday and nothing contends. It exits non-zero only on a real crash; `repeat_eval.py`
 exiting 1 on a failing GOLD case is the standing state, because testcases.txt is written
 red-first — see `known_red.txt` for which failures are deliberate.
+
+**When Chris marks up a PUBLISHED edition, run `markup.py`** (10.09.2026) — until then the
+judgement loop only ran one way, and nothing recorded what he would have changed in an edition
+that actually shipped:
+
+  cd ~/Downloads/breakfast-briefing && python3 markup.py <YYYYMMDD> \
+      --should-have 417,1265 --should-not 248 --note "his words" --dry-run
+
+It prints WHY each one landed where it did, read off the archive — the tier it was given, its
+importance rank that morning, whether anything of its text was readable, its section. That is
+what turns "you missed this" into something fixable: a story missed at rank 1,165 with no
+readable text is a different bug from one missed at rank 12. It records the correction in
+`markup/<date>.json` and overrides those verdicts in `tiers.json`, because Chris's label beats
+the curator's and a correction that does not reach tiers.json is one the pipeline forgets by
+morning. It **suggests** testcases and writes none until `--write-testcases`: a "should have
+run" does not say by itself which rule was wrong, so it proposes the ABOVE pairs and names the
+kinds that look more likely, and the choice stays human.
 
 If archiving fails, the edition is still fine — say so in the final message and move on.
 

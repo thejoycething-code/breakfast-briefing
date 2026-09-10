@@ -80,6 +80,28 @@ ORDER = [
 SECTION_CAPS = {"Politics, Government & Society": 40, "Church & Religion": 30,
                 "Immigration & Asylum": 30}
 
+# Soft caps: WARN, never trim. Chris, 10.09.2026.
+#
+# Why they exist. SECTION_CAPS bites in three sections; in the other six, tier 1/2/3 changes
+# almost nothing observable, because everything published either way and regions.sort_by_region
+# is the outer key so tier only reorders inside a region block. On 10.09.2026 that showed up
+# concretely: the picks came to 334 items and the only thing that brought them to 304 was the
+# curator noticing and hand-culling about thirty. Nothing in the pipeline had an opinion.
+#
+# So these are a prompt, not a rule. A section over its soft cap is being TOLD, at the moment
+# the decision is still cheap, that today is unusually heavy there - and then it publishes
+# anyway, because "there is no overall volume cap, do not trim to a number" is settled and a
+# hard cap here would retire good stories on an arithmetic argument.
+#
+# The numbers are the 90th percentile of each section's own history across the 18 archived
+# editions on 10.09.2026, not invented: medians were Life 39, Marriage 33, RF 25, Gender 23,
+# Other 19, Free Speech 17. At p90 they would have flagged three of the six that day - Free
+# Speech 25, Marriage 44, Other 36 - which is about the right sensitivity for a nudge.
+SECTION_SOFT_CAPS = {"Life": 50, "Marriage, Family & Education": 42,
+                     "Religious Freedom & Persecution": 32,
+                     "Gender, Identity & Sexuality": 30, "Other": 28,
+                     "Free Speech & Civil Liberties": 24}
+
 # Domains that republish other outlets' work. Their feeds credit the ORIGINAL publisher, so
 # the item arrives as "The Telegraph" and sails past the outlet block in shortlist.py, but its
 # URL points at the repost. The briefing would then print "- The Telegraph (£)" over a link to
@@ -928,6 +950,18 @@ def main():
                                     ", ".join(str(n) for n in t1_cut)))
             cut_by_cap[section] = chosen[cap:]
             chosen = chosen[:cap]
+
+        # Soft cap: says so, changes nothing. Checked AFTER the hard cap so a capped section
+        # is never told off twice for the same surplus, and reported with the section's own
+        # median so the number means something to whoever reads it.
+        soft = SECTION_SOFT_CAPS.get(section)
+        if soft and len(chosen) > soft:
+            sys.stderr.write(
+                "%s: %d items, over its soft cap of %d - heavy for this section (p90 of its "
+                "own history). Nothing was trimmed and nothing needs to be: check the tail is "
+                "genuinely worth running rather than filler that had nowhere else to go.\n"
+                % (section, len(chosen), soft))
+
         if not args.no_region_sort:
             # Stable, so any deliberate ordering inside a region survives.
             chosen = regions.sort_by_region(

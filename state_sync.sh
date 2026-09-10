@@ -131,8 +131,14 @@ CODE_FILES="shortlist.py run_tests.py regions.py compose.py fetch_feeds.py resol
 upload-archive-to-drive.sh upload-dir-to-drive.sh state_sync.sh gdrive_auth.sh \
 archive_day.py audit_feeds.py authors.py check_sources.py discover_feeds.py \
 mark_published.py publish.sh rank_eval.py slice_shortlist.py \
-textsignals.py tier_model.py sync_docs.sh backfill_firstseen.py slack_five.py eval_week.sh"
-# eval_week.sh added 10.09.2026 alongside slack_five.py.
+textsignals.py tier_model.py sync_docs.sh backfill_firstseen.py slack_five.py eval_week.sh markup.py"
+# markup.py and eval_week.sh added 10.09.2026 alongside slack_five.py.
+#
+# tier_model.json is deliberately NOT here. `tier_model.py --save` can write one, but nothing
+# reads it: the second-opinion flag it was written for was measured on 10.09.2026 and did not
+# work (see tier_model.py's docstring for the numbers), so shipping a 1.2MB artefact nothing
+# consumes would be dead weight in every push. It is one command to regenerate if anyone
+# revisits the idea.
 # slack_five.py added 10.09.2026, and this list caught it: the fixture failed with "1
 # script(s) missing from state_sync.sh CODE_FILES, so they are backed up NOWHERE" within a
 # minute of the file being written. That is the third time the same guard has caught the same
