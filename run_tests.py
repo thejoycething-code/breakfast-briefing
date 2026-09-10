@@ -18,6 +18,7 @@ his own words, dated. Run it before and after any change to the patterns:
 Exit status is 1 if anything fails, so it can gate a commit or a scheduled run.
 """
 
+import datetime as dt
 import os
 import sys
 
@@ -249,27 +250,35 @@ def run(verbose=False):
                 detail = "%s -> %s" % (ha.strip()[:46], got)
             elif kind in ("RANBEFORE", "NOTRANBEFORE"):
                 # RANBEFORE | <headline today> ::was:: <headline in a recent edition>
-                # Same section assumed on both sides: that is the case the strict path is
-                # for, and asserting the cross-section rejection separately would only be
-                # re-testing same_story's guard.
+                #            [::sections:: <today section> >> <past section>]
+                # Both sides default to one section. That default used to be justified here
+                # as "asserting the cross-section rejection would only be re-testing
+                # same_story's guard" - which assumed the guard was right. On 08.09.2026 it
+                # cost a real repeat, so the sections are now settable and the guard is
+                # asserted rather than assumed. See the 08.09.2026 block in testcases.txt.
                 joined = "|".join(parts)
                 today_h, _, past_h = joined.partition("::was::")
                 flags = {}
                 if "::entity::" in past_h:
                     past_h = past_h.replace("::entity::", "")
                     flags["ENTITY"] = True
+                sec_today = sec_past = "Life"
+                if "::sections::" in past_h:
+                    past_h, _, secspec = past_h.partition("::sections::")
+                    a, _, b = secspec.partition(">>")
+                    sec_today, sec_past = a.strip(), b.strip()
                 today_h, past_h = today_h.strip(), past_h.strip()
                 # ENTITY on the kind line turns the entity arm on for that case, by
                 # building an index over the pair. Two documents is a degenerate corpus, so
                 # this asserts the ARM fires, not that a real DF gate would keep the token -
                 # repeat_eval.py is what measures the gate over a real corpus.
-                hist = [{"date": "20260825", "section": "Life",
+                hist = [{"date": "20260825", "section": sec_past,
                          "headline": past_h, "outlet": "x", "key": ""}]
                 ents = (shortlist.entity_index(
                             [{"headline": today_h}, {"headline": past_h}])
                         if flags.get("ENTITY") else None)
                 hit = shortlist.ran_before(
-                    {"headline": today_h, "_section": "Life"}, hist, ents=ents)
+                    {"headline": today_h, "_section": sec_today}, hist, ents=ents)
                 got = "RANBEFORE" if hit else "NOTRANBEFORE"
                 ok = (got == kind)
                 detail = "%s -> %s" % (today_h[:46], got)
@@ -452,6 +461,28 @@ def run(verbose=False):
         failed.append(("smoke", "SEEN_RETENTION_DAYS (%dd) must exceed the longest per-feed "
                                 "window (%dh)" % (fetch_feeds.SEEN_RETENTION_DAYS, longest)))
 
+    # A genuinely undated item must age out on the date we FIRST SAW it, not on the run time.
+    # Chris, 08.09.2026: "Why do you keep including this every single day? What in the
+    # deduplication process has broken?" - the Spectator's surrogacy piece had been in every
+    # sweep from 18.08 to 08.09. Nothing in dedup was broken. Dateless scrapesrc items were
+    # stamped published=now, so they never left the window, and the only thing holding them
+    # back was seen.json - which records PUBLISHED items only, so anything offered and passed
+    # over stayed "new" for ever. 41 items carried age_h=None in the 08.09 sweep alone.
+    try:
+        cutoff = dt.datetime(2026, 9, 7, tzinfo=dt.timezone.utc)
+        old = {fetch_feeds.url_key("https://spectator.com/article/x"):
+               dt.datetime(2026, 8, 18, tzinfo=dt.timezone.utc).isoformat()}
+        stale = fetch_feeds.dateless_is_new("https://spectator.com/article/x", old, cutoff)
+        fresh = fetch_feeds.dateless_is_new("https://spectator.com/article/y", old, cutoff)
+        if (not stale) and fresh:
+            passed += 1
+        else:
+            failed.append(("smoke", "dateless freshness: first seen 18.08 against a 07.09 "
+                                    "cutoff must NOT be new (got new=%s), and an unseen link "
+                                    "must be new (got new=%s)" % (stale, fresh)))
+    except Exception as exc:  # noqa: BLE001
+        failed.append(("smoke", "dateless freshness: %s: %s" % (type(exc).__name__, exc)))
+
     # The shell tail must survive `set -u` on this Mac's bash. See the two functions below.
     bad_syntax = test_shell_syntax()
     if not bad_syntax:
@@ -588,7 +619,9 @@ def run(verbose=False):
         # reporter with a TypeError instead of reporting the failure - the one moment the
         # harness exists for. Found by deliberately breaking the new self-block assertion.
         print("  FAIL  %-9s %s" % ("line %d" % n if isinstance(n, int) else n, msg))
+
     return 1 if failed else 0
+
 
 
 
