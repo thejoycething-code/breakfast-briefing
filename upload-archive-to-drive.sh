@@ -88,3 +88,27 @@ for d in "$HERE"/archive/*/; do
   rm -f "$tgz"
 done
 echo "folder: https://drive.google.com/drive/folders/$FID"
+
+# The other two write-once corpora, added 10.09.2026. Same shape as archive/ - a day's file
+# is written once and never touched again - but they are small JSON, so they go up as files
+# rather than tarballs via upload-dir-to-drive.sh.
+#
+# Why they are here at all: both were created on 10.09.2026 and both were backed up NOWHERE.
+# state_sync.sh takes a flat file list and cannot express a directory, so neither list caught
+# them, and five/ is the ONLY record of the Slack five that has ever existed - the Doc has
+# tiers.json, archive/ and rank_eval, and until that day the five had nothing. Losing it
+# would lose the one corpus that records the narrowest, most-read editorial judgement of the
+# morning. run_tests.py now asserts that any corpus directory is named in an uploader, which
+# is the guard that would have caught the omission.
+#
+# five/<date>.json is written at STEP 10, after finish_edition.sh has already run this script,
+# so today's five is uploaded by tomorrow's run and Friday's by eval_week.sh on Saturday. The
+# uploader is idempotent, so catching up costs nothing.
+for corpus in five markup; do
+  if [ -d "$HERE/$corpus" ]; then
+    echo
+    echo "== $corpus/"
+    sh "$HERE/upload-dir-to-drive.sh" "$HERE/$corpus" "$corpus" || \
+      echo "  $corpus/: upload FAILED - the local copy is intact, say so and move on" >&2
+  fi
+done

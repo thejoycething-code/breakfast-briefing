@@ -82,6 +82,20 @@ else
     run_scorer repeat_eval.py repeat_eval.py --log "$NOTE" --collisions
 fi
 
+# Catch up the write-once corpora. finish_edition.sh runs the uploader every weekday, but
+# five/<date>.json is written at Step 10 AFTER that, so Friday's five would otherwise wait
+# until Monday. Guarded: a missing credential must not fail the eval job, which changes no
+# state of its own.
+if [ "$DRY" = 1 ]; then
+    echo
+    echo "== corpora upload (dry run: skipped)"
+else
+    echo
+    echo "== corpora upload (archive/, five/, markup/)"
+    ./upload-archive-to-drive.sh 2>&1 | tail -6 || \
+        echo "   upload failed - local copies are intact, nothing else is affected" >&2
+fi
+
 echo
 if [ "$rc" != 0 ]; then
     echo "== eval_week: a scorer CRASHED. The logs are unchanged for whichever one died." >&2

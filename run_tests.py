@@ -534,6 +534,14 @@ def run(verbose=False, known_red=None):
                        % (len(orphans),
                           "; ".join("%s (%dd)" % (n, f) for n, _u, f in orphans[:6]))))
 
+    # Every corpus DIRECTORY must be carried by an uploader. See the function below.
+    corp = test_corpus_dirs_backed_up()
+    if not corp:
+        passed += 1
+    else:
+        failed.append(("smoke", "%d corpus director(y/ies) backed up NOWHERE: %s"
+                       % (len(corp), "; ".join(corp))))
+
     # The age gloss must fire only where the printed age actually misleads, and the window
     # leak guard must stay quiet on a legitimate long window. See the function below.
     agef = test_age_flag_and_window_leak()
@@ -1034,6 +1042,52 @@ def test_text_coverage_line_counts_openings():
     for route in ("_opening", "_preview", "real_summary", "_lede", "_sibtext"):
         if route not in block:
             bad.append("coverage route %s missing from _text_route" % route)
+    return bad
+
+
+def test_corpus_dirs_backed_up():
+    """A directory of write-once day records must be carried by an uploader.
+
+    Chris, 10.09.2026. CODE_FILES has caught the same mistake three times - a new script
+    written straight into ~/Downloads and backed up nowhere (textsignals/tier_model 24.08,
+    sync_docs 26.08, slack_five 10.09). The same afternoon it missed that mistake in a
+    different shape: five/ and markup/ were created and neither was in any backup list,
+    because state_sync.sh takes a flat FILE list and cannot express a directory at all. So
+    the guard that existed for scripts had no counterpart for corpora, and five/ - the only
+    record of the Slack five that has ever existed - was one rm from gone.
+
+    It PARSES the uploader's own corpus list rather than grepping for the name. The first
+    version of this test grepped, and its own mutation test caught it out: removing five/
+    from the uploader left the test GREEN, because the substring "five" also occurs in
+    slack_five.py and in the prose of both scripts. A guard that cannot fail is worse than
+    none, because it reports a guarantee it is not providing.
+    """
+    import re
+    here = os.path.dirname(os.path.abspath(__file__))
+    # Directories the pipeline WRITES and would want back. Not a glob of everything on disk:
+    # __pycache__ and out/ are derived and deliberately not backed up.
+    corpora = ["archive", "five", "markup"]
+
+    uploader = os.path.join(here, "upload-archive-to-drive.sh")
+    if not os.path.exists(uploader):
+        return ["upload-archive-to-drive.sh is missing, so no corpus is backed up at all"]
+    text = open(uploader, encoding="utf-8").read()
+
+    covered = set()
+    # archive/ is this script's whole reason for existing; it tars archive/<day>/ directly.
+    if re.search(r"archive/\*/|\$HERE/archive", text):
+        covered.add("archive")
+    # the rest come from the explicit list it loops over
+    m = re.search(r"for\s+corpus\s+in\s+([^;\n]+?)\s*;\s*do", text)
+    if m:
+        covered.update(t for t in m.group(1).split() if t)
+
+    bad = []
+    for d in corpora:
+        if not os.path.isdir(os.path.join(here, d)):
+            continue          # not created yet; nothing to lose, and markup/ is written lazily
+        if d not in covered:
+            bad.append("%s/ is written by the pipeline and no uploader carries it" % d)
     return bad
 
 

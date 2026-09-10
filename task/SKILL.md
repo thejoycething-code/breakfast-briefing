@@ -673,7 +673,13 @@ That the scripts are in there is not decoration: on 20.08.2026 a `cp` that follo
 overwrote five of them with an older copy, and this push was the only thing that got them back.
 
 The second command backs up `archive/` — the ranking corpus Step 8 just wrote — as one tarball
-per edition. It is separate from `state_sync.sh` because the two have different shapes:
+per edition, **and since 10.09.2026 also `five/` and `markup/`** as plain JSON via
+upload-dir-to-drive.sh. Those two were created that day and were backed up NOWHERE: state_sync
+takes a flat file list and cannot express a directory, so neither list caught them, and `five/`
+is the only record of the Slack five that has ever existed. Note the ordering — `five/<date>.json`
+is written at Step 10, *after* this command runs, so today's five goes up on tomorrow's run and
+Friday's on Saturday's eval_week. The uploader is idempotent, so catching up costs nothing.
+`run_tests.py` now asserts that any corpus directory is carried by an uploader. It is separate from `state_sync.sh` because the two have different shapes:
 state_sync overwrites a fixed list of files every day, while an archived edition is written once
 and never touched again, so the archive upload is incremental and skips days already in Drive.
 Added 20.08.2026, when Step 9 pushed state faithfully every morning and left the labels — the
