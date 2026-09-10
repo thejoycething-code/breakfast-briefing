@@ -92,3 +92,34 @@ DEV COLLISIONS - 24 pair(s) that word overlap would merge and is_development_of 
     1x  lost                     vs resign                  
         ABVP carries out ‘Student Safety March’ at Delhi University; demand MCD Co
         Satya Niketan Tragedy: ABVP holds candle march at South Campus to pay trib
+
+=== 2026-09-10  10.09.2026 cross-section repeat FIXED + get/sentenc class. ran_before no longer guards on section (it cost a real repeat on 08.09: a story filed Marriage one day and Life the next came back unflagged). _DEV_CLASSES gains {sentenc,sentence,get,gets}: DEV COLLISIONS 24 -> 11, the 13 get/sentenc pairs gone, arrest/charg still blocked deliberately. Precision unchanged: CLUSTER 1.000, FP 0.000, XDAY 0.0003. GOLD 12/14 -> 14/14 once repeat_eval was taught to strip ::sections:: - the same phantom-veto bug ::entity:: had. known_red.txt now empty.
+DEV COLLISIONS - 11 pair(s) that word overlap would merge and is_development_of blocks
+(27.08.2026 baseline: 20 before the stem/class fix, 1 after - an arrest/charge pair left blocked deliberately)
+    2x  arrest                   vs charg                   
+        Man charged with arson after historic New Brunswick church destroyed by fi
+        Suspect Arrested for Arson in Burning of Historic Catholic Church in New B
+    2x  class1                   vs class3                  
+        Trump gets green light for $400million gold-gilded White House ballroom...
+        Supreme Court Delivers Win to Trump, Allows Construction to Continue on Wh
+    1x  born                     vs class1                  
+        Women demand trans Parkrun competitors are banned after biological man win
+        Women demand transgender Parkrun competitors born male are barred from fem
+    1x  lose                     vs return                  
+        Trump returns from golf club to gripe on Truth Social about Kennedy Center
+        Trump Loses It at Judge in Unhinged Kennedy Center Meltdown
+    1x  class1                   vs resign                  
+        Sir Keir Starmer to resign as MP after standing down as Prime Minister
+        The Morning Poll: Was Keir Starmer right to stand down as an MP and force 
+    1x  class3                   vs lose                    
+        DOJ Tells Sanctuary States They Must Report Illegals To Get Federal Welfar
+        States must report illegal immigrants or lose federal funds, DOJ says
+    1x  died                     vs dies                    
+        Gloria Steinem, feminist and abortion-rights advocate, dies at 92
+        Pro-abortion feminist icon Gloria Steinem has died at 92
+    1x  charg                    vs class3                  
+        Missouri candidate charged with trying to plant drugs on his political riv
+        GOP candidate gets busted allegedly trying to plant drugs on his political
+    1x  lost                     vs resign                  
+        ABVP carries out ‘Student Safety March’ at Delhi University; demand MCD Co
+        Satya Niketan Tragedy: ABVP holds candle march at South Campus to pay trib

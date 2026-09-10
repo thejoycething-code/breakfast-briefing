@@ -1271,3 +1271,20 @@ OUTLET Sydney Morning Herald | SMH.com.au
 # a conversion story out of the Middle East, and an MP legislating on a religious rite.
 SECTION Religious Freedom & Persecution | cbn.com | Visions of Jesus: Many Muslims Turning to Christ Amid Middle East Conflict
 SECTION Religious Freedom & Persecution | NSS | MP acts to regulate circumcision following child deaths
+
+# 10.09.2026 - "gets N years" and "sentenced to N years" are one moment, not two stages.
+#
+# Found by eval_week.sh's first scheduled run, not by a markup: DEV COLLISIONS went from 1
+# after the 27.08 stem/class fix to 24, and get/gets vs sentenc was 13 of the 24. Both pairs
+# below are the same sentencing, worded twice, and is_development_of was calling them
+# different stages - so word overlap wanted to merge them and the guard blocked it, which is
+# how a repeat reaches an edition.
+#
+# Written RED before _DEV_CLASSES is touched.
+DEVELOPMENT no  | 2 Women Who Killed Transgender Man Are Sentenced to Life in Prison ::vs:: Two women get life in prison for brutally torturing transgender man to death
+DEVELOPMENT no  | Unification Church leader gets two years in prison ::vs:: Unification Church leader Hak Ja Han sentenced to 2 years in prison
+# The guard on the same fix. Charge and sentence ARE different stages, and the arrest/charge
+# pair is blocked deliberately (27.08.2026), so grouping the sentencing words must not
+# collapse the arc that leads to a sentencing.
+DEVELOPMENT yes | Man charged over arson at historic church ::vs:: Man sentenced to five years over arson at historic church
+DEVELOPMENT yes | Pastor arrested in Shanghai house church raid ::vs:: Pastor gets three years after Shanghai house church raid

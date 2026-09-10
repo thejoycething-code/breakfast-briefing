@@ -534,6 +534,14 @@ def run(verbose=False, known_red=None):
                        % (len(orphans),
                           "; ".join("%s (%dd)" % (n, f) for n, _u, f in orphans[:6]))))
 
+    # repeat_eval's GOLD veto must not read a harness marker as a word. See the function below.
+    gm = test_gold_pairs_strip_markers()
+    if not gm:
+        passed += 1
+    else:
+        failed.append(("smoke", "%d gold pair(s) still carry a harness marker: %s"
+                       % (len(gm), "; ".join(gm))))
+
     # Every corpus DIRECTORY must be carried by an uploader. See the function below.
     corp = test_corpus_dirs_backed_up()
     if not corp:
@@ -1042,6 +1050,32 @@ def test_text_coverage_line_counts_openings():
     for route in ("_opening", "_preview", "real_summary", "_lede", "_sibtext"):
         if route not in block:
             bad.append("coverage route %s missing from _text_route" % route)
+    return bad
+
+
+def test_gold_pairs_strip_markers():
+    """repeat_eval's GOLD veto must strip every ::marker:: before comparing.
+
+    Chris, 10.09.2026. This is the SECOND time the same bug has been found. repeat_eval's own
+    comment records the first: leaving ::entity:: in the string "made it a word in the
+    comparison, which is how it first showed up as a phantom GOLD failure". On 08.09.2026 the
+    RANBEFORE cases gained a ::sections:: marker for run_tests, repeat_eval was not taught
+    about it, and the result was two GOLD failures that were not real - reported as a VETO,
+    which is the strongest signal the scorer has, every time the job ran.
+
+    So this asserts the general property rather than the specific marker: no gold pair may
+    contain "::" by the time it reaches the comparison. Any marker added to testcases.txt in
+    future fails here on the day it is added, rather than quietly becoming a word.
+    """
+    try:
+        import repeat_eval
+    except ImportError as exc:
+        return ["could not import repeat_eval: %s" % exc]
+    bad = []
+    for today, past, _want in repeat_eval.gold_pairs():
+        for side, text in (("today", today), ("past", past)):
+            if "::" in text:
+                bad.append("%s side still has a marker: %r" % (side, text[:70]))
     return bad
 
 

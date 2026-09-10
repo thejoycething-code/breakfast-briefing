@@ -127,6 +127,21 @@ def gold_pairs():
                 if "::entity::" in past:
                     skipped.append(today.strip())
                     continue
+                # ::sections:: is the same bug one marker later (10.09.2026). It was added on
+                # 08.09.2026 so run_tests could assert the cross-section case, repeat_eval was
+                # not taught about it, and the marker text became words in the comparison -
+                # exactly as ::entity:: had. The result was two GOLD failures that were not
+                # real, reported as a VETO, every time the job ran.
+                #
+                # Unlike ::entity:: these are NOT excluded: the section is genuinely
+                # irrelevant here, because ran_before stopped guarding on it on 10.09.2026,
+                # so the pair is corpus-independent and belongs in the veto. Only the marker
+                # goes.
+                #
+                # Split on the generic "::" rather than this one name, so the next marker
+                # someone adds cannot repeat the bug a third time. run_tests asserts the same
+                # property from the outside.
+                past = past.split("::")[0]
                 if past.strip():
                     out.append((today.strip(), past.strip(), kind == "RANBEFORE"))
     except OSError:

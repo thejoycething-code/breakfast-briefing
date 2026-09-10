@@ -1677,6 +1677,20 @@ _DEV_CLASSES = [
     {"uphold", "upholds", "upheld", "win", "wins", "back", "backs", "backed"},
     # "Texas drag show ban struck down" / "judge ... in overturning Texas drag show ban".
     {"struck down", "strike down", "overturn", "quash", "revers"},
+    # "... Are Sentenced to Life in Prison" / "Two women get life in prison for ...", and
+    # "Unification Church leader gets two years" / "... sentenced to 2 years". One sentencing,
+    # worded twice. Found 10.09.2026 by eval_week.sh's first run: DEV COLLISIONS had gone from
+    # 1 after the 27.08 stem/class fix to 24, and get/gets vs sentenc was 13 of the 24 - so
+    # word overlap wanted to merge these and this guard was blocking it, which is precisely
+    # how a repeat reaches an edition.
+    #
+    # get/gets are grouped with sentenc and NOT given a class of their own, because the whole
+    # collision is that they are the colloquial form of the same verb. This does not collapse
+    # the arc that LEADS to a sentencing: arrest, charged and jailed keep their own keys, so
+    # "Man charged" -> "Man sentenced" is still a development, and the arrest/charge pair the
+    # 27.08 fix deliberately left blocked stays blocked. Both directions are asserted in
+    # testcases.txt under the 10.09.2026 heading.
+    {"sentenc", "sentenced", "sentence", "get", "gets"},
 ]
 _DEV_CLASS_OF = {}
 for _n, _cls in enumerate(_DEV_CLASSES):
@@ -1905,7 +1919,9 @@ def ran_before(item, history, ents=None):
     back on 27.08 at the same slug with "-2" on the end and no URL-keyed store could see it.
 
     Three guards, each earning its place:
-      - same section, as in same_story. Two sections means two concerns.
+      - NOT the section. That guard was removed 10.09.2026 after it cost a real repeat;
+        see the note in the loop for why a same-section test is right within a day and
+        wrong across days.
       - is_development_of, so a running story that has MOVED is not called a repeat. "MPs
         vote down the Bill" after "MPs to vote on the Bill" is the news, not an echo.
       - the word-overlap arm only. The entity arm of same_story leans on ENTITY_MIN_DF, a
@@ -1919,11 +1935,26 @@ def ran_before(item, history, ents=None):
     if not wa:
         return None
     ta = ent_tokens(headline) if ents else set()
-    section = item.get("_section")
     best = None
     for past in history:
-        if section and past.get("section") and past["section"] != section:
-            continue
+        # NO SECTION GUARD. Removed 10.09.2026, and it is the reason this function existed in
+        # a broken state for two editions.
+        #
+        # It used to `continue` when the past item sat in a different section, justified as
+        # "same section, as in same_story - two sections means two concerns". That reasoning
+        # is sound WITHIN a day, where the section is a fixed property of the sweep. Across
+        # days it is not: the classifier can file the same story differently on two mornings,
+        # and the curator moves items by hand precisely because some routing cannot be read
+        # off a headline. So the guard was asking "did this run before, in the same section",
+        # when the question is "did this run before". On 08.09.2026 it cost a real repeat -
+        # a story filed under Marriage, Family & Education one day and Life the next came
+        # back unflagged - and the 09.09 and 10.09 editions both shipped with it open.
+        #
+        # What still supplies the precision: the word-overlap floors (CROSSDAY_MIN_WORDS,
+        # CROSSDAY_OVERLAP, CROSSDAY_WORDS) and is_development_of. The section was never
+        # doing that work; it was a cheap proxy that happened to be wrong in the one
+        # direction that matters, because a false NEGATIVE here publishes a repeat while a
+        # false positive only asks the curator to look.
         wb = sig_words(past.get("headline") or "")
         if not wb:
             continue

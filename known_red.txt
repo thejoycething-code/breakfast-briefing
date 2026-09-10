@@ -10,11 +10,8 @@
 # testcases.txt is written red before the rule is edited. Every entry needs the date, who is
 # waiting on it, and what has to be true before it can be deleted.
 #
-# 10.09.2026 - cross-section repeat, open since 08.09.2026.
-#   same_story's same-section guard rejects a pair that moved section between editions, so a
-#   running story that changes section comes back unflagged. It cost a real repeat on
-#   08.09.2026. run_tests.py was extended that day to make the sections settable and the case
-#   was added to testcases.txt red-first; the guard in shortlist.py is still unfixed, so the
-#   09.09 and 10.09 editions both shipped with the gap open.
-#   DELETE THIS when ran_before matches across sections and line ~1219 goes green.
-RANBEFORE expected
+# EMPTY, and that is the correct state. The one entry it held - the cross-section repeat,
+# open 08.09 to 10.09.2026 - was deleted on 10.09.2026 when ran_before stopped guarding on
+# the section and the case went green. The stale-waiver check is what forced the deletion:
+# it failed the run the moment the waiver stopped matching anything, which is the behaviour
+# that stops this file rotting into standing permission.
