@@ -25,6 +25,11 @@ So: two lists, and three things done with them.
      --new-only reads and what rank_eval scores against, so a correction that does not land
      there is a correction the pipeline forgets by morning.
 
+     A suggested case that turns out GREEN is the useful answer, not a wasted one: the
+     scorer already ranked the story where Chris wanted it and the curator missed it anyway,
+     so the fault is in the reading and no rule change will help. Measured on the first real
+     run, 10.09.2026: the ABOVE pair for index 417 passed on arrival.
+
   3. testcases lines are SUGGESTED, and only written with --write-testcases. Deliberately not
      automatic. testcases.txt is Chris's own corrections expressed as assertions, and the
      discipline that makes it work - a case is written RED before the rule is edited - depends
@@ -264,8 +269,13 @@ def main(argv=None):
                      "stops the fix being a special case for one headline.\n")
             for l in lines:
                 fh.write("%s\n" % l)
-        print("appended %d case(s) to testcases.txt - RUN run_tests.py NOW. They are meant "
-              "to be RED until the rule is fixed." % len(lines))
+        print("appended %d case(s) to testcases.txt - RUN run_tests.py NOW." % len(lines))
+        print("A case that comes up RED is a scoring bug: the scorer disagrees with Chris and")
+        print("the rule needs the fix. A case that comes up GREEN is the more interesting")
+        print("answer - the scorer ALREADY ranked it the way he wanted and the curator missed")
+        print("it anyway, so the fault is in the reading, not the ranking, and no rule change")
+        print("will help. Delete a green case rather than leaving it: it asserts something")
+        print("already true, so it can only ever pass, and testcases.txt is for corrections.")
     elif lines:
         print("testcases NOT written. Read the suggestions above, then re-run with "
               "--write-testcases if they say something true.")

@@ -1288,3 +1288,15 @@ DEVELOPMENT no  | Unification Church leader gets two years in prison ::vs:: Unif
 # collapse the arc that leads to a sentencing.
 DEVELOPMENT yes | Man charged over arson at historic church ::vs:: Man sentenced to five years over arson at historic church
 DEVELOPMENT yes | Pastor arrested in Shanghai house church raid ::vs:: Pastor gets three years after Shanghai house church raid
+# 10.09.2026 - "dies at 92" and "has died at 92" are one death, not two stages.
+# The last real synonym miss in the DEV COLLISIONS list after the get/sentenc fix. _dev_stem
+# handles regular -s (loses->lose, resigns->resign) and cannot reach an irregular form: it
+# protects stems under four characters, so die/dies/died/dying stay four separate keys. Same
+# reason win/wins are enumerated rather than stemmed. Steinem's death is a live case, not a
+# hypothetical - it will be reported for days.
+DEVELOPMENT no  | Gloria Steinem, feminist and abortion-rights advocate, dies at 92 ::vs:: Pro-abortion feminist icon Gloria Steinem has died at 92
+# The two collisions left in that list are NOT synonym misses and must stay blocked:
+# "Trump returns from golf club" vs "Trump Loses It at Judge" are not the same verb, and the
+# two ABVP marches are genuinely different events. Asserted so a later widening cannot quietly
+# swallow them.
+DEVELOPMENT yes | Trump returns from golf club to gripe on Truth Social about Kennedy Center ::vs:: Trump Loses It at Judge in Unhinged Kennedy Center Meltdown

@@ -1691,6 +1691,12 @@ _DEV_CLASSES = [
     # 27.08 fix deliberately left blocked stays blocked. Both directions are asserted in
     # testcases.txt under the 10.09.2026 heading.
     {"sentenc", "sentenced", "sentence", "get", "gets"},
+    # "Gloria Steinem ... dies at 92" / "... has died at 92". One death, reported twice.
+    # Enumerated rather than stemmed for the same reason win/wins are: _dev_stem protects
+    # stems shorter than four characters, so it cannot reach die/dies without turning them
+    # into "di", and died/dying are irregular anyway. Found 10.09.2026 - the last real
+    # synonym miss in the DEV COLLISIONS list once get/sentenc was grouped.
+    {"die", "dies", "died", "dying"},
 ]
 _DEV_CLASS_OF = {}
 for _n, _cls in enumerate(_DEV_CLASSES):
