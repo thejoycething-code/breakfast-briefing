@@ -472,6 +472,44 @@ OTHER_SPLIT = [
                 r"|judicial (review|independence|nominee|confirmation|appointment|reform)"
                 r"|court.packing|\bSCOTUS\b|redistrict|gerrymander|filibuster|impeach"
                 r"|executive order|legislature|statehouse"
+                # Public inquiries, added 16.09.2026. The Thirlwall Inquiry into Lucy Letby
+                # reported on 15.09 and the ENTIRE cluster reached no section at all - both
+                # GOV.UK primary documents, the Times, BBC and Telegraph reports, the doctor's
+                # reaction - and ran only because it was rescued by hand from the suppressed
+                # block. OTHER_ALLOW was never the gate: every one of them already matched it
+                # on "inquiry"/"NHS"/"hospital". They passed it, found no OTHER_SPLIT theme,
+                # fell to plain "Other", and were refused there because Other demands a
+                # positive subject of its own (16.08.2026). An inquiry reporting is not an
+                # "Other" subject; it is public accountability, which is this split's job.
+                #
+                # A bare "inquiry" IS the right width, and that is measured, not assumed:
+                # across the 19 archived editions it moves 59 items out of NO SECTION AT ALL,
+                # ~3 a day, and they are overwhelmingly real stories the briefing dropped
+                # silently - the Nottingham attack death ruled "potentially preventable", the
+                # chief coroner calling for an inquiry into the Manchester synagogue attack,
+                # RUC obstruction of the Robert Hamill murder inquiry, Bondi, the Australian
+                # antisemitism hearings, GPs' advice service causing missed cancer diagnoses.
+                # Narrower variants were built and measured too: anchoring "inquiry" to a
+                # reporting verb caught 9 of today's 14 and dropped the Times' "Lucy Letby
+                # inquiry: staff could have stopped three murders" - a lead item - on nothing
+                # but its punctuation.
+                #
+                # The single false sense is the police one, and it is excluded by the word in
+                # front rather than by narrowing the term: 2 of those 59 are "homicide
+                # inquiry". "murder, inquiry finds" keeps the comma and so still matches,
+                # which is correct - that is an inquiry into a murder investigation.
+                r"|(?<!homicide )(?<!murder )(?<!police )\binquir(y|ies)\b"
+                # The other half of the same story: a government ANSWERING an inquiry, which
+                # can be written without the word. "Government to act on Thirlwall patient
+                # safety recommendations" - a GOV.UK primary document, and the one Letby item
+                # the pattern above still missed. Both tokens measured on the archive and both
+                # tiny: the first moves 3 (this, plus New Zealand rejecting advice on
+                # retirement village payouts and the Scottish Government rejecting a men's
+                # health plan), the second 2 (this, plus the BMA chief warning the NHS puts
+                # reputation before patient safety). Every one a real story that was dropped.
+                # A bare "recommendations" was tried and rejected: same 2, but it also drags
+                # in EU programme boilerplate.
+                r"|government (to act on|accepts|rejects|responds)|patient safety"
                 # "politic" itself was missing, so a headline whose only political word was
                 # "political" reached no section at all - which is how the Belfast News
                 # Letter's "...short-lived political marriage" ended up relying on its
@@ -960,6 +998,9 @@ GOSSIP = re.compile(
     r"|i married the wrong|love life|dating history|ex-?wife|ex-?husband", re.I)
 # Entertainment desks whose marriage coverage is never our subject.
 ENTERTAINMENT_DESKS = re.compile(
+    # "etimes" is the Times of India's entertainment vertical and MUST stay anchored:
+    # unanchored it is a substring of "thetimes.com", which silently chaffed every Times
+    # item that did not trip CIVIC_MARRIAGE (found 14.09.2026 - see testcases.txt).
     r"telangana today|news18|pinkvilla|koimoi|bollywood hungama|filmfare|etimes"
     r"|hindustan times.*bollywood|zoom tv|india forums", re.I)
 

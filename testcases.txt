@@ -1300,3 +1300,40 @@ DEVELOPMENT no  | Gloria Steinem, feminist and abortion-rights advocate, dies at
 # two ABVP marches are genuinely different events. Asserted so a later widening cannot quietly
 # swallow them.
 DEVELOPMENT yes | Trump returns from golf club to gripe on Truth Social about Kennedy Center ::vs:: Trump Loses It at Judge in Unhinged Kennedy Center Meltdown
+
+# --- 16.09.2026: a public inquiry reporting reached NO SECTION AT ALL -----------------------
+# The Thirlwall Inquiry into Lucy Letby reported on 15.09 and the whole cluster - both GOV.UK
+# primary documents, the Times, BBC and Telegraph reports and the doctor's reaction - landed in
+# NO SECTION MATCHED. Only the Guardian's version classified, on "ministers". The edition ran
+# them only because they were rescued by hand from the suppressed block.
+#
+# The gate was NOT OTHER_ALLOW, which every one of these already matched ("inquiry", "NHS",
+# "hospital", "nurse"). They passed it, routed to plain "Other" because no OTHER_SPLIT theme
+# claimed them, and were then refused because "Other" additionally demands a positive subject
+# of its own (16.08.2026). So the fix belongs in the Politics split: a statutory inquiry
+# reporting, and a government answering one, is a question about public accountability, which
+# is what that split's institutional half is for.
+SECTION Politics, Government & Society | GOV.UK news | Government response to the Thirlwall Inquiry
+SECTION Politics, Government & Society | GOV.UK news | Government to act on Thirlwall patient safety recommendations
+SECTION Politics, Government & Society | The Times | Lucy Letby inquiry: staff could have stopped three murders
+SECTION Politics, Government & Society | BBC UK | Baby 'cot cams' plan after inquiry finds Lucy Letby crimes could have been prevented
+SECTION Politics, Government & Society | The Telegraph | Letby hospital could have saved three babies, inquiry finds
+SECTION Politics, Government & Society | BBC UK | Letby doctor says inquiry 'grim reading' and he wishes 'we had been brave enough to follow suspicion'
+# The boundary that stops this becoming a bare "inquiry|probe|investigation". Politics is a
+# residual split nothing else may lose items to (14.08.2026), and an ordinary police or
+# coronial investigation is not public accountability - it is crime reporting. These four must
+# stay unsectioned, exactly as they were before the fix.
+SECTION None | Belfast News Letter | Police probe into death of man in Co Down
+SECTION None | Sky News | Investigation launched by police after British man dies in Sicily
+SECTION None | WQAD | Man accused of murdering Trudy Appleby clashes with judge during latest court hearing
+# The one sense of "inquiry" that is ordinary crime reporting rather than public
+# accountability: a police homicide inquiry. Measured across the 19 archived editions, this
+# is the ONLY false positive a bare "inquiry" produces - 2 of the 59 items it moves.
+SECTION None | NZ Herald | Body found in Rotorua lake believed to be person linked to homicide inquiry
+SECTION None | Belfast News Letter | Man charged after murder inquiry launched into city centre death
+# Written as a negative first and corrected on the measurement: an official inquiry into a
+# fatal hospital fire is the same shape as Thirlwall - an institution investigated over deaths
+# in its care - and the archive carries the earlier half of the same story ("PM forms
+# four-member inquiry committee", 27.08). Foreign and minor, but section is not importance;
+# ranking is what handles that.
+SECTION Politics, Government & Society | The News International | Electrical failure most likely cause of deadly Pims blaze, says inquiry report
