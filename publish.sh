@@ -172,12 +172,16 @@ if [ "$VERIFY" = 1 ]; then
 import re,sys,html
 from urllib.parse import unquote
 doc=open(sys.argv[1],encoding='utf-8',errors='replace').read()
-# Docs' HTML export percent-encodes hrefs and wraps some in a redirector; unescape and
-# unwrap so the comparison is against the real target.
-doc=html.unescape(doc)
-doc=re.sub(r'https://www\.google\.com/url\?q=([^&"]+)[^"]*', lambda m: unquote(m.group(1)), doc)
+# Compare hrefs to hrefs, whole. A bare-URL regex over the doc stopped at ")" and reported
+# utm_source=(direct) links MISSING from a byte-exact doc (25.09.2026, 182/183). Docs' export
+# percent-encodes hrefs and wraps some in a redirector; unescape and unwrap each href so the
+# comparison is against the real target.
+def target(h):
+    h=html.unescape(h)
+    m=re.match(r'https://www\.google\.com/url\?q=([^&]+)',h)
+    return unquote(m.group(1)) if m else h
+got={target(h) for h in re.findall(r'href="([^"]*)"',doc)}
 want=[html.unescape(u) for u in re.findall(r'href="([^"]*)"',open(sys.argv[2]).read())]
-got=set(re.findall(r'https?://[^\s\)\]>"]+',doc))
 bad=[u for u in want if u not in got]
 print("  URLs %d/%d verified, %d corrupted" % (len(want)-len(bad),len(want),len(bad)))
 for u in bad[:20]: print("    MISSING:",u[:110])

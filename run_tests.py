@@ -568,6 +568,14 @@ def run(verbose=False, known_red=None):
                        % (len(trunc), "; ".join("got %s, want %s" % (g, w)
                                                 for g, w in trunc))))
 
+    # publish.sh --verify must see URLs containing ")" and still catch real losses.
+    pv = test_publish_verify_parens()
+    if not pv:
+        passed += 1
+    else:
+        failed.append(("smoke", "%d publish --verify misjudgement(s): %s"
+                       % (len(pv), "; ".join(pv))))
+
     # A decode that is really a paginated index must not be trusted. See the function below.
     idx = test_gnews_index_decode_flagged()
     if not idx:
@@ -1386,6 +1394,77 @@ def test_source_tier_not_substring():
     for o in should_not:
         if shortlist.source_tier_pos(o) is not None:
             bad.append("%s must NOT match SOURCE_TIER" % o)
+    return bad
+
+
+def test_publish_verify_parens():
+    """publish.sh --verify must match hrefs whole, parentheses included, and nothing looser.
+
+    25.09.2026. The check built its set of exported URLs with a bare-URL regex that stopped at
+    ")", so the Jakarta Post link below - utm_source=(direct) - came back cut at "(direct" and
+    was reported MISSING. The doc was byte-exact (a substring check found 183/183), but the run
+    halted at 182/183 and finish_edition.sh stopped before marking. The fix reads hrefs out of
+    the export instead, after html.unescape and unwrapping google.com/url?q=.
+
+    Runs the Python heredoc straight out of publish.sh, so the test cannot drift from what
+    ships. The negative cases pin that the fix did not buy its green by loosening the match:
+    a truncated URL, a URL that is only a PREFIX of an exported one, and a URL present only as
+    visible link text (not as an href) must all still fail.
+    """
+    import re
+    import subprocess
+    import tempfile
+    src = open(os.path.join(HERE, "publish.sh")).read()
+    m = re.search(r"<<'PY'\n(.*?)\nPY\n", src, re.S)
+    if not m:
+        return ["could not find the --verify heredoc in publish.sh"]
+    script = m.group(1)
+    jak = ("https://www.thejakartapost.com/indonesia/2026/09/25/tangerang-church-disruption-"
+           "rekindles-fears-among-minorities?utm_source=(direct)&utm_medium=single_latest")
+    # How the Docs HTML export writes it: redirector-wrapped, query percent-encoded, &amp;.
+    jak_wrapped = ("https://www.google.com/url?q=https://www.thejakartapost.com/indonesia/"
+                   "2026/09/25/tangerang-church-disruption-rekindles-fears-among-minorities"
+                   "?utm_source%3D(direct)%26utm_medium%3Dsingle_latest&amp;sa=D&amp;"
+                   "source=editors&amp;ust=1758800000000000&amp;usg=AOvVaw0abc")
+    paren_path = "https://en.wikipedia.org/wiki/Tangerang_(city)"
+    plain = "https://example.com/story?id=1&page=2"
+
+    def verify(want_urls, doc_body):
+        sent = "".join('<p><a href="%s">x</a></p>' % u.replace("&", "&amp;")
+                       for u in want_urls)
+        with tempfile.TemporaryDirectory() as d:
+            dp, sp = os.path.join(d, "doc.html"), os.path.join(d, "sent.html")
+            open(dp, "w").write("<html><body>%s</body></html>" % doc_body)
+            open(sp, "w").write("<html><body>%s</body></html>" % sent)
+            return subprocess.run([sys.executable, "-", dp, sp], input=script,
+                                  capture_output=True, text=True)
+
+    a = '<a class="c3" href="%s">link</a>'
+    cases = [
+        # (label, wanted, exported doc body, should pass)
+        ("paren query, redirector-wrapped", [jak], a % jak_wrapped, True),
+        ("paren query, bare href", [jak], a % jak.replace("&", "&amp;"), True),
+        ("paren in path", [paren_path], a % paren_path, True),
+        ("plain url, wrapped", [plain],
+         a % "https://www.google.com/url?q=https://example.com/story?id%3D1%26page%3D2&amp;sa=D",
+         True),
+        ("genuinely missing", [jak, plain], a % jak_wrapped, False),
+        ("truncated at the paren", [jak],
+         a % "https://www.thejakartapost.com/indonesia/2026/09/25/tangerang-church-disruption-"
+             "rekindles-fears-among-minorities?utm_source=", False),
+        ("wanted is only a prefix of the export", ["https://example.com/story"],
+         a % plain.replace("&", "&amp;"), False),
+        ("present as link text only, href differs", [jak],
+         '<a href="https://example.com/other">%s</a>' % jak.replace("&", "&amp;"), False),
+    ]
+    bad = []
+    for label, want, body, ok in cases:
+        proc = verify(want, body)
+        if (proc.returncode == 0) != ok:
+            bad.append("%s: expected %s, got rc=%d (%s)"
+                       % (label, "pass" if ok else "MISSING", proc.returncode,
+                          (proc.stdout + proc.stderr).strip().splitlines()[0][:80]
+                          if (proc.stdout + proc.stderr).strip() else "no output"))
     return bad
 
 
