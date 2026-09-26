@@ -592,6 +592,21 @@ def run(verbose=False, known_red=None):
         failed.append(("smoke", "%d cluster-provenance failure(s): %s"
                        % (len(relay), "; ".join(relay))))
 
+    # An issuing primary source must LEAD a cluster on the sheet. See the function below.
+    issuing = test_cluster_lead_prefers_an_issuing_primary()
+    if not issuing:
+        passed += 1
+    else:
+        failed.append(("smoke", "%d cluster-provenance failure(s), issuing: %s"
+                       % (len(issuing), "; ".join(issuing))))
+
+    # A stock topic phrase must not glue a day's stories together. See the function below.
+    phrase = test_common_words_do_not_cluster()
+    if not phrase:
+        passed += 1
+    else:
+        failed.append(("smoke", "%d topic-phrase merge(s): %s" % (len(phrase), "; ".join(phrase))))
+
     # SOURCE_TIER must not substring-match a different masthead. See the function below.
     tiermatch = test_source_tier_not_substring()
     if not tiermatch:
@@ -620,6 +635,13 @@ def run(verbose=False, known_red=None):
         passed += 1
     else:
         failed.append(("smoke", "wpjson feed mode: %s" % "; ".join(wpj)))
+
+    # A Google News sitemap must parse as a feed. See the function below.
+    nsm = test_news_sitemap_parses_as_a_feed()
+    if not nsm:
+        passed += 1
+    else:
+        failed.append(("smoke", "news sitemap: %s" % "; ".join(nsm)))
 
     # The sheet's coverage line must measure readability, not fetch work. See below.
     cov = test_text_coverage_line_counts_openings()
@@ -980,6 +1002,52 @@ def test_url_key_keeps_article_ids():
         bad.append("utm_* tracking parameters are being kept")
     if k("https://e.com/s/") != k("https://e.com/s"):
         bad.append("trailing-slash normalisation regressed")
+    return bad
+
+
+def test_news_sitemap_parses_as_a_feed():
+    """News-sitemap parsing (24.09.2026). Returns a list of problems; empty means pass.
+
+    A Google News sitemap lists every article of the last 48 hours, where a Google News
+    search stops at 100 results. The fixture is modelled on the Times' - which was measured
+    and then NOT added, because its robots.txt disallows us (see extra_feeds.txt). The
+    parser is kept for publishers that do permit it. Entries must come out shaped exactly
+    like parse_feed's RSS entries, or the sweep would drop them silently.
+    """
+    import fetch_feeds
+    raw = (b'<?xml version="1.0" encoding="UTF-8"?><urlset '
+           b'xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" '
+           b'xmlns:news="http://www.google.com/schemas/sitemap-news/0.9"><url>'
+           b'<loc>https://www.thetimes.com/uk/article/trump-media-ban-judge-abc123</loc>'
+           b'<lastmod>2026-09-24T08:02:47.000Z</lastmod><news:news><news:publication>'
+           b'<news:name>The Times</news:name><news:language>en</news:language>'
+           b'</news:publication><news:publication_date>2026-09-24T06:10:00.000Z'
+           b'</news:publication_date><news:title><![CDATA[Trump ordered to lift White '
+           b'House media ban by judge &amp; told why]]></news:title>'
+           b'<news:keywords>media, courts</news:keywords></news:news></url></urlset>')
+    try:
+        rows = fetch_feeds.parse_feed(raw)
+    except Exception as exc:  # noqa: BLE001
+        return ["parse_feed raised %s on a news sitemap" % type(exc).__name__]
+    if len(rows) != 1:
+        return ["parsed %d rows, expected 1" % len(rows)]
+    r = rows[0]
+    bad = []
+    for k in ("title", "link", "date", "author", "source", "feed_title", "summary",
+              "categories"):
+        if k not in r:
+            bad.append("missing the %r key parse_feed emits" % k)
+    if not (r.get("title") or "").startswith("Trump ordered to lift"):
+        bad.append("title not read from news:title, got %r" % r.get("title"))
+    if "&amp;" in (r.get("title") or ""):
+        bad.append("entities not unescaped - the doc quotes headlines verbatim")
+    if r.get("link") != "https://www.thetimes.com/uk/article/trump-media-ban-judge-abc123":
+        bad.append("link not read from loc")
+    d = r.get("date")
+    if d is None or d.tzinfo is None:
+        bad.append("date must be tz-aware or the window filter compares naive to aware")
+    elif d.hour != 6:
+        bad.append("publication_date must win over lastmod, got hour=%d" % d.hour)
     return bad
 
 
@@ -1370,6 +1438,145 @@ def test_cluster_relay_not_primary():
         bad.append("ADF's own release no longer beats EWTN's write-up")
     return bad
 
+
+def test_cluster_lead_prefers_an_issuing_primary():
+    r"""A primary source ISSUING its own analysis must lead the sheet over a write-up of it.
+
+    Chris, 15.09.2026, from his markup of the 15.09 edition. Sex Matters published "NSPCC's
+    changing-room guidance fails girls" - their own analysis of the charity's new schools
+    guidance. The Telegraph filed its own story on the same guidance. corroborate() collapsed
+    the two and printed the Telegraph's line, so the only version on the sheet was a
+    paywalled headline with no readable text, it read as a story that had already run the day
+    before, and the whole cluster was dropped. The compose-time COVERAGE check caught it -
+    "Sex Matters 1 unpicked" - and the piece had to be added to the Doc after publication.
+
+    This is the MIRROR of the 31.08.2026 relay case above, and the half that case did not
+    cover. Both selections were wired then, but only in one direction:
+
+      cluster_rank      has a PRIMARY_SOURCE term, so it promotes an issuing primary. The
+                        section shortlist got this right and even printed
+                        "<<< TAKE THIS ONE of 2 on this story" against the Sex Matters line.
+      cluster_lead_key  has no PRIMARY_SOURCE term at all. Its first term only DEMOTES a
+                        relaying primary; nothing promotes an issuing one, so the tie falls
+                        through to rank_score - 11 for the Telegraph against 7 for Sex
+                        Matters, on keyword vocabulary alone - and the newsroom wins.
+
+    So the two paths disagree on the same cluster, and the sheet is the one the curator
+    reads. Fixing cluster_rank in August did not touch this, exactly as the comment in
+    corroborate() warns.
+
+    The relay guard must keep working while this is fixed: an issuing primary leads, a
+    relaying one still sorts last. Those are the two halves of the same provenance rule, and
+    a change that satisfies one by dropping the other is not a fix.
+    """
+    bad = []
+    # The real pair, with the scores classify() actually gave them on 15.09.2026.
+    sm = {"outlet": "Sex Matters",
+          "headline": "NSPCC’s changing-room guidance fails girls",
+          "summary": "The National Society for the Prevention of Cruelty to Children (NSPCC) "
+                     "is the country's best-known child-protection charity, and the only one "
+                     "with statutory powers.",
+          "url": "https://sex-matters.org/posts/updates/nspccs-changing-room-guidance-fails-girls",
+          "_score": 1, "_section": "Gender, Identity & Sexuality"}
+    tel = {"outlet": "The Telegraph",
+           "headline": "Male teachers can supervise girls in changing rooms under NSPCC guidance",
+           "summary": "",
+           "url": "https://www.telegraph.co.uk/news/2026/09/14/nspcc-changing-rooms-guidance/",
+           "_score": 5, "_section": "Gender, Identity & Sexuality"}
+
+    # Neither is relaying: Sex Matters is reading the guidance, not a newsroom. If this
+    # trips, the failure below is about the relay guard and not about issuing.
+    if shortlist.relays_another_outlet(sm):
+        bad.append("Sex Matters' own analysis is being read as a relay")
+
+    # THE SHEET's collapse, which is what a curator actually sees.
+    for order, label in (([sm, tel], "issuing first"), ([tel, sm], "write-up first")):
+        lead = shortlist.corroborate(order)[id(order[0])][1]
+        if lead is not sm:
+            bad.append("sheet lead is %s, want Sex Matters (%s, corroborate path)"
+                       % (lead.get("outlet"), label))
+
+    # ...and the ordering stated directly, so a fix cannot pass by input-order luck.
+    if shortlist.cluster_lead_key(sm) > shortlist.cluster_lead_key(tel):
+        bad.append("cluster_lead_key still sorts the Telegraph's write-up above the release")
+
+    # The August relay case must survive the fix: a RELAYING primary still sorts last.
+    spuc = {"outlet": "SPUC", "headline": "Andy Burnham will NOT vote on assisted suicide",
+            "summary": "According to Politics UK, Andy Burnham has told Labour MPs that he "
+                       "will not be voting on the Bill.",
+            "_score": 40, "_section": "Life"}
+    tel2 = {"outlet": "The Telegraph",
+            "headline": "Burnham to abstain from assisted dying vote",
+            "summary": "Burnham to abstain from assisted dying vote The Telegraph",
+            "_score": 10, "_section": "Life"}
+    if shortlist.cluster_lead_key(spuc) < shortlist.cluster_lead_key(tel2):
+        bad.append("fixing issuing broke relaying: SPUC's relay leads the Telegraph again")
+    return bad
+
+
+
+def test_common_words_do_not_cluster():
+    r"""Words half the day shares are not evidence that two headlines are one story.
+
+    Chris, 23.09.2026, marking up that morning's edition: "You missed all of these important
+    stories?" Christianity Today's "Does Trump 2.0 Care About Religious Freedom Abroad?" (the
+    Cissie Graham Lynch / IRF office piece) never reached the sheet. corroborate() had built
+    an x19 "story" anchored on First Liberty's three-word "Reflecting on Religious Freedom":
+    every headline containing "religious freedom" shared 2 of that anchor's 3 significant
+    words, cleared the 0.55 ratio, and collapsed under one line - the Pakistan Ahmadi ruling,
+    Trump appointing a pastor jailed in Turkey to USCIRF, Yom Kippur synagogue threats, a
+    Fiji constitution story, the CT piece and 13 more. Eighteen unrelated stories, one line,
+    and the one line's borrowed text was First Liberty on the Founders. same_story() had the
+    same flaw per section: the CT piece was flagged a duplicate of "A book for those who care
+    about religious freedom" on {about, care, freedom, religious}.
+
+    The corpus is built so the phrase words are COMMON (as they were: "religiou" 31, "freedom"
+    26, "care" 28, "about" 43 of 1,752 that morning). Genuine duplicates must still merge.
+    """
+    filler = ["Religious freedom report number %d from region %s" % (i, w)
+              for i, w in enumerate("alpha bravo charlie delta echo foxtrot golf hotel india "
+                                    "juliet kilo lima mike november oscar papa quebec romeo "
+                                    "sierra tango uniform victor whisky xray yankee zulu".split())]
+    filler += ["Why we care about %s this week" % w for w in
+               "housing parks roads buses trains water power schools clinics libraries "
+               "museums bridges ports airports canals farms fishing forests mines rivers "
+               "lakes beaches".split()]
+    pairs_apart = [
+        ("Reflecting on Religious Freedom",
+         "Rights body condemns Pakistan court ruling upholding ban on Ahmadi literature, "
+         "warns of threat to religious freedom"),
+        ("Reflecting on Religious Freedom",
+         "Trump appoints pastor jailed in Turkey to US religious freedom commission"),
+        ("A book for those who care about religious freedom",
+         "Does Trump 2.0 Care About Religious Freedom Abroad?"),
+    ]
+    pairs_together = [
+        ("Supreme Court declines to intervene in custody dispute between California parents "
+         "and surrogate",
+         "US Supreme Court won't intervene in custody dispute between California couple and "
+         "surrogate"),
+        ("Two men arrested over suspected terror plot to target Jewish community in Manchester",
+         "Two arrested over suspected terrorist plot to target the Jewish community in "
+         "Manchester"),
+    ]
+    bad = []
+    for want, pairs in (("apart", pairs_apart), ("together", pairs_together)):
+        for ha, hb in pairs:
+            rows = [{"headline": h, "outlet": "o%d" % i, "_section": "Life", "_score": 5}
+                    for i, h in enumerate(filler)]
+            a = {"headline": ha, "outlet": "xa", "_section": "Life", "_score": 5}
+            b = {"headline": hb, "outlet": "xb", "_section": "Life", "_score": 5}
+            rows = [a] + rows + [b]
+            corr = shortlist.corroborate(rows)
+            merged_corr = corr[id(a)][1] is corr[id(b)][1]
+            marks = shortlist.cluster_duplicates(rows)
+            merged_dup = (id(a) in marks and id(b) in marks
+                          and ("TAKE THIS ONE" in marks[id(a)]) != ("TAKE THIS ONE" in marks[id(b)]))
+            for path, merged in (("corroborate", merged_corr), ("same_story", merged_dup)):
+                if merged != (want == "together"):
+                    bad.append("%s %s, want %s: %s | %s"
+                               % (path, "merged" if merged else "apart", want, ha[:34], hb[:34]))
+    return bad
 
 def test_source_tier_not_substring():
     r"""SOURCE_TIER is matched by substring, and "the times" is a substring of others.

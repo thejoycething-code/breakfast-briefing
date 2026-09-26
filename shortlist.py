@@ -58,6 +58,17 @@ SECTIONS = [
             # definition; the phrase has no other use.
             r"|freedom of religion|\bFoRB\b|conscientious objection"),
         (4, r"church (attack|burn|bomb|raid|demolish|clos)|attack on (a )?church"
+            # Any faith's place of worship, 27.09.2026: two reports of the Ontario synagogue
+            # shooting had no section, because only the church form existed. Anchored to a
+            # violent verb, so a synagogue's fundraiser or a mosque planning row stays in
+            # Church & Religion.
+            r"|(attack|shooting|shot|gunm[ae]n|opened fire|bomb|arson|firebomb|stabb|torch)"
+            r"\w*\b.{0,40}(synagogue|mosque|temple|gurdwara)"
+            r"|(synagogue|mosque|temple|gurdwara)s?\b.{0,20}(attack|shooting|arson|bomb)"
+            r"|antisemitic (attack|threat|assault|abuse)"
+            # The Easter Sunday bombings (Sri Lanka, 2019) targeted churches; neither report
+            # of the 25.09.2026 sentencing said "church" or "Christian".
+            r"|easter (sunday )?(bomb|attack|massacre)|(bomb|attack)\w*\b.{0,30}\beaster\b"
             r"|christians? (killed|kidnapp|abduct|jailed|imprison|arrest|detain|shot)"
             r"|(kill|murder|massacr|abduct|kidnap|behead|slaughter)\w*\b.{0,30}"
             r"(christian|catholic|worshipper|churchgoer|believer)s?"
@@ -179,6 +190,23 @@ SECTIONS = [
             # fell to Other. Chris, 17.08.2026: the ruling "should have stood as a free speech
             # issue" - so the subject matter has to carry it, not the wording of one headline.
             r"|social media ban|age verification|online safety|digital id"
+            # Chris, 24.09.2026: the US warning Australia over its social-media rules was
+            # missed. WORLD's "U.S. criticizes Australia's proposed digital safety legislation"
+            # matched nothing and sat in NO SECTION MATCHED - "digital safety" is the same
+            # speech-regulation beat as "online safety", worded the Australian way.
+            r"|digital (safety|services) (law|legislation|bill|act|rules|code)"
+            # 27.09.2026, four shapes that had no vocabulary (see testcases.txt): security
+            # and cyber laws, which are how most states now regulate speech; jailing over
+            # private communications; detaining journalists; and platform bosses facing
+            # criminal liability for content.
+            r"|(cyber ?security|cybercrime|anti-?terror\w*|foreign agents?|sedition"
+            r"|national security) (law|bill|act|legislation|ordinance)"
+            r"|(jail|imprison|sentenc|detain|arrest)\w*\b.{0,40}\b(over|for) (their |his |her )?"
+            r"(private )?(phone calls?|messages?|reporting|articles?|lyrics|cartoons?)"
+            r"|journalists?\b.{0,30}\b(detained|arrested|jailed|sentenced|charged|held)"
+            r"|(detain|arrest|jail)\w*\b.{0,20}\bjournalists?\b"
+            r"|social media\b.{0,50}\b(criminally liable|criminal liability)"
+            r"|social media (law|legislation|rules|regulation|code)s?\b"
             r"|(block|strike|struck|overturn)\w*\b.{0,24}(ban on|ban for|speech|expression)"),
         # Verbs and objects both widened 20.08.2026. Chris moved The Federalist's UK
         # speech-ban story to Free Speech; the Daily Wire's version of the same story
@@ -273,9 +301,20 @@ SECTIONS = [
             # "born alive" matched nothing at all, so the Daily Telegraph's "10,000 booties on
             # lawn in 'born alive' bill push" fell into NO SECTION MATCHED (Chris, 17.08.2026).
             r"|born.?alive|infanticide|viability (limit|threshold)|late-?term"
-            r"|conscientious objection|foeticide|feticide"),
+            r"|conscientious objection|foeticide|feticide"
+            # "aborted" and the pregnancy-loss vocabulary, 27.09.2026: Live Action's
+            # "Aborted baby's estate is awarded monetary damages" and CARE's "bereavement
+            # leave for pregnancy loss" both scored nothing. A court ordering a child to
+            # "carry (a) pregnancy" is an abortion ruling that never says the word.
+            r"|\baborted\b|abortionist|pregnancy loss|baby loss|miscarriage|stillbirth"
+            r"|carry (a |the |her )?pregnancy|terminat\w* (a |the |her )?pregnanc"),
         (6, r"assisted (dying|suicide|death)|euthanas|\bMAiD\b|\bMAID\b|right to die"
-            r"|dignity in dying|end of life|palliative|hospice|lethal (drug|prescription)"),
+            r"|dignity in dying|end of life|palliative|hospice|lethal (drug|prescription)"
+            # Word forms, 27.09.2026 (see testcases.txt, 25.09.2026 edition). The space-only
+            # "assisted (dying|...)" dropped AP's "Assisted-dying law goes into effect in
+            # Illinois"; "euthanas" never matched euthanized/euthanised; and "medical aid in
+            # dying" is the US statutory name, used alone in two headlines that day.
+            r"|assisted-(dying|suicide|death)|euthani[sz]|aid in dying"),
         (6, r"surrogac|surrogate|\bIVF\b|embryo|egg freezing|fertility (treatment|clinic|doctor)"
             r"|designer bab|gene edit|three.parent|artificial womb|sperm donor"),
         # Three gaps found 19.08.2026, all in NO SECTION MATCHED:
@@ -295,7 +334,9 @@ SECTIONS = [
             r"|cathedral|parish|vicar|curate|lambeth|canterbury|york minster"),
         (4, r"\bpope\b|vatican|papal|leo xiv|cardinal|conclave|holy see|encyclical"
             r"|canon law|catholic (church|bishops|conference)|magisterium"),
-        (3, r"\bchurch(es|goer|going)?\b|christian|catholic|evangelical|protestant"
+        # churchgoers? - the plural was missing, so "Half of younger churchgoers say..."
+        # had no section (27.09.2026).
+        (3, r"\bchurch(es|goers?|going)?\b|christian|catholic|evangelical|protestant"
             r"|orthodox|baptist"
             r"|methodist|presbyterian|congregation|pastor|priest|clergy|chaplain"
             # "Mass" but NOT "Mass." — the abbreviation for Massachusetts. Found 28.08.2026
@@ -310,6 +351,7 @@ SECTIONS = [
         # all (found 19.08.2026). Same class of bug as law/laws below.
         (3, r"faith[- ](leader|group|school|community|based)|religion|religious"
             r"|secular|atheis|humanist|islam|muslim|jewish|judaism|hindu|sikh"
+            r"|synagogue|mosque|gurdwara|\brabbi"
             r"|church attendance|churchgoing|belief"),
         # Marian vocabulary was absent entirely: Poland unveiling Europe's tallest statue of
         # the Virgin Mary matched nothing (19.08.2026), and three outlets carried it.
@@ -442,7 +484,11 @@ OTHER_SPLIT = [
      re.compile(r"migrant|migration|asylum|immigration|immigrant|border|deport|refugee"
                 r"|\bICE\b|smuggl|people.smugg|channel crossing|small boat|dinghy"
                 r"|visa\b|citizenship|naturalis|resettle|hotel(s)? (for|housing)"
-                r"|illegal alien|undocumented|sanctuary (city|state)", re.I)),
+                r"|illegal alien|undocumented|sanctuary (city|state)"
+                # 27.09.2026: trafficking gangs, the UK-France returns deal and birth
+                # tourism each passed OTHER_ALLOW and then found no theme here.
+                r"|human trafficking|trafficking (gang|ring|network)|trafficked"
+                r"|channel (deal|treaty|agreement)|one.in,? one.out|birth tourism", re.I)),
     ("Politics, Government & Society",
      # \bvotes?\b/\bvoting\b: "voter" was here but not "vote", so TVP World's "Fedorov calls
      # for wartime vote" reached no section while the same story from The European Conservative
@@ -516,7 +562,23 @@ OTHER_SPLIT = [
                 # publisher tag alone (20.08.2026). This can only pull items OUT of the
                 # residual bucket; it cannot take one from a real section, because
                 # other_section runs only when nothing else scored.
-                r"|politic", re.I)),
+                r"|politic"
+                # The state's money and its devolved governments, 27.09.2026: "Conservatives
+                # pledge to cut benefits for the long-term unemployed", "20 million adults
+                # don't pay income tax" and GOV.UK's £1.5bn offer to the Northern Ireland
+                # Executive all passed OTHER_ALLOW on benefits/tax/government and then had
+                # no theme. "conservatives" is here because the pattern above only knew the
+                # party by "conservative party" and "tory". Care homes and social care are
+                # public provision, the same beat as the NHS inquiries above.
+                r"|conservatives\b|\bbenefits? (cut|crackdown|claimants?|bill|system|cap)"
+                r"|long-term unemployed|universal credit|\bwelfare\b"
+                r"|\b(income|council|inheritance|wealth|mansion) tax\b|\btaxpayers?\b"
+                r"|stormont|northern ireland executive|holyrood|senedd|devolved"
+                r"|care homes?\b|social care"
+                # Community flashpoints: flag burning and religious slogans at a protest or
+                # attack. The 25.09.2026 Union flags trial led the Slack five and reached no
+                # section at all.
+                r"|union (jack|flag)s?|flag[- ]burn|burn\w* .{0,25}flags?\b|allahu akbar", re.I)),
 ]
 
 SECTION_NAMES = ([name for name, _ in SECTIONS]
@@ -559,6 +621,13 @@ SOURCE_HINTS = {
         # nothing scored - her press-regulation reporting still goes to Free Speech on its
         # own words, which testcases.txt pins.
         "charlotte gill",
+    ],
+    # 27.09.2026: the Church Times had no hint, so "Survivor Support Fund to be launched" -
+    # a church safeguarding story with no church word in its headline - reached no section.
+    # Consulted only when nothing scored, and its job adverts are chaffed by CHAFF_HARD's
+    # vacancy rule before they get here.
+    "Church & Religion": [
+        "church times",
     ],
 }
 SOURCE_BOOST = 4
@@ -630,7 +699,16 @@ CHAFF_HARD = re.compile(
     r"|radio show|daily broadcast|\| \d{1,2}-\d{1,2}-\d{2}|– \d{1,2}[-/]\d{1,2}[-/]\d{2}"
     r"|reflection for|daily devotion|verse of the day|prayer of the day"
     r"|quiz:|\brecipe|horoscope|lottery|deals? of the day|\d+ things|top \d+|best \d+"
-    r"|fringe (comedy )?review|album review|restaurant review|theatre review|gig review",
+    r"|fringe (comedy )?review|album review|restaurant review|theatre review|gig review"
+    # Newspaper notices pages (24.09.2026), brought in by the Times topic searches: they
+    # match "marriage", "death" and "church" and are never news. Anchored at the start,
+    # so a story that merely mentions the Court Circular is untouched.
+    r"|^births, marriages and deaths\b|^court circular\b"
+    # The Church Times job board (27.09.2026): "Vicar vacancy in South East" ran as a
+    # Church & Religion candidate three times on 25.09.2026. Anchored to the advert's own
+    # shape - "<role> vacancy in <place>" - so "vacancy rates" and a bishopric left vacant
+    # are untouched.
+    r"|\bvacanc(y|ies) in (the )?[A-Z]\w+",
     re.I)
 
 
@@ -919,6 +997,10 @@ BLOCKED_OUTLETS = re.compile(
     # display name rather than the URL.
     r"|truth[- ]?nigeria|24-7[- ]?press[- ]?release|this[- ]?day|\bzenit\b"
     r"|evangelical[- ]?times"
+    # The Times' job board (24.09.2026): teacher and care-worker adverts that the Times
+    # topic searches bring in under site:thetimes.com. Also blocked at fetch time in
+    # extra_feeds.txt; this is the backstop if an advert arrives under the bare domain.
+    r"|times[- ]?appointments"
     # Chris's markup on the TEST 20260824 draft: "Drop this source completely" (Voice of
     # Emirates, which arrives under its Arabic masthead), "Drop as a source" (Rediff, AOL.com)
     # and "This is a repeat from previous days. Also drop as a source." (China Daily). All
@@ -992,7 +1074,11 @@ GOSSIP = re.compile(
     r"bombshell|make-?or-?break|explodes amid|breaks? (her |his |their )?silence"
     r"|prenup|hidden detail|secret (wedding|romance|deal talks)|controversial marriage"
     r"|recalls? family opposition|opens? up about (her|his|their) (marriage|divorce|split)"
-    r"|spotted (with|together)|steps out with|cosy|cozy up|sparks .{0,20}rumou?rs"
+    r"|spotted (with|together)|steps out with|sparks .{0,20}rumou?rs"
+    # "cosy" is the celebrity-romance framing; "cosying up to" is a political idiom, and
+    # the bare word binned the Telegraph's "Labour is playing a dangerous game by cosying
+    # up to the Muslim Council for Britain" as gossip (25.09.2026).
+    r"|\bcos(y|ier|ied|ying)\b(?! up to)|\bcoz(y|ying) up with"
     r"|fuels .{0,20}rumou?rs|inside .{0,30}(marriage|divorce|split)|marriage hell"
     r"|\| bollywood|year-younger|age-shaming|wedding certificate|marriage decision"
     r"|i married the wrong|love life|dating history|ex-?wife|ex-?husband", re.I)
@@ -1001,7 +1087,7 @@ ENTERTAINMENT_DESKS = re.compile(
     # "etimes" is the Times of India's entertainment vertical and MUST stay anchored:
     # unanchored it is a substring of "thetimes.com", which silently chaffed every Times
     # item that did not trip CIVIC_MARRIAGE (found 14.09.2026 - see testcases.txt).
-    r"telangana today|news18|pinkvilla|koimoi|bollywood hungama|filmfare|etimes"
+    r"telangana today|news18|pinkvilla|koimoi|bollywood hungama|filmfare|\betimes\b"
     r"|hindustan times.*bollywood|zoom tv|india forums", re.I)
 
 
@@ -1176,6 +1262,11 @@ OTHER_INTEREST = re.compile(
     # same morning, which is precisely the landfill this gate exists to prevent - so the
     # radicalisation sense is anchored to an online/ideological referent.
     r"|radicalis|radicaliz|violent extremis|counter-?extremis"
+    # Terrorism and atrocity crimes, 27.09.2026: a Briton killed in a terrorist attack and a
+    # UK doctor charged over the Rwandan genocide both passed OTHER_ALLOW and were refused
+    # here for lacking a subject.
+    r"|terror(ist|ism)? (attack|plot|cell)|killed by (terrorists|jihadists|isis)"
+    r"|genocide|war crimes?|crimes against humanity"
     r"|extremis\w*\b.{0,25}(online|content|propaganda|material|network)"
     r"|(online|social media|internet)\b.{0,30}extremis", re.I)
 
@@ -1213,7 +1304,10 @@ OTHER_ALLOW = re.compile(_ML_OTHER.lstrip("|") + "|" +
     r"|defend|missile|ukraine|russia|nato|zelensky|putin|gaza|israel|iran|hamas"
     # and religious-practice words the Church section does not itself carry
     # ("Adult baptisms increase in Germany as overall numbers continue to decline").
-    r"|baptis|congregation|parish|seminar(y|ians)|ordination|vocations",
+    r"|baptis|congregation|parish|seminar(y|ians)|ordination|vocations"
+    # 27.09.2026: "Tim Scott Seeks to Shut Down Birth Tourism Pipeline" failed this gate
+    # before the Immigration split could see it.
+    r"|birth tourism|trafficking",
     re.I)
 
 
@@ -1762,6 +1856,27 @@ def _dev_matches(headline):
     return out
 
 
+# A court HEARING is its own event (Chris, 24.09.2026). The White House media ban ran on
+# 21-22.09; the hearing on 23.09 was flagged as a repeat of the ban's announcement, three
+# lines out of ~15, and never ran. Used by ran_before ONLY, not by the within-day clusterer:
+# across days "the judge heard it" versus "the ban was announced" is two moments, while
+# within one day a hearing report and a DOJ-brief report are the same news.
+#
+# Deliberately narrow - the judge acting in the courtroom, not any mention of a court.
+# "court" alone would split "Court blocks Illinois assisted suicide mandate" from "Illinois
+# agrees to pause enforcement", which testcases.txt holds as one story. Two headlines that
+# BOTH report the hearing are on the same side and still match.
+COURT_HEARD = re.compile(
+    r"\bjudges?\b[^.]{0,40}\b(hears?|heard|questions?|questioned|skeptical|sceptical"
+    r"|weighs?|rebukes?|rebuked|grills?|grilled|presses|pressed|appears)\b"
+    r"|\b(will not|won'?t|did not|does not) (yet )?rule\b|\bwithout (immediately )?ruling\b"
+    r"|\bhears? arguments?\b|\boral arguments?\b|\bat (a |the )?hearing\b", re.I)
+
+
+def _court_heard(headline):
+    return bool(COURT_HEARD.search(headline or ""))
+
+
 def is_development_of(a, b):
     """True when two same-subject items report DIFFERENT stages, not the same moment.
 
@@ -1787,6 +1902,58 @@ def is_development_of(a, b):
     return bool(da ^ db) and not (da & db)
 
 
+# --- Common words are not evidence of a shared story (Chris, 23.09.2026) -------------------
+# Word overlap measured "these headlines use the same words", and on a day when thirty
+# headlines say "religious freedom" that is not the same thing as "these are one story".
+# First Liberty's "Reflecting on Religious Freedom" has three significant words; every
+# headline containing the phrase shared two of them, cleared the 0.55 ratio, and corroborate()
+# built an x19 cluster of eighteen unrelated stories printed as one line. Christianity
+# Today's piece on Cissie Graham Lynch and the IRF office was one of them and never reached
+# the sheet. See test_common_words_do_not_cluster.
+#
+# So a word-overlap merge needs at least COMMON_MIN_DISTINCT shared word that is NOT used by
+# a large slice of the day's headlines.
+# Measured on 23.09.2026: "religiou" 31, "freedom" 26, "care" 28, "about" 43, "court" 95 of
+# 1,752 headlines. The same asymmetry as ENTITY_COOCCUR_MIN applies: a missed merge costs
+# one extra line to read, a wrong merge hides stories, so this errs towards keeping apart.
+# Measured both settings on 23.09.2026's 1,318 placed candidates. At 2 it broke 20 clusters,
+# half of them genuine (the SCOTUS surrogacy reports, the White House pool boycott, B.C.'s
+# snap election). At 1 it breaks exactly two: the x19 religious-freedom cluster, and three
+# "White House launches Trump TV" reports whose only shared words are all common - one
+# extra line on the sheet, which is the cheap side of the trade.
+#
+# The table is set per corpus by set_common_words(), which corroborate() calls on the whole
+# day. A two-headline fixture never reaches the floor, so every SAMESTORY/NOCLUSTER case in
+# testcases.txt is judged exactly as before.
+COMMON_DF_MIN = 15
+COMMON_DF_FRAC = 0.012
+COMMON_MIN_DISTINCT = 1
+_COMMON_WORDS = None
+
+
+def set_common_words(rows):
+    """Record which significant words are common across this corpus. Returns the set."""
+    global _COMMON_WORDS
+    df = collections.Counter()
+    for it in rows:
+        df.update(sig_words(it.get("headline") or ""))
+    floor = max(COMMON_DF_MIN, COMMON_DF_FRAC * len(rows))
+    _COMMON_WORDS = {w for w, n in df.items() if n >= floor}
+    return _COMMON_WORDS
+
+
+def words_overlap_enough(wa, wb):
+    """The word-overlap arm shared by same_story() and corroborate(). One rule, two callers."""
+    if not wa or not wb:
+        return False
+    shared = wa & wb
+    if not (len(shared) / max(1, min(len(wa), len(wb))) >= 0.55 or len(shared) >= 5):
+        return False
+    if _COMMON_WORDS:
+        return len(shared - _COMMON_WORDS) >= COMMON_MIN_DISTINCT
+    return True
+
+
 def same_story(a, b, wa, wb, shared_entities):
     """Word overlap as before, OR a distinctive shared entity plus a little topical overlap."""
     # Never cluster across sections. The French Constitutional Council ruled on assisted dying
@@ -1799,10 +1966,8 @@ def same_story(a, b, wa, wb, shared_entities):
         return False
     if is_development_of(a, b):
         return False
-    if wa and wb:
-        overlap = len(wa & wb) / max(1, min(len(wa), len(wb)))
-        if overlap >= 0.55 or len(wa & wb) >= 5:
-            return True
+    if words_overlap_enough(wa, wb):
+        return True
     if shared_entities:
         # A name alone is not enough - Farage on Clacton and Farage on welfare are two
         # stories. Require the name plus THREE other significant words in common.
@@ -2055,6 +2220,8 @@ def ran_before(item, history, ents=None):
             continue
         if is_development_of(item, past):
             continue
+        if _court_heard(headline) != _court_heard(past.get("headline") or ""):
+            continue
         if best is None or past["date"] > best["date"]:
             best = past
     return best
@@ -2084,6 +2251,8 @@ def unify_clusters(rows):
     stories aren't grouped". A story is one thing and belongs in one place, so clustering now
     happens across the whole day and the lead decides where the cluster lives.
     """
+    if _COMMON_WORDS is None:          # main() has already set it from the whole day
+        set_common_words(rows)
     sets = [(it, sig_words(it["headline"]), ent_tokens(it["headline"])) for it in rows]
     ents = entity_index(rows)
     seen, moved = set(), 0
@@ -2269,6 +2438,7 @@ def corroborate(rows):
     stating precisely, because the whole US-cap exemption turned on this contract and it was
     documented only at a call site.
     """
+    set_common_words(rows)
     sets = [(it, sig_words(it["headline"])) for it in rows]
     seen, out = set(), {}
     for i, (a, wa) in enumerate(sets):
@@ -2279,7 +2449,7 @@ def corroborate(rows):
         for b, wb in sets[i + 1:]:
             if id(b) in seen or len(wb) < 3:
                 continue
-            if len(wa & wb) / max(1, min(len(wa), len(wb))) >= 0.55 or len(wa & wb) >= 5:
+            if words_overlap_enough(wa, wb):
                 group.append(b)
                 seen.add(id(b))
         # Relaying items sort LAST, whatever they score. This is the selection that decides
@@ -2947,6 +3117,12 @@ POLITICIAN_LEGAL = re.compile(
     r"\b(MPs?|MLA|MSP|senator|congressman|councillor|mayor|minister|governor)\b", re.I)
 
 
+# A political party as the grammatical subject, acting. Used only on a WEAK Church score.
+PARTY_ACTS = re.compile(
+    r"^(labour|the tories|tories|conservatives|reform( uk)?|lib dems|the snp|snp|plaid"
+    r"|the dup|dup|sinn f[eé]in|greens|the greens|republicans|democrats)\b", re.I)
+
+
 # Religious-liberty litigators. Deliberately NOT in SOURCE_HINTS: that list is consulted
 # when nothing scored at all, and on 20.08.2026 putting them there swept a First Liberty piece
 # on Supreme Court term limits and its dated newsletter index into Religious Freedom. Used only
@@ -3250,6 +3426,14 @@ def classify(headline, outlet, categories=None, text=""):
         # overridden, so anything that genuinely scored elsewhere is untouched.
         if church[0][0] <= 3 and outlet and LIBERTY_LITIGATORS.search(outlet):
             return "Religious Freedom & Persecution", church[0][0]
+        # A party ACTING on a faith body is party politics, not church news (27.09.2026):
+        # the Telegraph's "Labour is playing a dangerous game by cosying up to the Muslim
+        # Council for Britain" scored only the bare "Muslim". Same WEAK-score guard as the
+        # two overrides around it, so a party story that genuinely scores for Church stays.
+        if church[0][0] <= 3 and PARTY_ACTS.search(headline):
+            routed = other_section(headline)
+            if routed != "Other":
+                return routed, church[0][0]
         if church[0][0] <= 3 and POLITICIAN_LEGAL.search(headline):
             routed = other_section(headline)
             if routed != "Other":

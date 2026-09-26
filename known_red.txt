@@ -15,3 +15,21 @@
 # the section and the case went green. The stale-waiver check is what forced the deletion:
 # it failed the run the moment the waiver stopped matching anything, which is the behaviour
 # that stops this file rotting into standing permission.
+
+# --- Chris, 15.09.2026: an ISSUING primary source does not lead the sheet ------------------
+# Sex Matters' own analysis of the NSPCC changing-room guidance lost its cluster to The
+# Telegraph's write-up, so the sheet printed a paywalled headline with no text, the story
+# read as yesterday's repeat, and the cluster was dropped. It reached the Doc only because
+# compose.py's COVERAGE check flagged "Sex Matters 1 unpicked" after publication.
+#
+# Waiting on: cluster_lead_key gaining a PRIMARY_SOURCE term. It currently has one only in
+# the negative - it DEMOTES a relaying primary (31.08.2026) but nothing promotes an issuing
+# one, so the tie falls through to rank_score and keyword vocabulary decides provenance.
+# cluster_rank already has the term, which is why the section list flagged the right item
+# and the sheet did not.
+#
+# Delete this entry when: test_cluster_lead_prefers_an_issuing_primary passes WITHOUT
+# test_cluster_relay_not_primary regressing. Both halves are the same rule; a fix that
+# satisfies issuing by dropping relaying is not a fix, and that case is asserted inside
+# this test so it cannot be traded away silently.
+cluster-provenance failure(s), issuing

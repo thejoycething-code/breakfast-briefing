@@ -1301,6 +1301,27 @@ DEVELOPMENT no  | Gloria Steinem, feminist and abortion-rights advocate, dies at
 # swallow them.
 DEVELOPMENT yes | Trump returns from golf club to gripe on Truth Social about Kennedy Center ::vs:: Trump Loses It at Judge in Unhinged Kennedy Center Meltdown
 
+# 14.09.2026 - "etimes" was unanchored, so thetimes.com matched ENTERTAINMENT_DESKS.
+#
+# Found on the morning the Commons rejected the assisted dying bill: seven Times pieces on
+# that vote - the single biggest UK story of the weekend - were sitting in the CHAFF bucket,
+# along with every other thetimes.com item that did not happen to trip CIVIC_MARRIAGE. The
+# token is the Times of India's entertainment vertical (etimes.indiatimes.com); as a bare
+# substring it is inside "th-etimes-.com", so the block had been silent and total since the
+# outlet started arriving under that display name. This is the failure the Telegraph/Times
+# benefit-of-the-doubt rule assumes cannot happen: that rule only helps an item that REACHES
+# the sheet, and these never did.
+#
+# Written RED before ENTERTAINMENT_DESKS is touched. Anchor the token, do not special-case
+# the headline - the Times of India vertical must stay blocked.
+KEEP | thetimes.com | Britain once led but assisted dying vote is backwards step
+KEEP | thetimes.com | The fatally flawed assisted dying bill should not be resurrected
+KEEP | thetimes.com | Times letters: Doctors' qualms about assisted dying
+KEEP | thetimes.com | Assisted dying campaigner plans 'Swiss pop-up advice office' in UK
+# The guard: the vertical this token was written for stays suppressed.
+SUPPRESS | etimes | Inside Virat Kohli and Anushka Sharma's marriage: the hidden detail fans missed
+SUPPRESS | etimes.indiatimes.com | Bollywood star opens up about her marriage and dating history
+
 # --- 16.09.2026: a public inquiry reporting reached NO SECTION AT ALL -----------------------
 # The Thirlwall Inquiry into Lucy Letby reported on 15.09 and the whole cluster - both GOV.UK
 # primary documents, the Times, BBC and Telegraph reports and the doctor's reaction - landed in
@@ -1337,3 +1358,114 @@ SECTION None | Belfast News Letter | Man charged after murder inquiry launched i
 # four-member inquiry committee", 27.08). Foreign and minor, but section is not importance;
 # ranking is what handles that.
 SECTION Politics, Government & Society | The News International | Electrical failure most likely cause of deadly Pims blaze, says inquiry report
+
+# --- Chris, 24.09.2026: markup of the 24.09 edition ----------------------------------------
+# (1) A court HEARING in a running fight is a new event, not a repeat of the fight. The White
+# House media ban ran 21-22.09; the hearing on 23.09 arrived as ~15 separate lines and three
+# of them were flagged SAME STORY against the ban's announcement, which read as "already
+# covered" and the hearing never ran. Chris named WaPo's piece on the ban standing on shaky
+# legal ground. These are the three flagged pairs, verbatim from the 24.09 sheet.
+NOTRANBEFORE | Judge hears arguments without immediately ruling in lawsuit over White House ban on 3 news outlets ::was:: Trump To Ban Left-Wing News Outlets From White House ::entity::
+NOTRANBEFORE | Judge Will Not Yet Rule on White House Stripping Media Outlets of Credentials: 'As Soon As I Can' ::was:: Trump To Ban Left-Wing News Outlets From White House ::entity::
+NOTRANBEFORE | Judge Rebukes Trump Over Botched White House Media Ban ::was:: Obama blasts Trump’s ‘unimaginable’ White House media ban ::entity::
+# ...but two reports of the SAME hearing are one story and must still match.
+RANBEFORE | Judge skeptical of Trump's White House media ban at hearing ::was:: Trump-appointed judge skeptical of White House media ban at hearing
+# (2) Censorship is a Free Speech story wherever it happens. Both of these reached no
+# section at all or were read past; the Australia story sat in NO SECTION MATCHED.
+SECTION Free Speech & Civil Liberties | wng.org | U.S. criticizes Australia’s proposed digital safety legislation
+SECTION Free Speech & Civil Liberties | The Hill | US warns Australia over social media censorship
+SECTION Free Speech & Civil Liberties | The Economist | Is China easing some online censorship?
+
+# --- Chris, 24.09.2026: sweep keyword filter gains vocabulary from the parl-monitor taxonomy -
+# Ofcom was requested by name: Guido's piece below reached the Doc only because the Daily
+# Sceptic's write-up of it happened to say "BBC". The rest were chosen from parl-monitor's
+# config/taxonomy.yaml v1.8 by measurement: of 2,556 in-window headlines from the filtered
+# feeds on 24.09, 1,862 were dropped. These six were dropped and are on-beat, verbatim.
+KEYWORD keep | Ofcom Accused of Covering Up Data Showing Viewers Trust GB News More Than BBC
+KEYWORD keep | Andy Burnham announces new unit to tackle Russian ‘lies and disinformation’
+KEYWORD keep | 19 Glasgow properties raided in massive operation to curb human trafficking gang
+KEYWORD keep | EU accused of hypocrisy after bloc copies Britain's Rwanda scheme despite labelling it 'extreme'
+KEYWORD keep | Prospect of social media company directors being held criminally liable raised by TDs
+# Precise taxonomy terms that matched nothing that day but name a live campaign front. A
+# headline carrying only this vocabulary would be dropped before any section saw it.
+KEYWORD keep | Grooming gangs inquiry chair named
+KEYWORD keep | Small boats: 600 cross in a single day
+KEYWORD keep | Cass Review author warns NHS on adult gender clinics
+KEYWORD keep | Stillbirth registration bill clears the Lords
+KEYWORD keep | Two-child limit to be scrapped in the Budget
+# ...and it is still a filter. Both of these came back from the new Telegraph topic searches
+# (Google matches the article body) and must die at fetch time.
+KEYWORD drop | Eric Cantona: I would never have signed for Man Utd under Sir Jim Ratcliffe
+KEYWORD drop | An insider’s guide to planning the perfect winter city break in Lucerne
+
+# --- Chris, 24.09.2026: Times topic searches, and what they drag in ------------------------
+# The Times reaches the sweep only via Google News (its sitemap is off-limits, see
+# extra_feeds.txt). Topic-scoped searches took on-beat items from 11 to 45, and brought two
+# kinds of noise with them. Its job board sits under the same site: and Google files it as
+# a separate source, "The Times Appointments" - teacher and care-worker adverts that pass
+# the keyword filter on "teacher", "school" or "church" - so it is blocked as a source.
+BLOCKED | The Times Appointments
+# The daily notices pages match "marriage", "death" and "church" and are not news.
+SUPPRESS | The Times | Births, marriages and deaths: September 24, 2026
+SUPPRESS | The Times | Court Circular: September 24, 2026
+# ...and the journalism must still come through - these arrived by the same searches.
+KEEP | The Times | Potty humour no answer to single-sex spaces debate
+KEEP | The Times | Marriages are lasting longer. Marrying later in life could be key
+
+# --- 25.09.2026 edition: rescued by hand from NO SECTION MATCHED and CHAFF -----------------
+# Chris, 27.09.2026: fix what fell through. Every one of these was real news on the day and
+# reached the edition only because it was picked out of the two SUPPRESSED blocks by hand;
+# one (the Union flags trial) went on to lead the Slack five. Most are WORD-FORM misses in
+# patterns that already name the subject: the Life pattern had "assisted (dying|suicide)"
+# with a SPACE, so AP's "Assisted-dying law goes into effect in Illinois" scored nothing;
+# "euthanas" matched euthanasia but not euthanized; "aborted" was absent; the Church
+# pattern's church(es|goer|going)? had no plural, so "churchgoers" missed.
+SECTION Life | AP News | Assisted-dying law goes into effect in Illinois after impassioned debate
+SECTION Life | KHQA | More local hospitals opt out of IL medical aid in dying law
+SECTION Life | MedPage Today | Medical Aid in Dying Keeps Expanding to More States
+SECTION Life | liveaction.org | UNPRECEDENTED: Aborted baby's estate is awarded monetary damages in lawsuit
+SECTION Life | New York Post | Grandma allegedly euthanized against her will died 'covered in her own blood' after botched first attempt
+SECTION Life | Christian Action Research and Education | Government announce bereavement leave for pregnancy loss
+SECTION Life | The Indian Express | Can’t be compelled to carry pregnancy, says J&K High Court on 11-year-old girl’s case
+SECTION Church & Religion | The Christian Post | Half of younger churchgoers say culture change makes some biblical truths 'obsolete'
+# An attack on a place of worship is persecution whichever faith it is. Only "church
+# (attack|burn|...)" existed, so two reports of the Ontario synagogue shooting had no section.
+SECTION Religious Freedom & Persecution | The Independent | Police say gunman shouted antisemitic threat before opening fire outside Ontario synagogue
+SECTION Religious Freedom & Persecution | The Globe and Mail | Belleville synagogue shooting was a ‘hate-motivated’ crime, police say
+# The Easter Sunday bombings targeted churches; a sentencing in that case is the persecution
+# beat, and neither headline says "church" or "Christian".
+SECTION Religious Freedom & Persecution | Christian Today | Cautious welcome as 15 men sentenced over Sri Lanka Easter Sunday bombings
+SECTION Religious Freedom & Persecution | Christian Solidarity Worldwide | High Court sentences 15 men for involvement in Easter Sunday bombings
+# State power over speech, in the shapes the Free Speech pattern did not have: security and
+# cyber laws, jailing over private communications, detaining journalists, and platform
+# bosses facing criminal liability.
+SECTION Free Speech & Civil Liberties | UCA News | 4 Cambodian activists jailed for 7 years over private phone calls
+SECTION Free Speech & Civil Liberties | UCA News | Bangladesh’s proposed cyber security law denounced as ‘repressive’
+SECTION Free Speech & Civil Liberties | UCA News | Sri Lanka’s new anti-terror law sparks outrage, criticism
+SECTION Free Speech & Civil Liberties | The Irish Times | Prospect of social media company directors being held criminally liable raised by TDs
+SECTION Free Speech & Civil Liberties | Stockholm Center for Freedom | Turkish journalist couple detained after reporting AKP lawmaker’s remarks thanking Öcalan
+# The residual splits. Each passed OTHER_ALLOW, found no split theme, and was refused by
+# plain Other for lacking a subject of its own - the Thirlwall shape again (16.09.2026).
+SECTION Immigration & Asylum | BBC UK | Police in Scotland arrest 36 in raids on Vietnamese crime gangs linked to human trafficking
+SECTION Immigration & Asylum | Mail Online UK | British taxpayers may have to pay £1billion to renew the UK's Channel deal with France
+SECTION Immigration & Asylum | The Daily Signal | Tim Scott Seeks to Shut Down Birth Tourism Pipeline
+SECTION Politics, Government & Society | The Times | Conservatives pledge to cut benefits for the long-term unemployed
+SECTION Politics, Government & Society | The Telegraph | It’s a disgrace that 20 million adults don’t pay income tax
+SECTION Politics, Government & Society | GOV.UK news | UK Government offers over £1.5bn to the Northern Ireland Executive
+SECTION Politics, Government & Society | The Telegraph | Exclusive: Sir Ranulph Fiennes kept in care home illegally
+SECTION Politics, Government & Society | Mail Online UK | Masked men shouted 'Allahu Akbar' and 'Free Palestine' as they tore down and burned pub's Union flags in an 'attack on the British people' two weeks after October 7, court hears
+SECTION Other | Sky News | 'Gallant' Briton killed in terrorist attack gave up place on helicopter
+SECTION Other | jurist.org | UK court charges doctor for offenses linked to 1994 genocide in Rwanda
+# CHAFF over-match: GOSSIP's "cosy" is there for "cosy night out with new beau", and it
+# swallowed the political idiom "cosying up to". The celebrity sense must still be chaff.
+SECTION Politics, Government & Society | The Telegraph | Labour is playing a dangerous game by cosying up to the Muslim Council for Britain
+SUPPRESS | Daily Mail | Reality star and new boyfriend look cosy at London restaurant
+# The Church Times had no source hint, so an item with no church word in its headline had no
+# section - and its job board was the opposite problem: "Vicar vacancy in South East" ran
+# as a Church & Religion candidate three times on 25.09.2026.
+SECTION Church & Religion | The Church Times | Survivor Support Fund to be launched
+SUPPRESS | The Church Times | Vicar vacancy in South East
+SUPPRESS | The Church Times | Deputy Director for Apostolic Life vacancy in South East
+# ...guards. The widened words must not pull in the shapes they were kept narrow against.
+SECTION None | CBS News | Frost Fund helps save animals from euthanasia with shelter transport trips
+KEEP | The Telegraph | Vacancy rates in council housing hit record high

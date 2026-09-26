@@ -201,6 +201,25 @@ KEYWORDS = [
     r"cristian", r"evang[eé]lic", r"evangelic", r"laicismo", r"laicit[aà]",
     r"misa\b", r"messa\b", r"oraci[oó]n", r"preghiera",
 
+    # From parl-monitor's config/taxonomy.yaml v1.8 (Chris, 24.09.2026). Measured first: of
+    # the taxonomy's ~390 terms, most are already caught here by a broader stem; these are
+    # the precise ones that are not. On 24.09 the filtered feeds dropped 1,862 of 2,556
+    # in-window headlines. The Ofcom, disinformation, human trafficking, Rwanda scheme and
+    # social media company lines in testcases.txt are dropped headlines from that day.
+    # The rest matched nothing that day and are here because each names a live campaign
+    # front. Every entry is a phrase or proper noun, so none can fire on ordinary traffic.
+    # Bare "social media" is NOT here: 4 matches that day, 1 on-beat (the same finding as
+    # the taxonomy's v1.8 note). It is only kept with a regulatory noun.
+    r"\bOfcom\b", r"\b(dis|mis)information\b", r"\bsmall[- ]boats?\b",
+    r"\bchannel crossings?\b", r"\b(grooming|rape) gangs?\b", r"\bonline safety\b",
+    r"\bage (verification|assurance)\b", r"\bdigital id\b", r"\bhate crimes?\b",
+    r"\bhuman trafficking\b", r"\bmodern slavery\b", r"\bbrothels?\b",
+    r"\bsex (work|workers?|buyers?)\b", r"\brwanda (scheme|plan|deal|policy)\b",
+    r"\b(forced|religious|anti-)conversions?\b", r"\bconversion (practices|therapy)\b",
+    r"\bcass review\b", r"\bistanbul convention\b", r"\bVAWG\b", r"\bequality act\b",
+    r"\bstill(birth|born)s?\b", r"\btwo-child (limit|benefit cap|cap)\b",
+    r"\bsocial media (bans?|laws?|rules|compan\w+|firms?|giants?|platforms?)\b",
+
     # Litigation. The ONLY procedural entry in this list — everything above names a subject,
     # these name a legal stage — so it was measured before being added rather than reasoned
     # about (Chris, 28.08.2026, on the Stars and Stripes lawsuit reaching us from nobody).
@@ -581,6 +600,37 @@ def parse_feed(raw):
         root = ET.fromstring(sanitise_xml(raw))
     tag = root.tag.split("}")[-1]
     out = []
+    if tag == "urlset":
+        # A Google News sitemap (24.09.2026). Complete for the last 48 hours, where a Google
+        # News search stops at 100 results. Use ONLY where the publisher's robots.txt
+        # permits us: the Times' sitemap was measured and rejected for exactly that reason
+        # (see extra_feeds.txt). A plain sitemap (no news:news block) has no headline, so it
+        # yields nothing rather than URLs as titles.
+        sm = "{http://www.sitemaps.org/schemas/sitemap/0.9}"
+        nw = "{http://www.google.com/schemas/sitemap-news/0.9}"
+        for u in root.findall(sm + "url"):
+            news = u.find(nw + "news")
+            if news is None:
+                continue
+            title = html_mod.unescape(_text(news.find(nw + "title")))
+            if not title:
+                continue
+            pub = news.find(nw + "publication")
+            kw = _text(news.find(nw + "keywords"))
+            out.append({
+                "title": title,
+                "link": _text(u.find(sm + "loc")),
+                # publication_date, not lastmod: lastmod moves on every correction, and a
+                # corrected three-day-old piece would re-enter the window as new.
+                "date": parse_date(_text(news.find(nw + "publication_date"))),
+                "author": "",
+                "source": _text(pub.find(nw + "name")) if pub is not None else "",
+                "source_url": "",
+                "feed_title": "",
+                "categories": [k.strip() for k in kw.split(",") if k.strip()],
+                "summary": "",
+            })
+        return out
     if tag == "rss" or root.find("channel") is not None:
         channel = root.find("channel")
         feed_title = _text(channel.find("title")) if channel is not None else ""
