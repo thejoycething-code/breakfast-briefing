@@ -324,6 +324,82 @@ def trusted_decode(hit, headline):
     return hit
 
 
+# --- Tidying a decoded link (27.09.2026) ------------------------------------------------
+# Google hands back the URL it would send a reader to, which is sometimes a tracked or AMP
+# variant of the article. Feed links have always been through fetch_feeds.clean_url; decoded
+# ones never were, so on the 27.09 test sweep 4 of 474 kept utm_/ref= trackers and 9 were
+# AMP copies. An AMP URL keys differently from its canonical, so the outlet's own feed copy
+# and the Google copy of one story did not dedupe, and the prefetcher read the AMP page.
+#
+# Trackers are stripped by the existing STRIP_PARAMS list - only when one is present, so a
+# clean URL stays byte-identical. AMP is NOT rewritten by pattern: that would be authoring a
+# link. The AMP page is fetched and its own rel=canonical copied, accepted only on the same
+# site and only if it is itself a non-AMP article URL. Anything less and the AMP link stays.
+_AMP_PATH = re.compile(r"(^|/)amp(/|$)|\.amp$", re.I)
+_AMP_QUERY = re.compile(r"(^|&)(amp(=1|=true)?|outputType=amp)(&|$)", re.I)
+_LINK_TAG = re.compile(r"<link\b[^>]*>", re.I)
+_REL_CANON = re.compile(r"""\brel\s*=\s*["']?canonical["'\s/>]""", re.I)
+_HREF = re.compile(r"""\bhref\s*=\s*["']([^"']+)["']""", re.I)
+
+
+def _is_amp(url):
+    try:
+        p = urllib.parse.urlsplit(url)
+    except ValueError:
+        return False
+    return (p.netloc.lower().startswith("amp.") or bool(_AMP_PATH.search(p.path))
+            or bool(_AMP_QUERY.search(p.query)))
+
+
+def _site(netloc):
+    return re.sub(r"^(www|amp|m)\.", "", netloc.lower().split(":")[0])
+
+
+def _page_canonical(body):
+    for tag in _LINK_TAG.findall(body or ""):
+        if _REL_CANON.search(tag):
+            m = _HREF.search(tag)
+            if m:
+                return html_mod.unescape(m.group(1)).strip()
+    return None
+
+
+def _fetch_text(url):
+    body = fetch_feeds.fetch(url, retry_uas=1)
+    return body.decode("utf-8", "replace") if isinstance(body, bytes) else body
+
+
+def tidy_decoded(url, fetch=_fetch_text):
+    """A decoded publisher URL with trackers stripped and an AMP copy replaced by the page's
+    own canonical. Returns the input unchanged whenever there is nothing safe to do."""
+    if not url:
+        return url
+    try:
+        p = urllib.parse.urlsplit(url)
+    except ValueError:
+        return url
+    if any(k in fetch_feeds.STRIP_PARAMS
+           for k, _ in urllib.parse.parse_qsl(p.query, keep_blank_values=True)):
+        url = fetch_feeds.clean_url(url)
+    if not _is_amp(url):
+        return url
+    try:
+        canon = _page_canonical(fetch(url))
+    except Exception:  # noqa: BLE001 - a blocked page keeps the AMP link, it does not fail
+        return url
+    if not canon:
+        return url
+    canon = urllib.parse.urljoin(url, canon)
+    try:
+        c = urllib.parse.urlsplit(canon)
+    except ValueError:
+        return url
+    if (c.scheme not in ("http", "https") or _site(c.netloc) != _site(p.netloc)
+            or _is_amp(canon) or _looks_like_index(canon) or _looks_truncated(canon)):
+        return url
+    return canon
+
+
 def decode_gnews(url):
     """The publisher URL behind a Google News redirect, straight from Google, or None.
 
@@ -518,6 +594,12 @@ def resolve_items(items, workers=8, use_cache=True, on_resolved=None, batch=BATC
 
     for it, url, cached in results():
         key = key_of(it)
+        # Tidied here, after the cache, so links cached before 27.09.2026 are tidied too; a
+        # changed result is written back so an AMP page is fetched for its canonical once.
+        if url:
+            tidy = tidy_decoded(url)
+            if tidy != url:
+                url, cached = tidy, False
         # Cache successes only. A cached *failure* is permanent: it pins the
         # miss to that headline forever, so a later run cannot benefit from a
         # transient block clearing or from the resolver getting better. That is

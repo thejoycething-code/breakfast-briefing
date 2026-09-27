@@ -2568,7 +2568,7 @@ def corroborate(rows):
         # the Telegraph's own report on keyword score alone - both are in SOURCE_TIER and
         # neither matched ACTION - and six national reports were invisible to the curator.
         # Fixing cluster_rank alone did not touch this path; see run_tests for both.
-        group.sort(key=cluster_lead_key)
+        choose_cluster_lead(group)
         # How many of the outlets on this story are ones Chris actually reads. Raw counts
         # measure general news bigness: an FBI visa-fraud sweep draws eight mainstream
         # outlets, while a Nigerian court freeing a Christian woman draws two movement
@@ -3157,8 +3157,75 @@ def cluster_lead_key(item):
        Ranked BELOW relay deliberately: provenance is a question about who published the
        document, this is only about whether the reader can open it.
     3. Then rank_score, as before.
+
+    corroborate() calls choose_cluster_lead(), which applies this key and then lifts a
+    primary source that ISSUED the story - published before every newsroom in the cluster -
+    to the front. That needs the whole group, so it cannot live in a per-item key.
     """
     return (relays_another_outlet(item), _link_is_unreadable(item), -rank_score(item))
+
+
+def _published_ts(item):
+    """The publisher's own timestamp as epoch seconds, or None when the feed gave no date.
+
+    age_h is None exactly when the feed was dateless; "published" then holds only the first
+    SIGHTING (fetch_feeds), which says when we looked, not when anyone published.
+    """
+    if item.get("age_h") is None or not item.get("published"):
+        return None
+    try:
+        import datetime as _dt
+        return _dt.datetime.fromisoformat(item["published"]).timestamp()
+    except ValueError:
+        return None
+
+
+def _issues_first(item, group):
+    """True if this is a primary source's own document, published before every newsroom in
+    the cluster. That is what "issuing" means in time: it came out, then they wrote it up.
+
+    Chris, 27.09.2026: "favour the earliest publisher". Sex Matters' NSPCC analysis went out
+    at 08:09 on 14.09, the Telegraph's story at 09:37, and the Telegraph led the sheet on
+    keyword score alone. Scoped to primary source vs the rest ON PURPOSE: earliest-first
+    across every cluster was replayed over 29 archived days and changed 984 of 2,847 leads,
+    mostly to aggregators and wire rewrites (Inbox.lv over the Christian Post, "News of the
+    United States" over the Washington Post) - being first is not provenance for a newsroom.
+    Scoped like this, the same 29 days change 7 leads, every one a primary source's own
+    release that predates the newsroom copy (Becket's Cupich suit over the Daily Signal,
+    ChinaAid's Shanghai raid over the Christian Post, Christian Concern over the Mail).
+
+    Needs a real date on BOTH sides. Undated, it cannot prove it was first, and falls back to
+    cluster_lead_key as before. A primary source that published AFTER a newsroom is reacting
+    to the story, not issuing it, and also falls back.
+    """
+    outlet = (item.get("outlet") or "").lower()
+    if (not any(t in outlet for t in PRIMARY_SOURCE) or relays_another_outlet(item)
+            or _link_is_unreadable(item)):
+        return False
+    mine = _published_ts(item)
+    if mine is None:
+        return False
+    others = [o for o in group if o is not item
+              and not any(t in (o.get("outlet") or "").lower() for t in PRIMARY_SOURCE)]
+    if not others:
+        return False                 # all primary sources: nothing to be first against
+    for o in others:
+        theirs = _published_ts(o)
+        if theirs is None or theirs < mine:
+            return False
+    return True
+
+
+def choose_cluster_lead(group):
+    """Order a cluster so [0] is the line the sheet prints: an issuing primary source that
+    published first, else cluster_lead_key. Sorts in place and returns the group."""
+    group.sort(key=cluster_lead_key)
+    first = [it for it in group if _issues_first(it, group)]
+    if first:
+        lead = min(first, key=_published_ts)
+        group.remove(lead)
+        group.insert(0, lead)
+    return group
 
 
 def rank_score(item):
