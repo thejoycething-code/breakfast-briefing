@@ -33,3 +33,5 @@ a failure to that headline permanently: the decoder landed and changed nothing a
 because all 81 of that morning's misses were already cached as failures and never retried.
 381 of 524 entries were negative; purged. A cached miss silently freezes the resolver at
 whatever it could do the first time it saw a story.
+
+**27.09.2026: decoded links are tidied** (`resolve.tidy_decoded`, applied in resolve_items after the cache lookup). Trackers are stripped via STRIP_PARAMS, and only when one is present. An AMP link is swapped for the page's own rel=canonical, same site and non-AMP only; never rewrite /amp/ by pattern, because that would be authoring a link. Decode coverage was already ~100% (828 decoded, 1 miss, 140 filler deliberately skipped), so quality was the remaining gap.
