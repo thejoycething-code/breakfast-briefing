@@ -40,3 +40,5 @@ seven-case regression test in the session log covering ADF>EWTN, the two 12.08 p
 Herald>OSV, Telegraph>GB News), already-published, tiered>untiered, link quality and
 primary>newsroom; it must pass in **both** feed orders, since ties used to be decided by luck.
 See [[breakfast-briefing]] and [[briefing-ranking-single-pass]].
+
+**27.09.2026: the earliest issuer leads.** Chris: "favour the earliest publisher". `choose_cluster_lead()` (called by corroborate) lifts a PRIMARY_SOURCE item to the front when it published before EVERY newsroom in its cluster. Both sides need real dates (age_h not None); relays and redirects never qualify. Do not widen it to all clusters: earliest-first everywhere changed 984 of 2,847 leads over 29 archived days, mostly to aggregators. Scoped, it changes 7. It closed the 15.09 Sex Matters vs Telegraph waiver (08:09 vs 09:37).

@@ -41,6 +41,11 @@ done
 [[ -f "$LIVE_SKILL" ]] || { echo "missing: $LIVE_SKILL" >&2; exit 3; }
 [[ -d "$LIVE_MEM"   ]] || { echo "missing: $LIVE_MEM" >&2; exit 3; }
 
+# Memory files that stay on this Mac and are never copied into the repo, because the repo is
+# PUBLIC (Chris, 27.09.2026). meta-organic-reports.md holds the connector's staff access-token
+# roster - names, email handles, an Asana gid. `pull` skips them, `check` ignores them.
+LOCAL_ONLY=(meta-organic-reports.md)
+
 case "$MODE" in
 pull)
     mkdir -p task memory
@@ -48,6 +53,7 @@ pull)
     # --delete equivalent: clear first, so a memory file deleted upstream stops being tracked.
     rm -f memory/*.md
     cp "$LIVE_MEM"/*.md memory/
+    for f in "${LOCAL_ONLY[@]}"; do rm -f "memory/$f"; done
     echo "pulled: task/SKILL.md ($(wc -c <task/SKILL.md | tr -d ' ') bytes)"
     echo "pulled: memory/ ($(ls -1 memory/*.md | wc -l | tr -d ' ') files)"
     ;;
@@ -56,9 +62,11 @@ check)
     if ! diff -q "$LIVE_SKILL" task/SKILL.md >/dev/null 2>&1; then
         echo "DRIFT: task/SKILL.md differs from $LIVE_SKILL"; rc=1
     fi
-    if ! diff -rq "$LIVE_MEM" memory --exclude='.*' >/dev/null 2>&1; then
+    EXCL=(--exclude='.*')
+    for f in "${LOCAL_ONLY[@]}"; do EXCL+=(--exclude="$f"); done
+    if ! diff -rq "$LIVE_MEM" memory "${EXCL[@]}" >/dev/null 2>&1; then
         echo "DRIFT: memory/ differs from $LIVE_MEM"
-        diff -rq "$LIVE_MEM" memory --exclude='.*' 2>&1 | sed 's/^/  /' || true
+        diff -rq "$LIVE_MEM" memory "${EXCL[@]}" 2>&1 | sed 's/^/  /' || true
         rc=1
     fi
     [[ $rc -eq 0 ]] && echo "in sync" || echo "run ./sync_docs.sh to update the repo copy"
