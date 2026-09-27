@@ -239,12 +239,103 @@ _GARTURLREQ = ('["garturlreq",[["X","X",["X","X"],null,null,1,1,"US:en",null,1,n
                '"%s",%s,"%s"]')
 
 
+# --- Batched decoding (27.09.2026) -------------------------------------------------------
+# A decode is two Google requests: the redirect page (for its signature and timestamp) and the
+# batchexecute lookup. Both queue behind fetch_feeds' 0.7s gap for news.google.com, so ~1,300
+# decodes had a serial floor of ~30 minutes however many workers ran. batchexecute is, as the
+# name says, a batch endpoint: measured 27.09.2026, five lookups in one POST came back in
+# 0.3s. So signatures are still fetched one per item, but lookups go BATCH_SIZE to a call:
+# ~1.1 Google requests per decode instead of 2.
+#
+# Google returns the rows in its own order, NOT the request order (a five-item test came
+# back 3,1,4 with 2 absent), and a failed lookup is a row with no payload. Each row carries
+# the request's own id, so results are matched on that id and never on position.
+BATCH_SIZE = 10
+
+
+def gnews_signature(url):
+    """The batchexecute request body for one redirect, or None if the page gave no signature."""
+    try:
+        body = fetch_feeds.fetch(url, retry_uas=1)
+        if isinstance(body, bytes):
+            body = body.decode("utf-8", "replace")
+    except Exception:  # noqa: BLE001
+        return None
+    sg, ts = _SG_RE.search(body), _TS_RE.search(body)
+    if not (sg and ts):
+        return None
+    aid = _AID_RE.search(body)
+    # Older redirect forms carry the id only in the path.
+    aid = aid.group(1) if aid else url.rstrip("/").split("/")[-1].split("?")[0]
+    return _GARTURLREQ % (aid, ts.group(1), sg.group(1))
+
+
+def parse_batch_response(raw):
+    """{request id: publisher URL} from a batchexecute response. Missing id = no answer."""
+    out = {}
+    body = raw.split("\n", 1)[1] if raw.startswith(")]}'") else raw
+    try:
+        rows = json.loads(body)
+    except ValueError:
+        rows = None
+    if isinstance(rows, list):
+        for row in rows:
+            if (isinstance(row, list) and len(row) >= 7 and row[0] == "wrb.fr"
+                    and isinstance(row[2], str)):
+                try:
+                    inner = json.loads(row[2])
+                except ValueError:
+                    continue
+                if isinstance(inner, list) and len(inner) > 1 and inner[0] == "garturlres":
+                    out[str(row[6])] = str(inner[1]).rstrip("/")
+        return out
+    # Not the plain JSON shape (a chunked "rt=c" body, say): fall back to the per-row regex
+    # that decode_gnews used before batching, one row at a time so ids stay attached.
+    for m in re.finditer(r'\["wrb\.fr","Fbv4je",(.*?),"(\d+)"\]', raw):
+        g = _GARTURL_RE.search(m.group(1))
+        if g:
+            out[m.group(2)] = _unescape_garturl(g.group(1)).rstrip("/")
+    return out
+
+
+def decode_gnews_batch(requests):
+    """Publisher URLs for a list of signature bodies (None entries allowed), same order."""
+    live = [(str(i + 1), r) for i, r in enumerate(requests) if r]
+    if not live:
+        return [None] * len(requests)
+    payload = [[["Fbv4je", body, None, rid] for rid, body in live]]
+    try:
+        raw = fetch_feeds.fetch(
+            BATCHEXECUTE, data=urllib.parse.urlencode({"f.req": json.dumps(payload)}).encode(),
+            headers={"Content-Type": "application/x-www-form-urlencoded;charset=utf-8"},
+            retry_uas=1)
+        if isinstance(raw, bytes):
+            raw = raw.decode("utf-8", "replace")
+    except Exception:  # noqa: BLE001
+        return [None] * len(requests)
+    got = parse_batch_response(raw)
+    return [got.get(str(i + 1)) if r else None for i, r in enumerate(requests)]
+
+
+def trusted_decode(hit, headline):
+    """A decode is authoritative unless it looks broken; a broken one must prove itself."""
+    if hit and (_looks_truncated(hit) or _looks_like_index(hit)) and not confirms(hit, headline):
+        return None
+    return hit
+
+
 def decode_gnews(url):
     """The publisher URL behind a Google News redirect, straight from Google, or None.
 
     Authoritative rather than constructed, so the caller must not verify the result
-    against the headline - see the module docstring.
+    against the headline - see the module docstring. One-item form of the batched path.
     """
+    return decode_gnews_batch([gnews_signature(url)])[0]
+
+
+def _decode_gnews_single(url):
+    """The pre-batching implementation, kept for comparison in tests. Do not call in the
+    sweep: it costs two Google requests per item."""
     try:
         body = fetch_feeds.fetch(url, retry_uas=1)
         if isinstance(body, bytes):
@@ -378,42 +469,74 @@ def resolve_one(headline, publisher, when=None, gnews_url=None):
     return None
 
 
-def resolve_items(items, workers=8, use_cache=True):
+def resolve_items(items, workers=8, use_cache=True, on_resolved=None, batch=BATCH_SIZE):
     """Fill in item["url"] for Google News links where a direct URL is found.
-    Returns (resolved_count, unresolved_list)."""
+    Returns (resolved_count, unresolved_list).
+
+    `on_resolved(item)` is called for each item as soon as its URL is known - fetch_feeds'
+    text prefetcher uses it to start reading the article while decoding carries on.
+
+    Decoding runs in chunks of `batch`: the chunk's signatures are fetched in parallel, then
+    looked up in ONE batchexecute call (see BATCH_SIZE). An item Google cannot decode falls
+    back to the publisher-side routes (resolve_one without the redirect: index match, then
+    constructed slugs that must prove themselves), exactly as before batching.
+    """
     cache = load_cache() if use_cache else {}
     todo = [it for it in items if "news.google.com" in it.get("url", "")]
     resolved, unresolved, fresh = 0, [], {}
 
-    def work(it):
-        key = "%s|%s" % (it.get("publisher", ""), slugify(it["headline"], 12))
-        if key in cache:
-            return it, cache[key], True
+    def key_of(it):
+        return "%s|%s" % (it.get("publisher", ""), slugify(it["headline"], 12))
+
+    def fallback(it):
         when = None
         try:
             when = dt.datetime.fromisoformat(it["published"]).date()
         except (KeyError, ValueError):
             pass
-        return it, resolve_one(it["headline"], it.get("publisher", ""), when,
-                               gnews_url=it["url"]), False
+        return resolve_one(it["headline"], it.get("publisher", ""), when, gnews_url=None)
 
-    with futures.ThreadPoolExecutor(max_workers=workers) as pool:
-        for it, url, cached in pool.map(work, todo):
-            key = "%s|%s" % (it.get("publisher", ""), slugify(it["headline"], 12))
-            # Cache successes only. A cached *failure* is permanent: it pins the
-            # miss to that headline forever, so a later run cannot benefit from a
-            # transient block clearing or from the resolver getting better. That is
-            # not hypothetical - on 18.08.2026 the batchexecute decoder went in and
-            # changed nothing, because all 81 of that morning's misses were already
-            # cached as None and never re-attempted. Retrying a miss costs one fetch.
-            if not cached and url:
-                fresh[key] = url
-            if url:
-                it["url"] = url
-                it["resolved"] = True
-                resolved += 1
+    def results():
+        """Yield (item, url or None, cached) - cached first, then chunk by chunk."""
+        live = []
+        for it in todo:
+            k = key_of(it)
+            if k in cache:
+                yield it, cache[k], True
             else:
-                unresolved.append(it)
+                live.append(it)
+        with futures.ThreadPoolExecutor(max_workers=workers) as pool:
+            for c in range(0, len(live), max(1, batch)):
+                chunk = live[c:c + max(1, batch)]
+                sigs = list(pool.map(lambda i: gnews_signature(i["url"]), chunk))
+                hits = decode_gnews_batch(sigs)
+                hits = [trusted_decode(h, i["headline"]) for h, i in zip(hits, chunk)]
+                misses = [i for i, h in zip(chunk, hits) if not h]
+                fb = dict(zip(map(id, misses), pool.map(fallback, misses)))
+                for it, h in zip(chunk, hits):
+                    yield it, h or fb.get(id(it)), False
+
+    for it, url, cached in results():
+        key = key_of(it)
+        # Cache successes only. A cached *failure* is permanent: it pins the
+        # miss to that headline forever, so a later run cannot benefit from a
+        # transient block clearing or from the resolver getting better. That is
+        # not hypothetical - on 18.08.2026 the batchexecute decoder went in and
+        # changed nothing, because all 81 of that morning's misses were already
+        # cached as None and never re-attempted. Retrying a miss costs one fetch.
+        if not cached and url:
+            fresh[key] = url
+        if url:
+            it["url"] = url
+            it["resolved"] = True
+            resolved += 1
+            if on_resolved:
+                try:
+                    on_resolved(it)
+                except Exception:  # noqa: BLE001 - a callback must never stop decoding
+                    pass
+        else:
+            unresolved.append(it)
 
     if use_cache and fresh:
         cache.update(fresh)

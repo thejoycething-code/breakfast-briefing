@@ -240,6 +240,9 @@ def main(argv=None):
                     help="print what the last %d fives ran, then exit" % FIVE_HISTORY)
     ap.add_argument("--allow-repeat", action="store_true",
                     help="post anyway when a pick already ran in a past five")
+    ap.add_argument("--leads", default="/tmp/leads.json",
+                    help="the sheet's leads manifest; its text is shown beside any slot "
+                         "that has no note, as material to write one from")
     args = ap.parse_args(argv)
 
     if args.history:
@@ -277,6 +280,23 @@ def main(argv=None):
         for p in problems:
             sys.stderr.write("  %s\n" % p)
         return 1
+
+    # Material for empty notes (27.09.2026). Printed, never inserted: a note is the writer's
+    # own words, and text copied from the manifest could carry a URL or a paywalled passage.
+    try:
+        by_i = {m["i"]: m for m in json.load(open(args.leads, encoding="utf-8"))}
+    except (OSError, ValueError):
+        by_i = {}
+    for p in picks:
+        if (p["note"] or "").strip():
+            continue
+        m = by_i.get(p["n"])
+        if m and m.get("text"):
+            sys.stderr.write("slack_five: %s has no note. What the sheet read (%s):\n    %s\n"
+                             % (p["n"], m.get("text_from") or "text", m["text"][:420]))
+        else:
+            sys.stderr.write("slack_five: %s has no note, and the sheet had no text for it - "
+                             "the headline is all there is.\n" % p["n"])
 
     leads = [p for p in picks if p["depth"] == 0]
     if not leads:

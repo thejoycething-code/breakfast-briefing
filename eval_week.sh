@@ -71,15 +71,38 @@ run_scorer() {
     rm -f "$log"
 }
 
+# repeat_eval gets TWO calls, never one with both flags. --collisions returns EARLY, before
+# score() ever runs: it prints the collision pairs and returns 0 unconditionally. The single
+# combined call this job carried from 10.09 to 12.09.2026 therefore never computed GOLD, URL,
+# CLUSTER, XDAY or XSEC at all - and, worse, swallowed the GOLD veto exit code, so a gold case
+# going red would have printed a clean collisions block and exited 0. A check that reports
+# success while doing nothing. Split, each arm appends its own dated entry and the veto reaches
+# run_scorer, where the crash-vs-score distinction already handles it correctly.
 if [ "$DRY" = 1 ]; then
     run_scorer rank_eval.py rank_eval.py
     run_scorer repeat_eval.py repeat_eval.py --misses
+    run_scorer "repeat_eval.py --collisions" repeat_eval.py --collisions
 else
     run_scorer rank_eval.py rank_eval.py --log "$NOTE"
+    run_scorer repeat_eval.py repeat_eval.py --log "$NOTE"
     # --collisions is the half that found a real bug: on 27.08.2026 word overlap would have
     # merged 20 pairs that is_development_of blocks, and the stem/class fix took it to 1.
     # Cheap, and it is the arm most likely to rot as the archive grows.
-    run_scorer repeat_eval.py repeat_eval.py --log "$NOTE" --collisions
+    run_scorer "repeat_eval.py --collisions" repeat_eval.py --log "$NOTE" --collisions
+fi
+
+# Re-learn site furniture from the week's text caches (27.09.2026, see boilerplate.py).
+# Templates change - GB News reshuffles its menu, outlets add share bars - and a learned list
+# that is never refreshed slowly stops matching. Guarded like the upload below: a failure
+# leaves last week's boilerplate.json in place, which is still correct for most sites.
+if [ "$DRY" = 1 ]; then
+    echo
+    echo "== boilerplate relearn (dry run: skipped)"
+else
+    echo
+    echo "== boilerplate relearn"
+    python3 boilerplate.py --learn || \
+        echo "   relearn failed - last week's boilerplate.json is still in use" >&2
 fi
 
 # Catch up the write-once corpora. finish_edition.sh runs the uploader every weekday, but

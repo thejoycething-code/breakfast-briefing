@@ -1469,3 +1469,72 @@ SUPPRESS | The Church Times | Deputy Director for Apostolic Life vacancy in Sout
 # ...guards. The widened words must not pull in the shapes they were kept narrow against.
 SECTION None | CBS News | Frost Fund helps save animals from euthanasia with shelter transport trips
 KEEP | The Telegraph | Vacancy rates in council housing hit record high
+# Guards found by replaying the widened patterns over 29 archived sweeps (27.09.2026).
+SECTION None | WTOV | Hancock County shelter officials say animals euthanized due to medical, behavioral issues
+SECTION None | The Herald Journal | Bear euthanized after capture in Logan
+SECTION Life | LifeNews.com | Canadian Family Files Complaint After Grandmother Euthanized Without Her Consent
+SECTION Religious Freedom & Persecution | Sky News | Scores of people kidnapped from mosque in Nigeria, residents say
+SECTION None | News On AIR | Nagaland: Mon Police bust inter-state drug trafficking network, seize 800 grams heroin
+KEEP | The Independent | Nine prisoners held on indefinite jail terms referred to Court of Appeal by miscarriage of justice watchdog
+SECTION None | Breitbart News | American Journalist Sentenced to Two Years in Prison for Spying for China
+SUPPRESS | The Church Times | Book review: Constable’s Year: An artist in changing seasons by Susan Owens
+SUPPRESS | The Church Times | Sunday’s Readings: 12th Sunday after Trinity
+# The Church Times fallback must not outrank the Politics split.
+SECTION Politics, Government & Society | Church Times | James Orr stands down as head of policy for Reform UK after Channel 4 investigation
+# Chris's rule that paid sources carry (£) must not depend on which route an item came by
+# (27.09.2026): on 25.09.2026 "The Church Times" was credited with (£) on one line and
+# without it on the next, because only the bare name was in the paywalled-outlet list.
+CREDIT The Church Times (£) | The Church Times | https://www.churchtimes.co.uk/articles/2026/25-september/news/uk/permission-granted-to-restore-burned-church
+
+# --- Leaks into the sections, sized over 29 archived sweeps (Chris, 27.09.2026) ----------
+# School sport arrives via "Christian" (a school's name) and via education words. ~5/day
+# each into Church & Religion and Marriage, Family & Education. A school-sport shape is not
+# redeemed by the faith word in its name - but the plural "Christians" is the faith, so
+# "Pakistani Christians Rally" must survive the sport vocabulary ("rally").
+SUPPRESS | WDBJ7 | 2026 Friday Football Extra team preview: Liberty Christian Bulldogs
+SUPPRESS | WABI | Bangor Christian comes into 2026 as defending 8-person girls soccer champions
+SUPPRESS | KOTA Territory News | Stevens girls tennis notches win over RC Christian
+SUPPRESS | Gwinnett Daily Post | Providence Christian defeats Greater Atlanta Christian in softball
+SUPPRESS | Rocky Mount Telegram | Faith Christian netters hand Warriors first loss
+SUPPRESS | TribLIVE.com | Jeannette downs rival Greensburg Central Catholic for 1st time in 13 years
+SUPPRESS | deseret.com | High school girls volleyball: Strong start pushes Corner Canyon past Orem in 4 sets
+SUPPRESS | WCIA.com | Highlights/scores: High school football (8-22-26)
+SUPPRESS | Pittsburgh Post-Gazette | High school sports results for Thursday, Sept. 24, 2026
+KEEP | pjmedia.com | Pakistani Christians Rally for Equal Rights
+KEEP | The Christian Post | 96 students baptized during high school worship events after games
+# "Christian" as somebody's first name, or a brand. NAME_COLLISION needed sport vocabulary as
+# proof of a person, so a memoir, a film remake, a share tip and an obituary all read as
+# church news. The fix adds the showbiz/finance/obituary shapes as evidence of a person.
+SUPPRESS | Motorsport.com | Christian Horner announces UK book tour for new memoir following Red Bull F1 exit
+SUPPRESS | IMDb | The Frontrunner to Replace Christian Bale in the 'American Psycho' Remake
+SUPPRESS | TradingView | ProCredit Holding AG: Christian Dagrosa, buy
+SUPPRESS | TradingView | Réorganisation de la structure de LVMH: la holding Christian Dior bondit de plus de 17% sur la Bourse de Paris
+SUPPRESS | Lindquist Mortuary | Christian Aaron Oviatt Obituary Aug 14, 2026
+KEEP | Jacobin | German Christian Democrats Are Paralyzed by a Far-Right Surge
+KEEP | Billy Graham Evangelistic Association | India Bill That Threatens Christian Ministries Paused Amid Outcry
+KEEP | KQED | Rep. Jared Huffman Warns about the Power of Christian Nationalism in Congress
+# Stonewall is a charity, an inn and a riot - and also a town, a school and a verb. Only the
+# first three are the Gender beat.
+SECTION None | The Ada News | Ada bats get hot in win at Stonewall
+SECTION None | dnronline.com | Stonewall Jackson football entering season with optimism
+SECTION Gender, Identity & Sexuality | The Telegraph | Stonewall accused of misleading schools over trans guidance
+SECTION Gender, Identity & Sexuality | Washington Blade | Victory: Trump Administration Agrees to Restore Pride Flag at Stonewall National Monument
+# Indian entertainment and crime desks: ~10/day reach Marriage, Family & Education on the
+# word "marriage" alone. Kept only when the marriage is public policy, law or a court case.
+SUPPRESS | The Times of India | 'Hum aur aap shaadi kar lete hai': Aamrapali Dubey's playful marriage proposal to Pawan Singh leaves fans excited
+SUPPRESS | NDTV | Man Kills Lover For Pressuring Him For Marriage, Hides Body In Gunny Bag
+SUPPRESS | The Times of India | Survey finds divorced singles taking a more practical view of love
+KEEP | India Today NE | Assam Cabinet approves Muslim marriage registration rules, Arunodoi Puja bonus
+KEEP | timesofindia.indiatimes.com | MPHC allows minor girl to return home after parents agree to future marriage
+KEEP | The Times of India | Himanta crackdown on child marriage, month-long drive from November 1
+# Guards from replaying the leak fixes over 29 archived sweeps (27.09.2026).
+KEEP | newscentermaine.com | Group continues push to ban transgender athletes from Maine high school sports
+KEEP | AppleValleyNewsNow.com | Student sues over alleged sexual assault during high school wrestling match with transgender athlete
+KEEP | LifeSiteNews | Bishop condemns Israel shutting down Christian village in West Bank
+KEEP | National Catholic Register | Bishop Boxie Shares Faith Journey From Practicing Law to Becoming Youngest U.S. Bishop
+KEEP | liveaction.org | Actor Christian Bale opens foster village to keep siblings together
+KEEP | The Christian Post | 'We will miss you down here': Christian artists react to Dolly Parton's death at 80
+KEEP | India Today | 'Robber Bride' gang busted in Bihar after luring Rajasthan family into sham wedding
+KEEP | The Times of India | Indian couple win payout after suing UK home office for 'unlawful' immigration detention
+KEEP | The Times of India | Pregnant Woman Killed For Refusing Abortion, Lover Arrested
+KEEP | bhaskarenglish.in | Germany’s far-right party wins poll for 1st time: Lesbian leader Weidel opposes same-sex marriage

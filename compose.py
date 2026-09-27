@@ -15,6 +15,7 @@ Usage:
 """
 
 import argparse
+import collections
 import datetime as dt
 import html
 import json
@@ -266,7 +267,9 @@ PAYWALLED_OUTLETS = re.compile(
     r"^(the telegraph|telegraph|the times|the sunday times|ny times|new york times"
     r"|daily wire|the globe and mail|globe and mail|world|wng\.org|the spectator"
     r"|spectator|the critic|unherd|spiked|the catholic herald|catholic herald"
-    r"|church times|the economist|new statesman|the australian|financial times"
+    # "the church times" 27.09.2026: only the bare form was here, so the 25.09.2026 Doc
+    # credited "The Church Times (£)" on one line and "The Church Times" on the next.
+    r"|church times|the church times|the economist|new statesman|the australian|financial times"
     r"|the wall street journal|the washington post|the atlantic"
     # Chris, 27.08.2026: "have a paywalled (£) with it". Keyed on the RENAMED form, which is
     # what tidy_outlet has produced by the time credit() tests this.
@@ -1086,7 +1089,7 @@ def main():
     # noticed. check_sources.py catches a source that stopped FILING; nothing caught a source
     # that filed and was then read past. This is that check, and it runs at compose time - the
     # last point before publishing, where it can still be acted on.
-    picked_outlets, cand = set(), {}
+    picked_outlets, cand, ran_only = set(), {}, collections.Counter()
     for sec in ORDER:
         for n in composed_out.get(sec, []):
             picked_outlets.add((items[n].get("outlet") or "").lower())
@@ -1095,8 +1098,20 @@ def main():
         if not it.get("_section") or shortlist.is_blocked_outlet(outlet.lower()):
             continue
         if any(t in outlet.lower() for t in shortlist.COVERAGE_WATCH):
+            # An item that already ran in an earlier edition is not a miss (27.09.2026). On
+            # 25.09 ChinaAid and the Iona Institute were each flagged for one unpicked item,
+            # and both items had run the day before - the warning asked a question the
+            # edition had already answered. Counted, so a source that filed ONLY repeats is
+            # still visible, but not reported as read past.
+            if it.get("seen_on"):
+                ran_only[outlet] += 1
+                continue
             cand.setdefault(outlet, []).append(it["headline"][:58])
     missed = {o: hs for o, hs in cand.items() if o.lower() not in picked_outlets}
+    quiet = sorted(o for o in ran_only if o not in cand and o.lower() not in picked_outlets)
+    if quiet:
+        sys.stderr.write("\ncoverage: not flagged - %d watched source(s) filed only items that "
+                         "already ran: %s\n" % (len(quiet), ", ".join(quiet)))
     if missed:
         sys.stderr.write(
             "\nCOVERAGE - %d watched source(s) filed today and NOTHING of theirs was picked.\n"

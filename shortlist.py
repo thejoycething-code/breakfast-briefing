@@ -20,6 +20,8 @@ Usage:
 
 import argparse
 import collections
+import functools
+import html
 import json
 import math
 import os
@@ -32,6 +34,7 @@ import regions
 import fetch_feeds   # url_key + fetch_lede, for the sheet's bounded lede fetch
 import textsignals   # report-vs-comment and friends, read off the article opening
 import history      # what actually appeared in recent editions, for the cross-day repeat check
+import boilerplate  # site furniture scrubbed from article text before the judge reads it
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -203,7 +206,7 @@ SECTIONS = [
             r"|national security) (law|bill|act|legislation|ordinance)"
             r"|(jail|imprison|sentenc|detain|arrest)\w*\b.{0,40}\b(over|for) (their |his |her )?"
             r"(private )?(phone calls?|messages?|reporting|articles?|lyrics|cartoons?)"
-            r"|journalists?\b.{0,30}\b(detained|arrested|jailed|sentenced|charged|held)"
+            r"|journalists?\b.{0,30}\b(detained|arrested|jailed|held)\b(?!.{0,40}\bspy)"
             r"|(detain|arrest|jail)\w*\b.{0,20}\bjournalists?\b"
             r"|social media\b.{0,50}\b(criminally liable|criminal liability)"
             r"|social media (law|legislation|rules|regulation|code)s?\b"
@@ -285,7 +288,12 @@ SECTIONS = [
             r"|strip.search|gender.critical|self-?id\b|biological (sex|male|female|m[ae]n|women)"
             r"|women'?s (sport|football|rugby|swimming|boxing|cricket|league|spa)"
             r"|female categor|male athlete"),
-        (3, r"\bLGBT|\bpride\b|\bqueer\b|lesbian|\bgay\b|bisexual|non-?binary|stonewall"
+        # Stonewall only in its LGBT senses (27.09.2026): the bare word also scored a town's
+        # baseball game, a high school named for Stonewall Jackson and the verb "stonewall",
+        # ~2.5 a day into Gender. The charity and the inn are named as such in headlines.
+        (3, r"\bLGBT|\bpride\b|\bqueer\b|lesbian|\bgay\b|bisexual|non-?binary"
+            r"|stonewall (inn|uprising|riots?|national monument|charity|uk|chief|boss|ceo"
+            r"|guidance|champions?|diversity|accused|says|warns|has|was|is)\b|stonewall'?s\b"
             r"|drag queen|conversion therapy|chestfeed|intersex|same-sex attract"
             r"|sexual orientation|\bWNBA\b|women'?s (basketball|team|categor)"),
         (4, r"\bDEI\b|\bEDI\b|diversity, equity|equity and inclusion|identity politics"
@@ -306,7 +314,8 @@ SECTIONS = [
             # "Aborted baby's estate is awarded monetary damages" and CARE's "bereavement
             # leave for pregnancy loss" both scored nothing. A court ordering a child to
             # "carry (a) pregnancy" is an abortion ruling that never says the word.
-            r"|\baborted\b|abortionist|pregnancy loss|baby loss|miscarriage|stillbirth"
+            r"|\baborted\b|abortionist|pregnancy loss|baby loss|miscarriage(?!s? of justice)"
+            r"|stillbirth"
             r"|carry (a |the |her )?pregnancy|terminat\w* (a |the |her )?pregnanc"),
         (6, r"assisted (dying|suicide|death)|euthanas|\bMAiD\b|\bMAID\b|right to die"
             r"|dignity in dying|end of life|palliative|hospice|lethal (drug|prescription)"
@@ -351,7 +360,6 @@ SECTIONS = [
         # all (found 19.08.2026). Same class of bug as law/laws below.
         (3, r"faith[- ](leader|group|school|community|based)|religion|religious"
             r"|secular|atheis|humanist|islam|muslim|jewish|judaism|hindu|sikh"
-            r"|synagogue|mosque|gurdwara|\brabbi"
             r"|church attendance|churchgoing|belief"),
         # Marian vocabulary was absent entirely: Poland unveiling Europe's tallest statue of
         # the Virgin Mary matched nothing (19.08.2026), and three outlets carried it.
@@ -487,7 +495,8 @@ OTHER_SPLIT = [
                 r"|illegal alien|undocumented|sanctuary (city|state)"
                 # 27.09.2026: trafficking gangs, the UK-France returns deal and birth
                 # tourism each passed OTHER_ALLOW and then found no theme here.
-                r"|human trafficking|trafficking (gang|ring|network)|trafficked"
+                r"|human trafficking|(?<!drug )(?<!drugs )(?<!arms )(?<!wildlife )"
+                r"trafficking (gang|ring|network)"
                 r"|channel (deal|treaty|agreement)|one.in,? one.out|birth tourism", re.I)),
     ("Politics, Government & Society",
      # \bvotes?\b/\bvoting\b: "voter" was here but not "vote", so TVP World's "Fedorov calls
@@ -571,8 +580,10 @@ OTHER_SPLIT = [
                 # party by "conservative party" and "tory". Care homes and social care are
                 # public provision, the same beat as the NHS inquiries above.
                 r"|conservatives\b|\bbenefits? (cut|crackdown|claimants?|bill|system|cap)"
-                r"|long-term unemployed|universal credit|\bwelfare\b"
-                r"|\b(income|council|inheritance|wealth|mansion) tax\b|\btaxpayers?\b"
+                r"|long-term unemployed|universal credit"
+                r"|welfare (reform|cuts?|state|bill|spending|system|claimants?|budget)"
+                r"|\b(income|council|inheritance|wealth|mansion|payroll) tax\b"
+                r"|taxpayer-funded|taxpayers'? (money|cash|bill)|cost (to )?taxpayers"
                 r"|stormont|northern ireland executive|holyrood|senedd|devolved"
                 r"|care homes?\b|social care"
                 # Community flashpoints: flag burning and religious slogans at a protest or
@@ -622,14 +633,16 @@ SOURCE_HINTS = {
         # own words, which testcases.txt pins.
         "charlotte gill",
     ],
-    # 27.09.2026: the Church Times had no hint, so "Survivor Support Fund to be launched" -
-    # a church safeguarding story with no church word in its headline - reached no section.
-    # Consulted only when nothing scored, and its job adverts are chaffed by CHAFF_HARD's
-    # vacancy rule before they get here.
-    "Church & Religion": [
-        "church times",
-    ],
 }
+
+# Outlets whose unscored items belong in Church & Religion - but only as a LAST resort, after
+# the Immigration/Politics splits have had their turn. 27.09.2026: the Church Times had no
+# hint, so "Survivor Support Fund to be launched", a church safeguarding story with no church
+# word in its headline, reached no section. Put in SOURCE_HINTS it was consulted FIRST and
+# took "James Orr stands down as head of policy for Reform UK" out of Politics, measured on
+# the 29 archived sweeps; here it only catches what would otherwise have had no section.
+# Its job adverts and standing columns are chaffed by CHAFF_HARD before they get this far.
+CHURCH_FALLBACK_OUTLETS = re.compile(r"(?<![a-z])church ?times(?![a-z])", re.I)
 SOURCE_BOOST = 4
 
 # Celebrity, entertainment and sport chaff. PinkNews' unfiltered feed is the main source
@@ -708,7 +721,14 @@ CHAFF_HARD = re.compile(
     # Church & Religion candidate three times on 25.09.2026. Anchored to the advert's own
     # shape - "<role> vacancy in <place>" - so "vacancy rates" and a bishopric left vacant
     # are untouched.
-    r"|\bvacanc(y|ies) in (the )?[A-Z]\w+",
+    r"|\bvacanc(y|ies) in (the )?[A-Z]\w+"
+    # ...and its standing columns, which the Church Times source hint would otherwise send
+    # to Church & Religion every week: reviews, the Sunday readings, the caption contest,
+    # photo round-ups and the money column. Anchored at the start, as the paper titles them.
+    r"|^(book|film|tv|radio|art|theatre|music|dance|exhibition) review:"
+    r"|^sunday.?s readings\b|caption competition|^photo stories of the week"
+    r"|^good money:|^resignations and retirements$|^\d+ years ago:|^notice board:"
+    r"|^books? photo:",
     re.I)
 
 
@@ -1051,7 +1071,15 @@ PERSON_CONTEXT = re.compile(
     r"|season|game|games|match|innings|touchdown|homer|home run|slugger|cornerback"
     r"|quarterback|striker|midfielder|coach|lineup|injury|injured|scored|playoff"
     r"|blast|rally|win over|defeat|astros|patriots|seahawks|yankees|dodgers|wnba|nba"
-    r"|hairstyle|girlfriend|boyfriend|red carpet)\b", re.I)
+    r"|hairstyle|girlfriend|boyfriend|red carpet"
+    # 27.09.2026: showbiz, business and death-notice shapes are just as much proof of a
+    # person as sport is - a memoir tour, a film remake, a share tip and an obituary all read
+    # as church news on the bare "Christian" until these were added.
+    r"|memoir|book tour|remake|trailer|film|movie|actor|actress|singer|album|designer"
+    r"|fashion|couture|obituary|buy|sell|stock|dies at|f1|red bull|formula one)\b", re.I)
+# Fashion houses named after a Christian (27.09.2026): LVMH's "holding Christian Dior" is a
+# stock story in French and had no English context word to prove it was not the faith.
+CHRISTIAN_BRAND = re.compile(r"\bchristian (dior|louboutin|lacroix|siriano)\b", re.I)
 
 
 
@@ -1103,6 +1131,10 @@ def is_name_collision(headline):
     """
     if FAITH_ORGS.search(headline):
         return False
+    if CHRISTIAN_BRAND.search(headline):
+        return True
+    if SHAPE_RESCUE.search(headline):
+        return False
     if not NAME_COLLISION.search(headline):
         return False
     return bool(PERSON_CONTEXT.search(headline))
@@ -1143,6 +1175,65 @@ def is_blocked_outlet(outlet=""):
     return bool(outlet and BLOCKED_OUTLETS.search(outlet))
 
 
+# School and college sport (27.09.2026). ~5 a day reached Church & Religion because the
+# school is called "... Christian" or "... Catholic", and ~5 more reached Marriage, Family &
+# Education on "high school". A match report is never the beat, whatever the school's name -
+# but the PLURAL is the faith, so every school-name arm requires "Christian" not followed by
+# "s": "Pakistani Christians Rally for Equal Rights" must survive the word "rally".
+SCHOOL_SPORT = re.compile(
+    r"high school (sports|football|soccer|volleyball|basketball|baseball|softball|tennis|golf"
+    r"|wrestling|cross country|lacrosse|hockey|swimming|girls|boys)\b"
+    r"|highlights/scores|\b(sports|football|soccer|volleyball) results\b|football extra"
+    r"|team preview"
+    r"|\b(christian|catholic|lutheran|baptist|adventist)\b(?!s)[^|]{0,60}\b(football|soccer"
+    r"|volleyball|basketball|baseball|softball|tennis|netters|golf|hockey|wrestling"
+    r"|cross country|lacrosse|bulldogs|eagles|knights|lions|warriors|champions)\b"
+    r"|\b(football|soccer|volleyball|basketball|baseball|softball|tennis|golf)\b[^|]{0,60}"
+    r"\b(christian|catholic|lutheran|baptist)\b(?!s)"
+    # Result verbs in their unambiguous headline forms only: "down" matched "shutting down
+    # Christian village" and "beat" would match "police beat Christian man" (27.09.2026).
+    r"|\b(defeats|defeated|downs|tops|edges|routs|rolls past|falls to|win over|notches win"
+    r"|loss to|sweeps)\b[^|]{0,50}\b(christian|catholic|lutheran|baptist|adventist)\b(?!s)"
+    r"|\b(christian|catholic|lutheran|baptist)\b(?!s)[^|]{0,50}\b(defeats|defeated|downs"
+    r"|tops|edges|routs|rolls past|falls to|win over|first loss|sweeps)\b", re.I)
+# Issue words that outrank a sport or name-collision shape: a ban on transgender athletes in
+# high school sports is the Gender beat whatever else the headline says, and "Actor Christian
+# Bale opens foster village" is a fostering story. Replaying 29 archived sweeps found both.
+SHAPE_RESCUE = re.compile(
+    r"transgender|\btrans\b|gender|women'?s (sport|sports|category)|girls'? (sport|sports)"
+    r"|sexual assault|abuse|shoot|shot|killed|persecut|\bpray|faith journey|coach (fired|sacked)"
+    r"|lawsuit|\bsues?\b|\bban\b|banning|referendum|foster|adopt|abortion|surrogac|euthanas"
+    r"|bishop|\bchurch|pastor|baptis|worship|ministry|mission", re.I)
+
+# Indian entertainment and crime desks (27.09.2026): ~10 a day reached Marriage, Family &
+# Education on "marriage" alone - a film star's proposal, a lover's murder, a dating survey.
+# Kept only when the marriage is public policy, law or a court case, which is what those
+# desks also carry (child-marriage drives, High Court rulings, registration rules).
+INDIA_DESKS = re.compile(
+    r"times of india|timesofindia|\bndtv\b|india today|hindustan times|news18|the statesman"
+    r"|dt next|mensxp|bhaskar|gujarat ?samachar|news minute|deccan herald|india tv|\babp\b"
+    r"|zee news|indulgexpress|magzter|punjab newsline|mangalore today|court book|lawchakra"
+    r"|free press journal|oneindia|republic world", re.I)
+_MARRIAGE_WORD = re.compile(r"marri|marry|wedding|divorc|shaadi|spouse|husband|wife|\blove"
+                            r"|lover|couple|dating|alimony", re.I)
+_INDIA_CIVIC = re.compile(
+    r"child marriage|forced|minor|high court|supreme court|\bcourt\b|\blaw\b|\bbill\b"
+    r"|\bact\b|\brules?\b|registration|cabinet|government|ministry|dowry|conversion"
+    r"|inter-?(faith|caste|religious)|love jihad|polygamy|uniform civil code"
+    # ...and anything that is one of the OTHER beats, or in scope as marriage fraud (Chris,
+    # 13.08.2026: sham marriage stays in Marriage). Found replaying 29 sweeps: a sham-wedding
+    # gang, a forced-abortion killing and a UK Home Office detention payout were all binned.
+    r"|sham|fraud|traffick|abort|surroga|euthan|pregnan|transgender|convert|christian|church"
+    r"|muslim|hindu|temple|visa|immigra|deport|\bsue|suing|lawsuit|payout|home office"
+    r"|same-sex|\bgay\b|lesbian|lgbt|\bparty\b|election|\bpoll\b"
+    r"|(?-i:\b[A-Z]*HC\b)|\bUCC\b", re.I)
+
+
+def is_offbeat_india_marriage(headline, outlet=""):
+    return bool(outlet and INDIA_DESKS.search(outlet) and _MARRIAGE_WORD.search(headline)
+                and not _INDIA_CIVIC.search(headline))
+
+
 def is_chaff(headline, outlet="", categories=None):
     """True if the headline is celebrity/sport/schedule filler and nothing more."""
     if is_excluded(headline):
@@ -1161,6 +1252,10 @@ def is_chaff(headline, outlet="", categories=None):
     if outlet and ENTERTAINMENT_DESKS.search(outlet) and not CIVIC_MARRIAGE.search(headline):
         return True
     if is_name_collision(headline):
+        return True
+    if SCHOOL_SPORT.search(headline or "") and not SHAPE_RESCUE.search(headline or ""):
+        return True
+    if is_offbeat_india_marriage(headline or "", outlet):
         return True
     # Publisher tags it as arts/culture filler - Chris marked these "Not interesting".
     if category_is_filler(categories):
@@ -1451,9 +1546,19 @@ def _deaccent(s):
     return unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode("ascii")
 
 
-def sig_words(headline):
+# sig_words, entities and ent_tokens are pure functions of one headline, and the cross-day
+# repeat check calls them for every archived headline once per LEAD: 5.1 million entities()
+# calls and 56s of CPU on one sheet, measured 27.09.2026, for ~1,500 distinct strings. They
+# are memoised; each call still returns a fresh set, so a caller that mutates what it gets
+# back cannot corrupt the cache.
+@functools.lru_cache(maxsize=200000)
+def _sig_words_frozen(headline):
     t = re.sub(r"[^a-z0-9 ]", " ", _deaccent(headline).lower())
-    return {_stem(w) for w in t.split() if len(w) > 3 and w not in STOPW}
+    return frozenset(_stem(w) for w in t.split() if len(w) > 3 and w not in STOPW)
+
+
+def sig_words(headline):
+    return set(_sig_words_frozen(headline or ""))
 
 
 # A primary source that is RELAYING a newsroom is not the primary source of that story.
@@ -1612,7 +1717,12 @@ ENTITY_COOCCUR_MIN = 3
 
 
 def entities(headline):
-    """Multi-word proper nouns, minus sentence-initial noise."""
+    """Multi-word proper nouns, minus sentence-initial noise. Memoised - see sig_words."""
+    return set(_entities_frozen(headline or ""))
+
+
+@functools.lru_cache(maxsize=200000)
+def _entities_frozen(headline):
     out = set()
     # Deaccented first: ENTITY_RE is [A-Z][a-z]{2,}, which cannot match "Päivi" or "Orbán",
     # so accented names were not entities at all. See _deaccent().
@@ -1625,7 +1735,7 @@ def entities(headline):
             out.add(" ".join(words).lower())
         elif len(words[0]) >= 5:
             out.add(words[0].lower())
-    return out
+    return frozenset(out)
 
 
 def ent_tokens(headline):
@@ -2474,6 +2584,131 @@ def corroborate(rows):
     return out
 
 
+# --- Event size: how many items are about one NAMED event (27.09.2026) -------------------
+# Why. corroborate() groups on headline word overlap alone, so a big story reported in many
+# wordings shows as many small lines: on 25.09.2026 the White House media-ban ruling was 16
+# lines, Fulton Sheen's beatification 23, the FDA nominee's hearing 9 - each looking like an
+# x1 or x2 story. Names were no help there: entity links (same_story) are barred for any name
+# in more than ENTITY_MAX_DF=12 headlines, which is exactly the biggest stories' names -
+# "Sheen" was in 57 headlines, "Politico" 25, "Overton" 16.
+#
+# Tested as a MERGE first and rejected: star-merging on a shared name + event word took 1,302
+# lines to 1,290 and hid real pieces - most of the 40 Sheen items were distinct features, not
+# duplicates, and ~15% of merges were wrong (measured over 25.09, 24.09 and 18.09). A wrong
+# merge hides a story; this codebase's rule is that that is the expensive error.
+#
+# So it is a COUNT, printed beside xN as eN, and nothing is merged. Two items belong to one
+# event when they share a proper NAME and an EVENT word ("Sheen" + "beatification", "Overton"
+# + "hearing"); events are the connected components of those links. A wrong link costs an
+# inflated number, never a missing line. What counts as a name was the whole difficulty:
+#   - title-case headlines make "Judge", "Election" and "Speech" look like names. A token is a
+#     name only if it is rarely written lowercase that day (judge 78% lowercase, Sheen 0%);
+#   - institutions and roles (Senate, White House, Supreme Court, senator) pass that test but
+#     are topics, as are places (regions.py's own signals) and a few generic capitalised words
+#     ("Amendment" chained a Transgender Persons Amendment to the Hyde Amendment on 22.09).
+# Top events after those filters, all correct on 25.09: media ban 16, Sheen 14, Overton 12,
+# Danny Tommo 6, Holborn by-election 4, the Polish priest 3.
+EVENT_WORD = re.compile(
+    r"^(stab|attack|shoot|shot|kill|murder|dead|die|death|bomb(s|ing|ed|er|ers)?$|beatif|canoni"
+    r"|ban$|bans$|banne|lift|hear|ruling|rule|judg|court|charg|arrest|sentenc|verdict|convict"
+    r"|jail|vote|elect|resign|confirm|nomin|protest|march|rally|visit|trip|summit|speech|cross"
+    r"|boat|dinghy|landing|arriv|tribunal|strike|flood|quake|fire|lawsuit|sue|appeal|deport"
+    r"|raid|slash|hack|breach|poll|deal|sanction|war|ceasefire|amend|bill|law|inquir|report"
+    r"|launch|close|clos|block|restor|access|reinstat|order)", re.I)
+EVENT_NAME_STOP = {
+    "senate", "house", "white", "congress", "parliament", "supreme", "commons", "lords",
+    "government", "ministry", "department", "federal", "state", "states", "united", "national",
+    "court", "police", "trump", "biden", "america", "american", "britain", "british", "europe",
+    "european", "union", "nations", "church", "catholic", "christian", "muslim", "islamic",
+    "jewish", "labour", "tory", "tories", "conservative", "conservatives", "democrat",
+    "democrats", "republican", "republicans", "reform", "news", "times", "post", "daily",
+    "world", "global", "international", "north", "south", "east", "west", "new", "york",
+    "september", "october", "november", "december",
+    "senator", "senators", "minister", "president", "prime", "bishop", "archbishop", "cardinal",
+    "judge", "mayor", "governor", "secretary", "chief", "leader", "nominee", "commissioner",
+    "attorney", "general",
+    "israeli", "palestinian", "iranian", "russian", "ukrainian", "chinese", "indian", "french",
+    "irish", "scottish", "welsh", "english", "german", "italian", "spanish", "polish",
+    "channel", "county", "amendment", "amendments", "midterm", "midterms", "act", "persons",
+    "people", "family", "families", "woman", "women", "man", "men", "child", "children",
+    "school", "schools", "university", "college", "city", "council", "party", "group", "day",
+    "week", "year", "today", "live", "update", "updates", "video", "photos", "analysis",
+    "review", "decision", "report", "exclusive", "watch", "breaking", "opinion"}
+EVENT_NAME_MAX_DF = 150
+_EVENT_PLACE_RX = None
+_event_place_cache = {}
+
+
+def _is_place(tok):
+    global _EVENT_PLACE_RX
+    if _EVENT_PLACE_RX is None:
+        _EVENT_PLACE_RX = ([rx for _t, rx in regions.HEADLINE_SIGNALS]
+                           + [rx for pairs in regions.COUNTRY_SIGNALS.values()
+                              for _c, rx in pairs])
+    if tok not in _event_place_cache:
+        probe = " %s " % tok.capitalize()
+        _event_place_cache[tok] = any(rx.search(probe) for rx in _EVENT_PLACE_RX)
+    return _event_place_cache[tok]
+
+
+def _proper_tokens(rows):
+    """Tokens written capitalised (not headline-initial) and rarely lowercase, today."""
+    cap, low = collections.Counter(), collections.Counter()
+    for r in rows:
+        toks = re.findall(r"[A-Za-z][A-Za-z'’-]+", _deaccent(r.get("headline") or ""))
+        for i, t in enumerate(toks):
+            k = t.lower().strip("'’")
+            if t[0].isupper():
+                if i > 0:
+                    cap[k] += 1
+            else:
+                low[k] += 1
+    return {k for k in cap if cap[k] >= 2 and low[k] / (cap[k] + low[k]) < 0.3}
+
+
+def event_names(headline, proper):
+    out = set()
+    for e in ent_tokens(headline):
+        n = re.sub(r"['’]s$", "", e)
+        if n.endswith("s") and n[:-1] in EVENT_NAME_STOP:
+            n = n[:-1]
+        if (n in EVENT_NAME_STOP or e in EVENT_NAME_STOP or EVENT_WORD.match(n)
+                or _is_place(n)):
+            continue
+        if n in proper or e in proper:
+            out.add(n)
+    return out
+
+
+def event_sizes(rows):
+    """{id(item): size of its named event}. Stamps nothing; see stamp_event_sizes."""
+    proper = _proper_tokens(rows)
+    sets = [(sig_words(r.get("headline") or ""), event_names(r.get("headline") or "", proper))
+            for r in rows]
+    parent = list(range(len(rows)))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    by_name = collections.defaultdict(list)
+    for i, (_w, names) in enumerate(sets):
+        for n in names:
+            by_name[n].append(i)
+    for idx in by_name.values():
+        if not 2 <= len(idx) <= EVENT_NAME_MAX_DF:
+            continue
+        for x in range(len(idx)):
+            for y in range(x + 1, len(idx)):
+                i, j = idx[x], idx[y]
+                if any(EVENT_WORD.match(w) for w in sets[i][0] & sets[j][0]):
+                    parent[find(i)] = find(j)
+    size = collections.Counter(find(i) for i in range(len(rows)))
+    return {id(r): size[find(i)] for i, r in enumerate(rows)}
+
+
 def real_summary(item, max_len=200):
     """The feed summary, trimmed, if it says more than the headline - else None.
 
@@ -2570,8 +2805,17 @@ def attach_openings(leads, cap=0, workers=8):
             os.replace(tmp, OPENINGS_CACHE)
         except OSError:
             pass
+    # Site furniture is scrubbed HERE, at read time, and the cache keeps the raw page text:
+    # see boilerplate.py for why (the learner needs the furniture present, and a scrub change
+    # then applies to every cached entry at once). Day-level grams catch furniture that
+    # changes daily - Fox's in-body sidebar headlines - from today's leads per host.
+    raw_of = lambda i: cache.get(fetch_feeds.url_key(i["url"]))
+    day = boilerplate.day_grams(leads, raw_of)
     for it in leads:
-        opening = cache.get(fetch_feeds.url_key(it["url"]))
+        opening = raw_of(it)
+        if opening:
+            opening = boilerplate.scrub(it["url"], opening,
+                                        day.get(boilerplate.host_of(it["url"])))
         if opening:
             it["_opening"] = opening
         it["_sig"] = textsignals.signals(
@@ -2623,7 +2867,115 @@ def attach_previews(leads, workers=6):
         if it.get("paywalled"):
             got = cache.get(fetch_feeds.url_key(it["url"]))
             if got:
+                got = boilerplate.scrub(it["url"], got)
+            if got:
                 it["_preview"] = got
+    return live
+
+
+SYNDICATED_CACHE = os.path.join(HERE, "syndicated.json")
+# Publisher host -> syndication partners that publish its articles free, under licence, with
+# the publisher credited in their own structured data. 27.09.2026: the Telegraph's site answers
+# 402 (Tollbit) and its Bluesky account has been silent since June, but Yahoo News carries a
+# share of its journalism with JSON-LD "provider": "The Telegraph" and the Telegraph's own
+# standfirst as the description. Reading that is reading what the Telegraph chose to publish
+# free; it is not a route past its pay gate, and only the standfirst plus a capped opening is
+# taken. MSN also syndicates it but serves an app shell with no credit to check - not used.
+SYNDICATION = {"telegraph.co.uk": ("yahoo.com", "Telegraph")}
+_LDJSON_RE = re.compile(r'<script[^>]+application/ld\+json[^>]*>(.*?)</script>', re.S)
+
+
+def _syndicated_copy(item, partner, credit):
+    """(text, url) of a partner's credited copy of `item`, or None."""
+    import urllib.parse as _up
+    words = re.sub(r"[‘’'“”\"]", "", item.get("headline") or "").split()[:7]
+    if len(words) < 4:
+        return None
+    try:
+        raw = fetch_feeds.fetch("https://www.bing.com/news/search?q=%s&format=RSS&count=10"
+                                % _up.quote("site:%s %s" % (partner, " ".join(words))))
+        entries = fetch_feeds.parse_feed(raw)
+    except Exception:  # noqa: BLE001
+        return None
+    hw = sig_words(item.get("headline") or "")
+    for e in entries:
+        url = fetch_feeds.unwrap_link(e.get("link") or "")
+        if partner not in _up.urlsplit(url).netloc:
+            continue
+        ew = sig_words(e.get("title") or "")
+        if not hw or len(hw & ew) / max(1, min(len(hw), len(ew))) < 0.6:
+            continue
+        try:
+            body = fetch_feeds.fetch(url, retry_uas=1)
+            body = body.decode("utf-8", "replace") if isinstance(body, bytes) else body
+        except Exception:  # noqa: BLE001
+            continue
+        desc = credited_description(body, credit)
+        if desc:
+            return desc, url
+    return None
+
+
+def credited_description(body, credit):
+    """The article description from a page's JSON-LD, ONLY if its provider is `credit`.
+
+    The credit check is the whole safeguard: a similar headline from another outlet must
+    never be shown on the sheet as the Telegraph's own words.
+    """
+    for blk in _LDJSON_RE.findall(body or ""):
+        try:
+            data = json.loads(blk)
+        except ValueError:
+            continue
+        for d in (data if isinstance(data, list) else [data]):
+            if not isinstance(d, dict) or "Article" not in str(d.get("@type")):
+                continue
+            prov = (d.get("provider") or {})
+            prov = prov.get("name", "") if isinstance(prov, dict) else str(prov)
+            if credit.lower() not in prov.lower():
+                continue
+            desc = re.sub(r"\s+", " ", html.unescape(d.get("description") or "")).strip()
+            if len(desc) >= 60:
+                return desc[:600]
+    return None
+
+
+def attach_syndicated_text(leads, workers=4):
+    """The publisher's own text from a licensed syndication partner, for blind leads."""
+    import concurrent.futures as _futures
+    import urllib.parse as _up
+    try:
+        cache = json.load(open(SYNDICATED_CACHE))
+    except (ValueError, OSError):
+        cache = {}
+    todo = []
+    for it in leads:
+        if (it.get("_opening") or it.get("_preview") or real_summary(it) or it.get("_lede")):
+            continue
+        host = _up.urlsplit(it.get("url") or "").netloc.lower().replace("www.", "")
+        for pub, (partner, credit) in SYNDICATION.items():
+            if host == pub or host.endswith("." + pub):
+                k = fetch_feeds.url_key(it["url"])
+                if k in cache:
+                    it["_syntext"], it["_synfrom"] = cache[k]["text"], cache[k]["from"]
+                else:
+                    todo.append((it, partner, credit, k))
+    live = 0
+    if todo:
+        with _futures.ThreadPoolExecutor(max_workers=workers) as pool:
+            for (it, partner, credit, k), got in zip(todo, pool.map(
+                    lambda t: _syndicated_copy(t[0], t[1], t[2]), todo)):
+                if got:
+                    frm = "%s, syndicating the %s's own copy" % (partner.split(".")[0].title(),
+                                                               credit)
+                    it["_syntext"], it["_synfrom"] = got[0], frm
+                    cache[k] = {"text": got[0], "from": frm, "url": got[1]}
+                    live += 1
+        if live:
+            tmp = SYNDICATED_CACHE + ".tmp"
+            with open(tmp, "w") as fh:
+                json.dump(cache, fh)
+            os.replace(tmp, SYNDICATED_CACHE)
     return live
 
 
@@ -2643,7 +2995,7 @@ def attach_sibling_text(leads, workers=6):
     import concurrent.futures as _futures
     blind = [it for it in leads
              if not it.get("_opening") and not it.get("_preview")
-             and not real_summary(it) and not it.get("_lede")
+             and not real_summary(it) and not it.get("_lede") and not it.get("_syntext")
              and it.get("_siblings")]
 
     def best_sibling(it):
@@ -2659,6 +3011,7 @@ def attach_sibling_text(leads, workers=6):
         with _futures.ThreadPoolExecutor(max_workers=workers) as pool:
             for (it, sib), text in zip(pairs, pool.map(
                     lambda p: fetch_feeds.fetch_article_opening(p[1]["url"]), pairs)):
+                text = boilerplate.scrub(sib["url"], text) if text else text
                 if text:
                     it["_sibtext"] = text
                     it["_sibfrom"] = sib.get("outlet") or "another outlet"
@@ -2680,10 +3033,19 @@ def attach_ledes(leads, cap=150, workers=8):
         cache = json.load(open(LEDES_CACHE))
     except (ValueError, OSError):
         cache = {}
+    # A lede is only ever the fallback for a lead with no opening (the sheet's "page" route),
+    # so a lead whose opening is already cached does not need one fetched. Before 27.09.2026
+    # this ran first and spent its whole cap of 150 fetches (27s) on leads that then printed
+    # their cached article text instead - the more so now fetch_feeds prefetches openings.
+    try:
+        _opened = json.load(open(OPENINGS_CACHE))
+    except (ValueError, OSError):
+        _opened = {}
     todo = [it for it in leads
             if real_summary(it) is None
             and not it.get("paywalled")
-            and "news.google.com" not in (it.get("url") or "")]
+            and "news.google.com" not in (it.get("url") or "")
+            and fetch_feeds.url_key(it["url"]) not in _opened]
     todo.sort(key=lambda i: -importance(i))
     hits = misses = 0
     fetchable = []
@@ -3282,10 +3644,12 @@ LEAD_TIEBREAK_SKIP = {frozenset(("Religious Freedom & Persecution", "Church & Re
 # Both halves are required, and the animal noun is looked for in the TEXT as well as the
 # headline: "Appeal of euthanasia order for 'Bubba,' 'Stewie,'" names two dogs without using
 # the word, which is exactly the case a headline-only rule would miss.
-_EOL_WORDS = r"euthanas|put (?:down|to sleep)|\bcull(?:ed|ing)?\b"
+_EOL_WORDS = r"euthanas|euthani[sz]|put (?:down|to sleep)|\bcull(?:ed|ing)?\b"
 _ANIMAL_WORDS = (r"\b(?:dogs?|cats?|puppy|puppies|kitten|pets?|animals?|horses?|eagle|"
                  r"terrier|shepherd|livestock|cattle|sheep|kennel|zoo|wildlife|raptor|"
-                 r"veterinar|shelter (?:animal|pet|dog|cat)|bald eagle)\b")
+                 r"veterinar|shelter (?:animal|pet|dog|cat)|bald eagle|bears?|wolf|wolves"
+                 r"|mole rats?|deer|rodents?|mice|rats|\bvets?\b|pup|foal|calf"
+                 r"|dolphins?|whales?|orcas?|seals?)\b")
 
 
 _APOS = {0x2019: "'", 0x2018: "'", 0x02BC: "'", 0xFF07: "'",
@@ -3402,7 +3766,11 @@ def classify(headline, outlet, categories=None, text=""):
                 return routed, 0
         if outlet and ESSAY_SOURCES.search(outlet):
             return "Other", 0
-        return (("Other", 0) if OTHER_INTEREST.search(headline) else (None, 0))
+        if OTHER_INTEREST.search(headline):
+            return "Other", 0
+        if outlet and CHURCH_FALLBACK_OUTLETS.search(outlet):
+            return CHURCH, 1
+        return None, 0
     specific = [(s, n) for s, n in ranked if n != CHURCH]
     if specific and specific[0][0] >= SPECIFIC_MIN:
         return specific[0][1], specific[0][0]
@@ -3464,6 +3832,13 @@ def main():
     ap.add_argument("--text-chars", type=int, default=900,
                     help="how much article text to print per story in --sheet (default 900; "
                          "was 260 before 25.08.2026)")
+    ap.add_argument("--text-short", type=int, default=320,
+                    help="tiered depth: print only this many characters of text for a lead "
+                         "that is x1, not UK/Irish, not a primary source and not part of a "
+                         "named event (see text_depth). Default 320 since 27.09.2026 - it cut "
+                         "the 25.09 sheet by 32%%, and all 8 of that day's tier-1 picks that "
+                         "fell in the short tier were decidable from their first 320 chars. "
+                         "0 = off, every lead gets --text-chars")
     ap.add_argument("--leads-json", metavar="PATH",
                     help="sheet only: also write a machine-readable manifest of the leads "
                          "shown, for record_tiers.py. Emitted from the same list the sheet "
@@ -3562,6 +3937,7 @@ def main():
         # preview for paywalled leads, and - last - another outlet's account of the same
         # story for the ones that refuse machine access entirely.
         previewed = 0 if args.no_ledes else attach_previews(leads)
+        syndicated = 0 if args.no_ledes else attach_syndicated_text(leads)
         borrowed = 0 if args.no_ledes else attach_sibling_text(leads)
         # ...and re-sorted now the text exists, because importance() reads the text signals
         # that attach_openings has just written. Until 25.08.2026 only the first sort ran, so
@@ -3589,6 +3965,7 @@ def main():
             if it.get("_preview"):  return "preview"
             if real_summary(it):    return "feed"
             if it.get("_lede"):     return "page"
+            if it.get("_syntext"):  return "syndicated"
             if it.get("_sibtext"):  return "sibling"
             return None
 
@@ -3597,9 +3974,11 @@ def main():
         total = len(leads) or 1
         sys.stderr.write(
             "text coverage: %d/%d leads readable (%.0f%%) - %d article text, %d paywalled "
-            "preview, %d feed summary, %d shallow page, %d via another outlet, %d NO TEXT\n"
+            "preview, %d feed summary, %d shallow page, %d syndicated copy, %d via another "
+            "outlet, %d NO TEXT\n"
             % (have, len(leads), 100.0 * have / total, routes["text"], routes["preview"],
-               routes["feed"], routes["page"], routes["sibling"], routes[None]))
+               routes["feed"], routes["page"], routes["syndicated"], routes["sibling"],
+               routes[None]))
         late = outside_own_window(items)
         if late:
             # An item outside its OWN source's window means fetch_feeds' cutoff or a date
@@ -3613,24 +3992,44 @@ def main():
                                               for n, f, a, w in late[:6])))
         sys.stderr.write(
             "  fetched this run (rest came from cache): %d opening(s), %d lede(s), "
-            "%d preview(s), %d sibling(s)\n" % (opened, fetched, previewed, borrowed))
+            "%d preview(s), %d syndicated, %d sibling(s)\n"
+            % (opened, fetched, previewed, syndicated, borrowed))
         if 100.0 * have / total < 70:
             sys.stderr.write(
                 "  TEXT COVERAGE DEGRADED - under 70%. The day is being ranked on headlines; "
                 "say so prominently in the final message.\n")
 
         def lead_text(it):
-            return it.get("_opening") or it.get("_preview") or it.get("_sibtext")
+            return (it.get("_opening") or it.get("_preview") or it.get("_syntext")
+                    or it.get("_sibtext"))
 
         # The manifest is written from `leads` BEFORE --new-only filters it: recording only
         # the leads that were re-read would leave every unchanged story permanently absent
         # from the store, and so permanently "new" - the exact loop this is meant to break.
         if args.leads_json:
             import tiers as _tiers
+            # "text"/"text_from" added 27.09.2026 for slack_five.py: the five's notes are
+            # written by hand, and for a lead whose own page is unreadable (the Telegraph's
+            # RCN "eunuch" story on 25.09) the writer had nothing to write from, though the
+            # sheet had shown another outlet's account. slack_five prints this beside any slot
+            # left without a note. It is source material for a note, never pasted into one.
+            def _from(it):
+                if it.get("_opening"):
+                    return "article text"
+                if it.get("_preview"):
+                    return "paywall preview"
+                if it.get("_syntext"):
+                    return it.get("_synfrom") or "syndicated copy"
+                if it.get("_sibtext"):
+                    return "via " + (it.get("_sibfrom") or "another outlet")
+                return None
             manifest = [{"i": it["_i"], "key": fetch_feeds.url_key(it["url"]),
                          "section": it.get("_section"), "headline": it.get("headline"),
                          "outlet": it.get("outlet"),
-                         "text_id": _tiers.text_id(lead_text(it))} for it in leads]
+                         "text_id": _tiers.text_id(lead_text(it)),
+                         "text": (lead_text(it) or real_summary(it, 600) or "")[:600],
+                         "text_from": _from(it) or ("feed summary" if real_summary(it)
+                                                    else None)} for it in leads]
             with open(args.leads_json, "w") as fh:
                 json.dump(manifest, fh)
             sys.stderr.write("wrote %d lead(s) to %s\n"
@@ -3674,8 +4073,10 @@ def main():
         out.write("RANKING SHEET - %d stories from %d candidates, %s sources\n"
                   % (len(leads), len(all_rows), data.get("sources", "?")))
         out.write("one line per story; xN = N outlets carrying it (the only free measure of "
-                  "how big it is)\ncols: N | section | region | iN xN | headline | outlet | "
-                  "age\n'> text:' is the article's own opening, fetched and scrubbed of page "
+                  "how big it is). eN, where shown, = N items on the same NAMED event (a shared "
+                  "name plus an event word), reported in wordings too different to collapse - "
+                  "it merges nothing, so read the other lines too\ncols: N | section | region | "
+                  "iN xN [eN] | headline | outlet | age\n'> text:' is the article's own opening, fetched and scrubbed of page "
                   "furniture - rank on this, not the headline. '> feed:' is the outlet's own "
                   "summary, used when the page could not be fetched; '> page:' an older "
                   "shallow standfirst.\n'> preview (£...)' is a PAYWALLED story's public "
@@ -3713,14 +4114,34 @@ def main():
         # stories that should have run and 17 of them were in the sweep, unpicked, most of them
         # exactly that shape. The marker does not reorder anything - reordering by source would
         # bury the day's real news instead - it just makes them findable wherever they sit.
+        ev = event_sizes(all_rows)
+
+        # Tiered text depth (27.09.2026). The full-text sheet reached ~280k tokens on
+        # 25.09.2026, past what can be read in one pass without truncating by hand. Chris's
+        # instruction (25.08.2026) is to rank on the article, not the headline, and the reason
+        # it holds is the lead that turns on a fact in paragraph two - so depth is cut only
+        # where the ranking is least likely to turn on it: a single-outlet, non-UK story that
+        # is not a primary source and not part of a named event. Those still get the opening
+        # (--text-short chars), which carries report-vs-comment and the basic facts. UK and
+        # Irish stories, anything corroborated, every primary source and every named event
+        # keep the full --text-chars.
+        def text_depth(it, region, e):
+            if not args.text_short:
+                return args.text_chars
+            full = (region in ("UK", "Ireland") or it["_corr"] >= 2 or e >= 3
+                    or any(t in (it["outlet"] or "").lower() for t in PRIMARY_SOURCE))
+            return args.text_chars if full else args.text_short
+
         for it in leads:
             n = it["_corr"]
             star = " ★" if any(t in (it["outlet"] or "").lower()
                                for t in PRIMARY_SOURCE) else ""
-            out.write("%d%s | %s | %s | i%-2d x%d | %s | %s%s | %s%s\n" % (
-                it["_i"], star, it["_section"][:4],
-                regions.region(it["headline"], it["outlet"], "", region_text(it)),
-                importance(it), n, it["headline"], it["outlet"],
+            e = ev.get(id(it), 1)
+            reg = regions.region(it["headline"], it["outlet"], "", region_text(it))
+            depth = text_depth(it, reg, e)
+            out.write("%d%s | %s | %s | i%-2d x%d%s | %s | %s%s | %s%s\n" % (
+                it["_i"], star, it["_section"][:4], reg,
+                importance(it), n, (" e%d" % e) if e > n else "", it["headline"], it["outlet"],
                 (" £" if it["paywalled"] else "") +
                 (" ↗" if "news.google.com" in it["url"] else ""),
                 "new" if it["age_h"] is None else "%sh" % it["age_h"],
@@ -3736,7 +4157,7 @@ def main():
                 out.write("    > is: %s\n" % flags)
             text = real_summary(it)
             if it.get("_opening"):
-                out.write("    > text: %s\n" % it["_opening"][:args.text_chars])
+                out.write("    > text: %s\n" % it["_opening"][:depth])
             elif it.get("_preview"):
                 out.write("    > preview (£, publisher's own summary): %s\n"
                           % it["_preview"])
@@ -3744,9 +4165,11 @@ def main():
                 out.write("    > feed: %s\n" % text)
             elif it.get("_lede"):
                 out.write("    > page: %s\n" % it["_lede"][:200])
+            elif it.get("_syntext"):
+                out.write("    > syndicated (%s): %s\n" % (it["_synfrom"], it["_syntext"]))
             elif it.get("_sibtext"):
                 out.write("    > via %s on the same story: %s\n"
-                          % (it["_sibfrom"], it["_sibtext"][:args.text_chars]))
+                          % (it["_sibfrom"], it["_sibtext"][:depth]))
             else:
                 # Say WHY there is no text. An absent line reads as an absent story, and
                 # the outlet it happens to most is the Telegraph - 8 of its 12 leads on

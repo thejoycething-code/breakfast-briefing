@@ -57,7 +57,9 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 # State lives in the briefing folder by default. Set BB_STATE_FOLDER to keep it elsewhere.
 FOLDER="${BB_STATE_FOLDER:-$BB_STATE_FOLDER_DEFAULT}"
 STATE_FILES="seen.json cut.json source_health.json resolved.json authors.json ledes.json \
-             openings.json previews.json firstseen.json"
+             openings.json previews.json firstseen.json boilerplate.json syndicated.json"
+# boilerplate.json added 27.09.2026: site furniture learned from the text caches. Rebuildable
+# (python3 boilerplate.py --learn) but only from the caches above, so it travels with them.
 # firstseen.json added 08.09.2026. It records when an UNDATED item was first offered, which is
 # the only thing that stops a dateless source's whole index counting as new every single day -
 # seen.json cannot, because it only ever knows what was published. Losing it would silently
@@ -131,7 +133,9 @@ CODE_FILES="shortlist.py run_tests.py regions.py compose.py fetch_feeds.py resol
 upload-archive-to-drive.sh upload-dir-to-drive.sh state_sync.sh gdrive_auth.sh \
 archive_day.py audit_feeds.py authors.py check_sources.py discover_feeds.py \
 mark_published.py publish.sh rank_eval.py slice_shortlist.py \
-textsignals.py tier_model.py sync_docs.sh backfill_firstseen.py slack_five.py eval_week.sh markup.py"
+textsignals.py tier_model.py sync_docs.sh backfill_firstseen.py slack_five.py eval_week.sh markup.py \
+verify_doc.sh verify_links.py boilerplate.py"
+# verify_doc.sh and verify_links.py added 27.09.2026 for finish_edition.sh --from.
 # markup.py and eval_week.sh added 10.09.2026 alongside slack_five.py.
 #
 # tier_model.json is deliberately NOT here. `tier_model.py --save` can write one, but nothing

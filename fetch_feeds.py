@@ -302,6 +302,8 @@ def fetch(url, retry_uas=2, data=None, headers=None):
         }
         if headers:
             hdrs.update(headers)
+        if "cloud.feedly.com" in url and os.environ.get("BB_FEEDLY_TOKEN"):
+            hdrs["Authorization"] = "OAuth " + os.environ["BB_FEEDLY_TOKEN"]
         req = urllib.request.Request(url, data=data, headers=hdrs)
         try:
             with _OPENER.open(req, timeout=TIMEOUT) as resp:
@@ -323,7 +325,7 @@ def fetch(url, retry_uas=2, data=None, headers=None):
 # Source loading
 # ---------------------------------------------------------------------------
 FEED_MODES = ("pass", "filter", "gnews", "gnewsf", "bing", "bingf",
-              "scrapesrc", "scrapesrcf", "wpjson", "wpjsonf")
+              "scrapesrc", "scrapesrcf", "wpjson", "wpjsonf", "feedly")
 # Modes that keep only items matching the topical keyword list.
 FILTERED_MODES = {"filter", "gnewsf", "bingf", "scrapesrcf", "wpjsonf"}
 
@@ -395,9 +397,19 @@ def gnews_url(target, days=2):
 
 def bing_url(domain):
     """Bing News site: search. Its links wrap the real publisher URL, which we
-    unwrap in unwrap_link(), so these come out as direct links."""
+    unwrap in unwrap_link(), so these come out as direct links.
+
+    "kw:" makes it a free query, as for gnews_url (27.09.2026). Bing is the one route that
+    carries the publisher's own standfirst for outlets that refuse machine access - every
+    item of `site:telegraph.co.uk migrants` came with one - but it answers a single term
+    and returns ~1 result for an OR-query, so topic searches are one term per line.
+    """
+    if domain.startswith("kw:"):
+        query = domain[3:].strip()
+    else:
+        query = "site:" + domain
     return ("https://www.bing.com/news/search?q=%s&format=RSS&count=40"
-            % urllib.parse.quote("site:" + domain))
+            % urllib.parse.quote(query))
 
 
 def unwrap_link(url):
@@ -438,6 +450,42 @@ def is_paywalled(url, src_domain=""):
     return False
 
 
+def feed_outlet_label(ftitle):
+    """The outlet name a feed's title stands for, when the item names no source itself.
+
+    A "(bing: topic)" suffix is this file's own label for one of several searches of the same
+    outlet (extra_feeds.txt, 27.09.2026), never part of the outlet's name. Bing items carry no
+    source field, so without this the credit read "The Telegraph (bing: church)". Only that
+    exact label is stripped: "The Post (New Zealand)" is a real name, and its bracket is what
+    places it.
+    """
+    return re.sub(r"\s*\(bing:[^)]*\)\s*$", "", ftitle or "")
+
+
+def _safe_reaches(it):
+    try:
+        return reaches_a_section(it)
+    except Exception:  # noqa: BLE001
+        return True
+
+
+def recheck_paywall(it):
+    """Re-derive the paywall flag once a Google News redirect has become a real URL.
+
+    Found 27.09.2026. is_paywalled() runs when the item is read, and for a Google News item
+    the URL is then an opaque redirect, so it falls back to the domain the search targeted.
+    A topic search ("kw:... site:telegraph.co.uk") targets no domain, so every Telegraph and
+    Times item from the 24.09.2026 topic searches was marked NOT paywalled: the sheet printed
+    them without the (£) mark, and the text fetch treated them as free pages and asked for
+    the full article rather than the capped public preview (fetch_article_preview's docstring
+    explains why that cap is a boundary). The Telegraph answers 402 regardless, but a metered
+    paywall that ships the whole article in its HTML would not have. Only ever sets the flag,
+    never clears it.
+    """
+    if not it.get("paywalled") and is_paywalled(it.get("url") or ""):
+        it["paywalled"] = True
+
+
 def load_feeds():
     extra, scrapes, disabled, blocked = load_extra()
     feeds, seen_urls = [], set()
@@ -471,6 +519,9 @@ def load_feeds():
             target = gnews_url(target) if mode.startswith("gnews") else bing_url(target)
         elif mode.startswith(("scrapesrc", "wpjson")):
             domain = urllib.parse.urlsplit(target).netloc
+        elif mode == "feedly":
+            domain = urllib.parse.urlsplit(target).netloc.replace("www.", "")
+            target = feedly_url(target)
         add(category, title, target, mode, domain)
 
     body = ET.parse(OPML).getroot().find("body")
@@ -535,6 +586,46 @@ def sanitise_xml(raw):
     raw = raw.decode("utf-8", "replace").encode("utf-8")
     raw = CTRL_CHARS.sub(b"", raw)
     return BARE_AMP.sub(b"&amp;", raw)
+
+
+# A publisher's RSS, read through Feedly (27.09.2026). The Church Times now answers every
+# request to its own site - the RSS included - with a Cloudflare bot challenge, so on
+# 25.09.2026 all of its news reached the sheet as bare Google News headlines. Feedly still
+# polls that same RSS (it is the reader Chris's OPML came from), and its stream endpoint
+# returns the publisher's own items, dates and standfirsts: 40 of 40 had a 250-char summary.
+# This reads the publisher's public feed via the reader it was written for; it does not
+# touch the publisher's site. $BB_FEEDLY_TOKEN, if set, is sent as the account's developer
+# token; without it the public endpoint is used, which is what worked when this was built.
+# Useless where Feedly is ALSO challenged - EWTN GB's Feedly copy stopped on 05.08.2026.
+FEEDLY_STREAM = "https://cloud.feedly.com/v3/streams/contents?streamId=%s&count=60"
+
+
+def feedly_url(feed_url):
+    return FEEDLY_STREAM % urllib.parse.quote("feed/" + feed_url, safe="")
+
+
+def parse_feedly(raw, feed_title=""):
+    data = json.loads(raw.decode("utf-8", "replace") if isinstance(raw, bytes) else raw)
+    if not isinstance(data, dict) or "items" not in data:
+        raise ValueError("feedly-no-items")
+    out = []
+    for x in data["items"]:
+        link = ((x.get("canonical") or x.get("alternate") or [{}])[0] or {}).get("href", "")
+        body = (x.get("summary") or x.get("content") or {}).get("content", "")
+        body = html_mod.unescape(re.sub(r"<[^>]+>", " ", body))
+        when = x.get("published") or x.get("crawled")
+        out.append({
+            "title": html_mod.unescape(x.get("title") or "").strip(),
+            "link": link,
+            "date": (dt.datetime.fromtimestamp(when / 1000, dt.timezone.utc) if when else None),
+            "author": (x.get("author") or "")[:40],
+            "source": feed_title,
+            "source_url": "",
+            "feed_title": feed_title,
+            "summary": re.sub(r"\s+", " ", body).strip(),
+            "categories": [],
+        })
+    return out
 
 
 def parse_wpjson(raw, feed_title=""):
@@ -1148,6 +1239,118 @@ def fetch_article_opening(url, max_len=4000, paras=10):
 
 
 # ---------------------------------------------------------------------------
+# Text prefetch - article text fetched DURING the sweep, not after it
+# ---------------------------------------------------------------------------
+# Why (27.09.2026). The morning ran two long waits back to back: the sweep (~31 min on
+# 25.09.2026, most of it decoding ~1,300 Google News redirects at ~1.2s each, which only
+# talks to Google) and then shortlist --sheet (~17 min, fetching ~750 article pages, which
+# never talks to Google). Nothing in the second depends on the first except which URL to
+# fetch - and most URLs are known before decoding starts. So the article fetches now run
+# alongside the decode: direct links are queued as soon as the feeds are read, and each
+# redirect is queued the moment Google decodes it.
+#
+# It writes the SAME caches the sheet reads (openings.json, previews.json), with the same
+# schema and the same never-cache-a-failure rule, so shortlist's attach_openings finds them
+# warm and only fetches what is left. Nothing here decides anything: it is the sheet's work,
+# done earlier. A miss costs nothing - the sheet fetches it as it always has.
+PREFETCH_WORKERS = 8
+PREFETCH_GRACE = 240   # seconds to let queued fetches finish after decoding is done
+
+
+def reaches_a_section(it):
+    """True if shortlist would put this item in a section - i.e. it can reach the sheet.
+
+    Shared by the text prefetcher and the decode filter so the two cannot disagree with each
+    other or with shortlist. Blocked sources and chaff never reach the sheet; nor does an item
+    no section wants (it is printed in NO SECTION MATCHED, headline only, and a rescue from
+    there is resolved at compose time like any other pick).
+    """
+    import shortlist as sl               # local: shortlist imports this module
+    outlet = it.get("outlet") or ""
+    if sl.is_blocked_outlet(outlet) or sl.is_chaff(it["headline"], outlet, it.get("categories")):
+        return False
+    sec, _ = sl.classify(it["headline"], outlet, it.get("categories"), sl.region_text(it))
+    return sec is not None
+
+
+class TextPrefetcher:
+    def __init__(self, workers=PREFETCH_WORKERS):
+        import shortlist as _sl          # local: shortlist imports this module
+        self.sl = _sl
+        self.caches = {}
+        for name, path in (("open", _sl.OPENINGS_CACHE), ("prev", _sl.PREVIEWS_CACHE)):
+            try:
+                c = json.load(open(path))
+            except (OSError, ValueError):
+                c = {}
+            if name == "open" and c.get("__schema__") != _sl.OPENINGS_SCHEMA:
+                c = {"__schema__": _sl.OPENINGS_SCHEMA}
+            self.caches[name] = c
+        self.new = {"open": {}, "prev": {}}
+        self.queued = set()
+        self.lock = threading.Lock()
+        self.pool = futures.ThreadPoolExecutor(max_workers=workers)
+        self.futs = []
+        self.skipped = 0
+
+    def _wanted(self, it):
+        url = it.get("url") or ""
+        if not url or "news.google.com" in url:
+            return False
+        key = url_key(url)
+        if key in self.queued:
+            return False
+        if key in self.caches["prev" if it.get("paywalled") else "open"]:
+            return False
+        return reaches_a_section(it)
+
+    def submit(self, it):
+        try:
+            if not self._wanted(it):
+                self.skipped += 1
+                return
+        except Exception:  # noqa: BLE001 - a classification hiccup must not stop the sweep
+            return
+        key = url_key(it["url"])
+        self.queued.add(key)
+        self.futs.append(self.pool.submit(self._one, key, it["url"], bool(it.get("paywalled"))))
+
+    def _one(self, key, url, paywalled):
+        text = fetch_article_preview(url) if paywalled else fetch_article_opening(url)
+        if text:
+            with self.lock:
+                self.new["prev" if paywalled else "open"][key] = text
+
+    def finish(self, grace=PREFETCH_GRACE):
+        """Wait up to `grace` seconds, drop the rest, merge into the on-disk caches."""
+        done, pending = futures.wait(self.futs, timeout=grace)
+        for f in pending:
+            f.cancel()
+        self.pool.shutdown(wait=False, cancel_futures=True)
+        sl = self.sl
+        for name, path in (("open", sl.OPENINGS_CACHE), ("prev", sl.PREVIEWS_CACHE)):
+            with self.lock:
+                fresh = dict(self.new[name])
+            if not fresh:
+                continue
+            # Re-read before writing: the file on disk is the authority, and merging onto it
+            # rather than overwriting it means nothing another process wrote is lost.
+            try:
+                disk = json.load(open(path))
+            except (OSError, ValueError):
+                disk = {}
+            if name == "open" and disk.get("__schema__") != sl.OPENINGS_SCHEMA:
+                disk = {"__schema__": sl.OPENINGS_SCHEMA}
+            disk.update(fresh)
+            tmp = path + ".tmp"
+            with open(tmp, "w") as fh:
+                json.dump(disk, fh)
+            os.replace(tmp, path)
+        return (len(self.new["open"]), len(self.new["prev"]), len(pending),
+                len(self.queued))
+
+
+# ---------------------------------------------------------------------------
 # Seen store
 # ---------------------------------------------------------------------------
 def load_seen():
@@ -1264,6 +1467,9 @@ def main():
                          "sends ~40%% of leads to the ranker with no article text")
     ap.add_argument("--decode-workers", type=int, default=8,
                     help="concurrency for redirect decoding (default 8)")
+    ap.add_argument("--no-prefetch", action="store_true",
+                    help="do not fetch article text during the sweep; the sheet then fetches "
+                         "it all afterwards, as before 27.09.2026 (~15 min slower)")
     args = ap.parse_args()
 
     # 36h by default so nothing slips through the gap between runs; the overlap is
@@ -1308,6 +1514,8 @@ def main():
                     # A WordPress REST collection. Dated like a feed, so it takes the
                     # normal window path below - nothing here is dateless.
                     entries = parse_wpjson(job.result(), ftitle)
+                elif mode == "feedly":
+                    entries = parse_feedly(job.result(), ftitle)
                 else:
                     entries = parse_feed(job.result())
             except Exception as exc:  # noqa: BLE001
@@ -1363,7 +1571,7 @@ def main():
                         continue
                     firstseen_add.setdefault(url_key(link), now.isoformat())
                 outlet = (e["source"] or (suffix if is_g else "")
-                          or ftitle or outlet_from_url(link))
+                          or feed_outlet_label(ftitle) or outlet_from_url(link))
                 outlet = re.sub(r"\s+", " ", outlet).strip()[:44]
                 if is_junk_title(headline, outlet):
                     continue
@@ -1406,7 +1614,25 @@ def main():
             direct = link_index.get(title_key(it["headline"]))
             if direct and "news.google.com" not in direct:
                 it["url"] = direct
+                recheck_paywall(it)
                 resolved += 1
+
+    def on_decoded(it):
+        recheck_paywall(it)
+        if prefetch:
+            prefetch.submit(it)
+
+    # Start fetching article text now, alongside the decode below (see TextPrefetcher).
+    prefetch = None
+    if not args.no_prefetch:
+        try:
+            prefetch = TextPrefetcher()
+            for it in items:
+                if "news.google.com" not in it["url"]:
+                    prefetch.submit(it)
+        except Exception as exc:  # noqa: BLE001 - prefetch is an optimisation, never a gate
+            sys.stderr.write("prefetch disabled: %s\n" % exc)
+            prefetch = None
 
     # Then ask Google itself for whatever title-matching could not reach.
     #
@@ -1423,20 +1649,49 @@ def main():
     # below that can now match a redirect against the direct link to the same story.
     # resolve_items caches successes only - never failures (see its comment).
     decoded = 0
+    skipped_filler = 0
     if not args.no_decode:
         import resolve as _resolve   # local: resolve imports this module
         still = [it for it in items if "news.google.com" in it["url"]]
+        # Decode only what can reach the sheet (27.09.2026). On 25.09.2026, 214 of the 806
+        # decoded redirects (27%) were chaff, blocked or matched no section, and each cost
+        # two Google requests behind the 0.7s gap. They stay as redirects, reported apart
+        # from the real "still redirects" count so the decoder-health signal is unchanged.
+        try:
+            keep = [it for it in still if reaches_a_section(it)]
+        except Exception as exc:  # noqa: BLE001 - never let the filter stop the decode
+            sys.stderr.write("decode filter disabled: %s\n" % exc)
+            keep = still
+        skipped_filler = len(still) - len(keep)
+        still = keep
         if still:
             decoded, _ = _resolve.resolve_items(
-                still, workers=args.decode_workers)
+                still, workers=args.decode_workers,
+                on_resolved=on_decoded)
 
     # Dedup: direct links beat Google redirects; then newest wins.
     items.sort(key=lambda i: ("news.google.com" in i["url"], i["published"]))
     cut = load_cut()
     by_url, by_title, kept, already, cut_out = set(), set(), [], 0, 0
+    # The copy dedup drops may carry text the kept copy lacks (27.09.2026). The Telegraph
+    # arrives both via Google News (headline only - its feed summary is the headline again)
+    # and via Bing (the publisher's own standfirst); once the Google redirect is decoded both
+    # are direct links, and whichever sorts first was kept - so the standfirst was thrown
+    # away and the lead reached the ranker as "NO TEXT". Keep the longer summary instead.
+    kept_by = {}
+
+    def _borrow_summary(dup):
+        k = kept_by.get(url_key(dup["url"])) or kept_by.get(title_key(dup["headline"]))
+        if k is None:
+            return
+        mine, theirs = (k.get("summary") or ""), (dup.get("summary") or "")
+        if len(theirs) > len(mine) + 40 and not theirs.startswith(k["headline"][:40]):
+            k["summary"] = theirs
+
     for it in items:
         uk, tk = url_key(it["url"]), title_key(it["headline"])
         if uk in by_url or (tk and tk in by_title):
+            _borrow_summary(it)
             continue
         # Lost to a section cap in an earlier edition: drop, do not flag. See load_cut().
         if uk in cut:
@@ -1451,9 +1706,26 @@ def main():
         by_url.add(uk)
         if tk:
             by_title.add(tk)
+        kept_by[uk] = it
+        if tk:
+            kept_by[tk] = it
         kept.append(it)
 
-    unresolved = sum(1 for i in kept if "news.google.com" in i["url"])
+    filler_left = 0
+    if skipped_filler:
+        # Of the redirects left in `kept`, the ones the filter chose not to decode are filler
+        # by construction; the rest are genuine decode failures - the health signal.
+        filler_left = sum(1 for i in kept if "news.google.com" in i["url"]
+                          and not _safe_reaches(i))
+    unresolved = sum(1 for i in kept if "news.google.com" in i["url"]) - filler_left
+
+    if prefetch:
+        t0 = time.monotonic()
+        n_open, n_prev, n_dropped, n_queued = prefetch.finish()
+        sys.stderr.write(
+            "prefetch: %d opening(s) + %d paywall preview(s) fetched during the sweep, of %d "
+            "queued (%d unfinished left for the sheet; waited %.0fs after decoding)\n"
+            % (n_open, n_prev, n_queued, n_dropped, time.monotonic() - t0))
     kept.sort(key=lambda i: (i["category"], i["published"]))
 
     out = sys.stdout
@@ -1465,9 +1737,9 @@ def main():
               "| %d already published in an earlier edition (kept, flagged) "
               "| %d dropped as cut by an earlier cap "
               "| gnews: %d matched to a direct link, %d decoded via Google, "
-              "%d still redirects\n"
+              "%d still redirects (+%d filler not decoded)\n"
               % (len(feeds) - len(errors), len(errors), len(items), len(kept),
-                 already, cut_out, resolved, decoded, unresolved))
+                 already, cut_out, resolved, decoded, unresolved, filler_left))
     out.write("paywalled items (marked £, use \"(£)\" after the outlet name): %d\n"
               % sum(1 for i in kept if i["paywalled"]))
     out.write("cols: N | headline | url | outlet | author | age  "

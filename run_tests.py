@@ -576,6 +576,23 @@ def run(verbose=False, known_red=None):
         failed.append(("smoke", "%d publish --verify misjudgement(s): %s"
                        % (len(pv), "; ".join(pv))))
 
+    # 27.09.2026 additions: the resume path's verifier, the text scrubber, the paywall
+    # re-check after decoding, and the Bing topic routes. See each function below.
+    for fn, what in ((test_verify_links, "verify_links (--from) misjudgement"),
+                     (test_boilerplate_scrub, "boilerplate scrub problem"),
+                     (test_paywall_rechecked_after_decode, "paywall re-check problem"),
+                     (test_bing_topic_routes, "Bing topic-route problem"),
+                     (test_finish_edition_from_guards, "finish_edition --from guard problem"),
+                     (test_event_sizes, "event-size problem"),
+                     (test_feedly_parse, "Feedly-route problem"),
+                     (test_batched_decode_mapping, "batched-decode problem"),
+                     (test_syndicated_credit, "syndicated-copy problem")):
+        got = fn()
+        if not got:
+            passed += 1
+        else:
+            failed.append(("smoke", "%d %s(s): %s" % (len(got), what, "; ".join(got))))
+
     # A decode that is really a paginated index must not be trusted. See the function below.
     idx = test_gnews_index_decode_flagged()
     if not idx:
@@ -1796,6 +1813,295 @@ def test_all_data_files_backed_up():
                       % (f, DERIVED[f]) for f in DERIVED if not _writer_of(f))
     orphans = sorted(f for f in ORPHANS if os.path.isfile(os.path.join(HERE, f)))
     return (missing, orphans)
+
+
+def test_boilerplate_scrub():
+    """boilerplate.scrub removes site furniture and nothing else (27.09.2026).
+
+    Measured on 18,276 cached openings: the Independent's login notice opened 346 of 346 of its
+    entries, GB News's 60-word menu 232 of 232, and the sheet printed them as article text. The
+    negative cases pin the three ways the first draft of the scrubber damaged real prose: a
+    case-insensitive "COMMENTS" rule that took the noun out of "his comments", a learned
+    6-gram that cut ADF's "the U.S. Court of Appeals for the" out of a sentence (hence
+    MIN_RUN), and a punctuation tidy-up that rewrote text containing no furniture at all.
+    """
+    import boilerplate as bp
+    bad = []
+    prose = ("The Home Office initially rejected her asylum application, citing suspicions "
+             "that the marriage was not legitimate, the tribunal heard on Thursday afternoon.")
+    notice = ("Please refresh the page or navigate to another page on the site to be "
+              "automatically logged in Please refresh your browser to be logged in")
+    gb_menu = ("US Edition UK Edition Home GBN Shop YourSay YouDecide Support Us News Alerts "
+               "Latest Puzzles Win Tickets News UK News US News Cost of Living Energy Bills "
+               "I'm A Celeb! with Stephen and Anne You are about to be charged £0.00 *")
+    cases = [
+        ("independent notice only", "independent.co.uk/x", notice, None),
+        ("independent notice + prose", "independent.co.uk/x", notice + " " + prose, prose),
+        # The prose repeats either side of the menu, so drop_standfirst_echo keeps one copy.
+        ("gb news menu, closed", "gbnews.com/x", prose + " " + gb_menu + " " + prose, prose),
+        ("standfirst echo", "example.com/x",
+         prose[:120] + " " + prose + " It continues with a second sentence of real detail.",
+         prose + " It continues with a second sentence of real detail."),
+        ("gb news menu, runs to end", "gbnews.com/x",
+         prose + " US Edition UK Edition Home GBN Shop YourSay YouDecide Support Us News "
+         "Alerts Latest Puzzles Win Tickets", prose),
+        ("guardian fullscreen", "theguardian.com/x",
+         "View image in fullscreen " + prose, prose),
+    ]
+    for label, key, text, want in cases:
+        got = bp.scrub(key, text)
+        if got != want:
+            bad.append("%s: got %r" % (label, (got or "None")[:90]))
+    # Untouched when nothing is furniture - byte-identical, not merely similar.
+    plain = "He defended his comments , and said 0 people were hurt; the comments stood."
+    plain = plain + " " + prose
+    if bp.scrub("example.com/x", plain) is not plain:
+        bad.append("text with no furniture was rewritten: %r" % bp.scrub("example.com/x", plain)[:90])
+    # Learned/day furniture: host-scoped, run-length gated, opinion markers kept.
+    furniture = ("EWTN News, Inc. is the world's largest Catholic news organization, comprised "
+                 "of television, radio, print and digital media outlets")
+    texts = [prose + " " + furniture + " story %d continues here with more words." % i
+             for i in range(8)]
+    grams = bp.learn_grams(texts, 0.4, 4)
+    if bp.scrub("ncregister.com/x", texts[0], extra=grams) == texts[0]:
+        bad.append("a 20-word recurring blurb was learned but not cut")
+    court = ("ADF attorneys asked the U.S. Court of Appeals for the Ninth Circuit to act, "
+             "arguing the rule was unconstitutional and harmed the athletes involved.")
+    topics = ["a school board", "a florist", "a pregnancy centre", "a chaplain", "a baker",
+              "a campus ministry", "a counsellor", "a wrestler"]
+    short_grams = bp.learn_grams(
+        ["Lawyers for %s filed with the U.S. Court of Appeals for the circuit number %d on "
+         "a different day entirely." % (t, i) for i, t in enumerate(topics)], 0.4, 4)
+    got = bp.scrub("adflegal.org/x", court, extra=short_grams)
+    if "Court of Appeals" not in (got or ""):
+        bad.append("a short recurring phrase was cut (MIN_RUN): %r" % (got or "None")[:90])
+    op = "CP VOICES do not necessarily reflect the views of The Christian Post editors"
+    if any("necessarily reflect" in g for g in bp.learn_grams(
+            [op + " piece %d about something else entirely." % i for i in range(8)], 0.4, 4)):
+        bad.append("an opinion marker was learned as furniture")
+    return bad
+
+
+def test_verify_links():
+    """verify_links.py (finish_edition.sh --from) matches hrefs whole, parentheses included.
+
+    Same cases as test_publish_verify_parens, run against the resume path's own verifier, so
+    `--from mark` cannot mark against a doc a looser check would have waved through.
+    """
+    import tempfile
+    import verify_links as vl
+    jak = ("https://www.thejakartapost.com/indonesia/2026/09/25/tangerang-church-disruption-"
+           "rekindles-fears-among-minorities?utm_source=(direct)&utm_medium=single_latest")
+    jak_wrapped = ("https://www.google.com/url?q=https://www.thejakartapost.com/indonesia/"
+                   "2026/09/25/tangerang-church-disruption-rekindles-fears-among-minorities"
+                   "?utm_source%3D(direct)%26utm_medium%3Dsingle_latest&amp;sa=D&amp;usg=x")
+    a = '<a href="%s">link</a>'
+    cases = [
+        ("paren query, wrapped", [jak], a % jak_wrapped, 0),
+        ("paren query, bare", [jak], a % jak.replace("&", "&amp;"), 0),
+        ("truncated at the paren", [jak],
+         a % jak.split("(")[0], 1),
+        ("prefix only", [jak + "&x=1"], a % jak.replace("&", "&amp;"), 1),
+        ("visible text, no href", [jak], "<p>%s</p>" % jak, 1),
+        ("nothing wanted", [], a % jak_wrapped, 1),
+    ]
+    bad = []
+    for label, want, doc, rc in cases:
+        sent = "".join('<a href="%s">x</a>' % u.replace("&", "&amp;") for u in want)
+        with tempfile.TemporaryDirectory() as d:
+            dp, sp = os.path.join(d, "doc.html"), os.path.join(d, "sent.html")
+            open(dp, "w").write(doc)
+            open(sp, "w").write(sent)
+            import io
+            import contextlib
+            with contextlib.redirect_stdout(io.StringIO()):
+                got = vl.main(["verify_links.py", dp, sp])
+        if got != rc:
+            bad.append("%s: exit %d, want %d" % (label, got, rc))
+    return bad
+
+
+def test_paywall_rechecked_after_decode():
+    """A decoded Google News item is re-checked for a paywall (27.09.2026).
+
+    Topic searches ("kw:... site:telegraph.co.uk") target no domain, so while the link was
+    still a redirect is_paywalled() had nothing to go on: 50 items on 25.09.2026 - 22 Times,
+    16 Telegraph, 5 Church Times - went to the text fetch as free pages.
+    """
+    import fetch_feeds as ff
+    bad = []
+    it = {"url": "https://news.google.com/rss/articles/CBMiabc", "paywalled":
+          ff.is_paywalled("https://news.google.com/rss/articles/CBMiabc", "")}
+    if it["paywalled"]:
+        bad.append("fixture: a bare redirect should not look paywalled")
+    it["url"] = "https://www.telegraph.co.uk/news/2026/09/24/story"
+    ff.recheck_paywall(it)
+    if not it["paywalled"]:
+        bad.append("decoded Telegraph URL was not flagged paywalled")
+    free = {"url": "https://www.bbc.co.uk/news/articles/x", "paywalled": True}
+    ff.recheck_paywall(free)
+    if not free["paywalled"]:
+        bad.append("recheck_paywall cleared a flag; it must only ever set one")
+    return bad
+
+
+def test_bing_topic_routes():
+    """Bing topic searches build the right query and credit the real outlet (27.09.2026)."""
+    import fetch_feeds as ff
+    bad = []
+    u = ff.bing_url("kw:site:telegraph.co.uk migrants")
+    if "site%3Asite" in u or "site%3Atelegraph.co.uk%20migrants" not in u:
+        bad.append("kw: Bing query malformed: %s" % u)
+    if "site%3Aewtn.co.uk" not in ff.bing_url("ewtn.co.uk"):
+        bad.append("plain Bing site: query changed")
+    for raw, want in [("The Telegraph (bing: church)", "The Telegraph"),
+                      ("The Post (New Zealand)", "The Post (New Zealand)"),
+                      ("The Independent (Asia)", "The Independent (Asia)")]:
+        if ff.feed_outlet_label(raw) != want:
+            bad.append("feed_outlet_label(%r) = %r" % (raw, ff.feed_outlet_label(raw)))
+    return bad
+
+
+def test_finish_edition_from_guards():
+    """finish_edition.sh --from rejects what it cannot do, BEFORE touching anything (27.09.2026).
+
+    The resume path skips compose and publish, so its argument guards are the only thing that
+    stands between a typo and a half-run tail. Both cases below must exit 2 without reading
+    /tmp/today.json - they fail at argument parsing, so this is safe to run any time.
+    """
+    import subprocess
+    bad = []
+    for args in (["--from", "bogus"], ["--from", "mark", "--dry-run"], ["--from"]):
+        r = subprocess.run(["bash", os.path.join(HERE, "finish_edition.sh")] + args,
+                           capture_output=True, text=True, timeout=30)
+        if r.returncode != 2 or "==" in r.stdout:
+            bad.append("%s -> exit %d, stdout %r" % (" ".join(args), r.returncode,
+                                                      r.stdout[:60]))
+    return bad
+
+
+def test_event_sizes():
+    """event_sizes links one NAMED event across wordings, and nothing else (27.09.2026).
+
+    Built from 25.09.2026's real headlines: the FDA nominee's hearing arrived in wordings too
+    different for word overlap, and the fix links them on "Overton" + an event word. The
+    negatives are the three ways the first drafts chained unrelated stories: a title-case
+    common noun ("Judge"), a capitalised legal word ("Amendment", 22.09.2026), and an
+    institution ("Senate") shared by two different hearings.
+    """
+    import shortlist as sl
+    heads = [
+        "STAT+: Heidi Overton, Trump's pick for FDA head, faced questions at Senate hearing",
+        "Dr. Heidi Overton appears before Senate committee for confirmation hearing",
+        "Opinion | The deceptively high stakes of Heidi Overton's Senate hearing",
+        "Senate hearing probes claims of Flock camera Fourth Amendment violations",
+        "Parliament passes Transgender Persons Amendment Bill after heated debate",
+        "On the 50th anniversary of the Hyde Amendment, what the vote meant",
+        "Judge orders Trump to lift White House media ban on CNN and Politico",
+        "Judge dismisses Ohio lawmakers' lawsuit challenging abortion amendment",
+        "a judge said the ruling would stand, and the judge declined to comment",
+        "the judge who heard the case said the judge's order stood",
+    ]
+    rows = [{"headline": h} for h in heads]
+    size = sl.event_sizes(rows)
+    got = [size[id(r)] for r in rows]
+    bad = []
+    if got[0] < 3 or got[1] < 3 or got[2] < 3:
+        bad.append("the three Overton reports did not form one event: %s" % got[:3])
+    if got[3] != 1:
+        bad.append("a different Senate hearing joined the Overton event (%d)" % got[3])
+    if got[4] != 1 or got[5] != 1:
+        bad.append("'Amendment' chained two unrelated stories: %s" % got[4:6])
+    if got[6] != 1 or got[7] != 1:
+        bad.append("'Judge' linked two unrelated court stories: %s" % got[6:8])
+    return bad
+
+
+def test_feedly_parse():
+    """The Church Times arrives through Feedly's stream of its RSS (27.09.2026).
+
+    Pins the fields the sweep relies on: the publisher's canonical link (not a Feedly URL),
+    a timezone-aware date so the window test works, the standfirst as the summary, and that
+    an error body raises rather than looking like an empty feed.
+    """
+    import json as _json
+    import fetch_feeds as ff
+    bad = []
+    body = _json.dumps({"id": "feed/https://www.churchtimes.co.uk/rss", "items": [{
+        "title": "City of London churches sever ties with bishops",
+        "published": 1790290380000,
+        "alternate": [{"href": "https://www.churchtimes.co.uk/articles/2026/25-september/"
+                               "news/uk/city-of-london-churches-sever-ties-with-bishops"}],
+        "summary": {"content": "<p>THE Rector of St Helen&#8217;s, Bishopsgate, has "
+                               "characterised the bishops...</p>"}}]}).encode()
+    ents = ff.parse_feedly(body, "Church Times")
+    e = ents[0] if ents else {}
+    if not e.get("link", "").startswith("https://www.churchtimes.co.uk/articles/"):
+        bad.append("link is not the publisher's: %r" % e.get("link"))
+    if not e.get("date") or e["date"].tzinfo is None:
+        bad.append("date missing or naive: %r" % e.get("date"))
+    if "St Helen\u2019s" not in e.get("summary", "") or "<p>" in e.get("summary", ""):
+        bad.append("summary not unescaped/stripped: %r" % e.get("summary", "")[:60])
+    try:
+        ff.parse_feedly(b'{"errorCode": 401, "errorMessage": "unauthorized"}', "x")
+        bad.append("an error body parsed as an empty feed")
+    except ValueError:
+        pass
+    if "streamId=feed%2Fhttps%3A%2F%2Fwww.churchtimes.co.uk%2Frss" not in ff.feedly_url(
+            "https://www.churchtimes.co.uk/rss"):
+        bad.append("feedly_url malformed: %s" % ff.feedly_url("https://www.churchtimes.co.uk/rss"))
+    return bad
+
+
+def test_batched_decode_mapping():
+    """Batched Google decodes are matched by request id, never by position (27.09.2026).
+
+    The response below is the shape Google returned live that day: rows out of request order
+    (3, 1, 4) and request 2 - a lookup Google could not answer - present with no payload.
+    Matching by position would give request 2 the URL of request 3.
+    """
+    import resolve as rv
+    bad = []
+    raw = (")]}'\n\n"
+           '[["wrb.fr","Fbv4je",null,null,null,[3],"2"],'
+           '["wrb.fr","Fbv4je","[\\"garturlres\\",\\"https://example.com/three?x=1\\",1]",'
+           'null,null,null,"3"],'
+           '["wrb.fr","Fbv4je","[\\"garturlres\\",\\"https://example.com/one\\",1]",'
+           'null,null,null,"1"],'
+           '["wrb.fr","Fbv4je","[\\"garturlres\\",\\"https://example.com/four(a)\\",1]",'
+           'null,null,null,"4"],["di",12]]')
+    got = rv.parse_batch_response(raw)
+    want = {"1": "https://example.com/one", "3": "https://example.com/three?x=1",
+            "4": "https://example.com/four(a)"}
+    if got != want:
+        bad.append("parse_batch_response: %r" % got)
+    if "2" in got:
+        bad.append("an unanswered request was given a URL")
+    return bad
+
+
+def test_syndicated_credit():
+    """A syndicated copy is used only when the partner credits the publisher (27.09.2026).
+
+    Yahoo republishes some Telegraph journalism with JSON-LD provider "The Telegraph"; the
+    same page shape carries other providers' stories too, and a similar headline from the
+    Mail must never be shown on the sheet as the Telegraph's own words.
+    """
+    import json as _json
+    import shortlist as sl
+    def page(provider, desc):
+        return ('<script type="application/ld+json">%s</script>'
+                % _json.dumps({"@type": "NewsArticle", "provider": {"name": provider},
+                               "publisher": {"name": "Yahoo News"}, "description": desc}))
+    desc = "Zohran Mamdani has hit back at Benjamin Netanyahu after the Israeli prime minister attacked him."
+    bad = []
+    if sl.credited_description(page("The Telegraph", desc), "Telegraph") != desc:
+        bad.append("a Telegraph-credited copy was not accepted")
+    if sl.credited_description(page("Daily Mail", desc), "Telegraph") is not None:
+        bad.append("a copy credited to another provider was accepted")
+    if sl.credited_description("<html>no structured data</html>", "Telegraph") is not None:
+        bad.append("a page with no JSON-LD was accepted")
+    return bad
 
 
 if __name__ == "__main__":
