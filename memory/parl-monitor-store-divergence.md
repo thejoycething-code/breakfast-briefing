@@ -75,3 +75,22 @@ and REFUSES when a table that had rows is empty (`--accept-loss` to override, `-
 to compare without publishing). After any rebuild, run `--check` and the full suite
 before pushing. The 24 Aug copy predates several tables' backfills, so `.recover`
 output cannot be trusted to be complete.
+
+## A fifth route: a laptop push racing a CI publish (14 Sept 2026)
+
+The Monday publish (delayed schedule, 08:35-09:16Z) was uploading its store while
+a laptop `db_state.py --push` had renamed the old asset aside and was uploading
+too. The laptop upload got a 404; its failure path DELETED the publish's fresh
+asset as "a partial upload" and renamed the old copy back. Forty minutes of CI
+work (publish_log row, devolved judge, spend) existed only in a sidecar pointing
+at bytes that no longer existed, and every pull then refused SHA MISMATCH. Worse,
+the refused pull had overwritten the working store with the download, taking a
+live re-score with it.
+
+**Fixed:** the failure path restores FIRST (a rename fails on a name clash) and
+only deletes what holds the name if GitHub says it is not "uploaded"; a finished
+rival stands. `pull` downloads beside the working store and installs only after
+verification (`install_download`). Healed by writing the sidecar to the copy
+actually on the release, committing, then pushing the repaired store.
+**Rule:** never push from the laptop inside a CI publish window (Mon 03:00-10:00
+UTC; the schedule can fire hours late) without checking `gh run list` first.

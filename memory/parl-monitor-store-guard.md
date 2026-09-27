@@ -49,3 +49,33 @@ is how the cascade started.
 **The pointer file merges itself (7 Sept 2026):** `tools/merge_sidecar.py` is a git merge driver for `data/parl-monitor.db.json`. Rule: the side that names the asset the release ACTUALLY holds wins (GitHub exposes the asset digest via the API, no download); fallback: later `published_utc` (safe because the lineage guard forbids publishing an older store); neither: exit 1, human resolves. "Take mine" was right three times and is wrong in general. `--pull` installs the driver in local config on every clone/runner because `.gitattributes` alone is not enough.
 
 Related: [[parl-monitor-store-artifact]], [[parl-monitor-store-divergence]].
+
+## Never pipe db_state into tail (repeated 11 Sept 2026)
+
+`python3 tools/db_state.py --pull | tail -1 && ...` ran the whole chain on a REFUSED pull
+because the shell saw tail's exit code. The ledger then wrote into a stale local store
+and the push was (rightly) refused. Same trap as finish.sh on 9 Sept. **How to apply:**
+redirect to a log file and test `$?`, or `set -o pipefail`; and always `git pull` before
+`db_state --pull` — the pull verifies against the COMMITTED sidecar, so a stale checkout
+makes a good asset look divergent.
+
+**Cancelled is the silent one (19 Sept 2026).** GitHub reports a job that hits
+`timeout-minutes` as *cancelled*, not failed, and alert.yml fired on `failure`
+alone, so the EU weekly died twice at the written-question drain (14 min of
+pulls and body reads, then 300 detail fetches sitting in 429 backoff) and the
+triage, edition, tracker and 5CA steps were skipped with no DM. Now: the alert
+fires on failure/cancelled/timed_out and names it; the weekly has 60 minutes
+and `PYTHONUNBUFFERED=1` (buffered stdout into `| tee` left a killed step's log
+empty); the EP drains carry a wall clock (`src/drain.py`, 600s) because a
+count cap bounds the API, only a clock bounds the job. Never pipe a suite
+through `tail -3`: unittest's verdict is on stderr, test prints buffer on
+stdout, and the verdict is what `tail` loses.
+
+**Monday publish (21 Sept 2026).** `gh workflow run monday-publish.yml` with no
+input is a DRY RUN (`dry_run` defaults to true): it judges, renders and deploys
+but posts nothing, and the crons still owe the week. The publish is idempotent
+per week via `publish_log`, so a hand dispatch never doubles a late cron. The
+crons drift 3-5 hours on this repo; a 30-minute wall killed the run inside
+`run_monday.py` after the devolved judge (8 min, ~76 calls) and the renders,
+somewhere in the tool list (roster, trackers, 5CA, briefs, Drive). Wall is 60
+now and the step is unbuffered.

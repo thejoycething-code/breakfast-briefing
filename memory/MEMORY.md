@@ -11,7 +11,7 @@
 - [Briefing: cluster provenance](briefing-cluster-provenance.md) — dedup picks the primary source, not the punchiest headline; ADF beats EWTN
 - [Briefing: markup becomes a test case](briefing-markup-becomes-testcase.md) — corrections go in testcases.txt failing-first, never a silent regex tweak
 - [Briefing: two suppression buckets](briefing-suppression-two-buckets.md) — chaff is tiny; "no section matched" is where real news dies
-- [UK campaign calendar](uk-campaign-calendar.md) — assisted dying delivers 4 Sept 2026; OSA submission due 7 Sept; why the TIA brief stays rejected
+- [UK campaign calendar](uk-campaign-calendar.md) — Burnham is PM; TIA Bill fell 11 Sept; palliative-care follow-up brief in briefs/pm-promise-palliative-care; OSA not ours
 - [Briefing: cap drops get retired](briefing-cap-drops-get-marked.md) — cap losers go to cut.json and never come back; over-pick freely
 - [Briefing: decode Google News links](briefing-gnews-decode.md) — batchexecute signature route resolves 100%; never cache resolver failures
 - [Briefing: text for judgement only](briefing-text-for-judgement-only.md) — sheet carries feed/page text for the judge; regex over body text rewards commentary
@@ -66,3 +66,38 @@
 - [X source groundwork](x-source-groundwork.md) — scoped 8 Sep 2026; dormant on branch x-source (not pushed); sealed refresh tokens, 7+1 schedule, budget guard; start go-live at the probe
 - [Westminster backfill depth](parl-monitor-westminster-backfill.md) — ledger to June 2017; 2020-21 thinness is real; divisions need the candidate finder; backfills one at a time
 - [Page vs post numbers](meta-page-vs-post-numbers.md) — Business Suite = page_media_view incl. ads; metric_date is off by one day
+- [One pack, one session](parl-monitor-one-pack-one-session.md) — two sessions' renders race on the same clip paths; check ps and git log first; a shut lid looks like a stall
+- [Vote feeds the 5CA](parl-monitor-vote-feeds-5ca.md) — signed stances outrank the model; absences from the day's other divisions; WAVERING needs two good votes; TARGETED from campaign names; former Aye voters capped at +
+- [Ad spend needs ads_read](meta-ads-read-missing.md) — stopped 29 Aug; token lacks the scope; re-auth, not a code fix
+- [Campaigns Brief house style](campaigns-brief-house-style.md) — Christopher's own briefs set the style: email codes L/RT/RL, numbered arguments, RF4 scored at Plan, totals are formulas, timeline comment lives in column D
+- [5CA results board](parl-monitor-5ca-election-mockups.md) — A+B built into make_5ca_web.py as a Results tab (17 Sept); chips count MOVED only; C/D still mock-ups
+- [EU monitor parity](parl-monitor-eu-monitor.md) — per-day sweep, body-matched texts, once-ever triage; same-night EP labels lack `en`; secrets env fallback lives in load_secrets; division label-vs-body gap open
+- [Connector deploys are CLI-only](meta-connector-deploy-is-cli-only.md) — no Vercel/GitHub link; a push deploys nothing, and `vercel --prod` ships the local tree
+- [IG video transcription is possible](ig-video-transcription-feasibility.md) — Graph gives a fetchable mp4, no transcript field; 402 Reels ≈ 3GB
+- [Intel reports verified from the store](intel-reports-verified-from-store.md) — quarterly England reports: run the ⚑ list against parl-monitor; what it can and cannot close
+- [Baseline from the window, not the rows](meta-baseline-from-window-not-rows.md) — top_posts measured "vs median" against the posts it displayed; 1.09M vs a true 25,757
+- [Germany scope](parl-monitor-germany.md) — Bundestag phase 1 built; English taxonomy matched 1 useful vote in 68, so nothing is classified; DIP needs a key
+- [Actions billing stalled collection](meta-actions-billing-stall.md) — 22–23 Sept: 4s failures = GitHub refused the job; Reels transcription used up the minutes
+- [Briefing: common words fake clusters](briefing-common-word-clusters.md) — x19 "religious freedom" cluster hid 18 stories 23.09; words_overlap_enough needs 1 uncommon shared word
+- [Who shared is not available](meta-who-shared-not-available.md) — sharedposts and reactions return empty on a post shared 10,764 times; comments and counts are not
+- [Briefing: a court step is not a repeat](briefing-court-step-not-repeat.md) — hearing ≠ announcement; COURT_HEARD in ran_before; 24.09 markup fixed Herald, Hill depth, digital-safety vocab
+- [Telegraph and Times coverage](briefing-telegraph-100-cap.md) — Google News caps at 100; six topic queries each (Tel 16→28, Times 11→33 clean); Times sitemap REJECTED (robots Disallow / for *)
+- [Slack routing](slack-routing-uk-channel-rest-dm.md) — UK to #campaigns-en-gb, everything else DMs Christopher; never fall back to a channel
+- [PQ answers in the edition](parl-monitor-pq-answers-in-edition.md) — answers live only in data/raw; cluster on answer text, groupedQuestions is always empty
+- [Edition shape in recess](parl-monitor-edition-recess-shape.md) — actionable leads, recess note last and uncapped; What's on renders in recess too
+- [Answer kind](parl-monitor-answer-kind.md) — the label the questions section routes on; rules beat the judge, only rule positions lead, bank counts demotions apart
+- [Eval loops are scheduled](parl-monitor-eval-scheduled.md) — Monday publish + German weekly; ingest→sample→report before the store push; the German loop was write-only
+- [German debate packs](parl-monitor-de-debate-packs.md) — Mediathek decides who spoke (one video per speech); align by order; protocol is a Vorabfassung
+- [UPR loss recovered](parl-monitor-upr-loss-recovered.md) — the 3 Sept clobber; guard never failed, recovery was never done; re-run pull_upr and regenerate the tracker
+- [German keyless sources](parl-monitor-de-keyless.md) — PDF protocol fallback (de-hyphenate!) and the MdB register; religion not stored
+- [Canada scope](parl-monitor-canada.md) — phases 1-3 built; 5CA readings all drafts (nothing places); run the FULL suite, ca tables live in db.TABLES now
+- [German taxonomy v0.5](parl-monitor-de-taxonomy-v05.md) — DIP descriptor scan beats circular probes; inner * was literal (4 dead terms); retag additively only
+- [Backfills to 2020](parl-monitor-backfills-2020.md) — Canada $0, Germany ~$25-35; Vorgänge held (edition floods); one-pending-per-group trap; repos report public
+- [Area 13 organ donation](parl-monitor-area13-organ-donation.md) — position stated, stance-scored, no 5CA sheet; store repaired 27 Sept; EU retag mapping fixed, nothing was stale
+- [Briefing repo is public](briefing-repo-is-public.md) — memory/ syncs get committed there; push code-only commits, ask before any memory push
+- [Briefing: text scrubber](briefing-text-scrubber.md) — boilerplate.py cleans text at read time; caches stay raw; learned per host, MIN_RUN 10, weekly relearn
+- [Briefing: prefetch and --from](briefing-prefetch-and-resume.md) — text fetched during the decode (sheet ~2-5 min); `finish_edition.sh --from mark` re-verifies first; paywall rechecked after decode
+- [Briefing: blocked publishers](briefing-blocked-publishers.md) — Church Times now via Feedly stream; EWTN GB Cloudflare (Feedly stale); Telegraph Tollbit — never mirror; Bing single-term standfirsts
+- [Backfill to 2010](parl-monitor-backfill-2010.md) — approved ~$65 27 Sept; windows Sun night + Mon day; PQs from 2014, divisions from 2016; German mandate-attribution fix
+- [Briefing: eN and tiered depth](briefing-event-size-and-depth.md) — named-event count shown not merged (merge tested, 15% wrong); --text-short 320 default; echo dropped
+- [MCP deferred](parl-monitor-mcp-deferred.md) — scoped 27 Sept, kept as an app for now; separate connector + Postgres mirror if revived

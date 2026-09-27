@@ -32,18 +32,29 @@ second copy.
   cd ~/Downloads/breakfast-briefing && python3 fetch_feeds.py --json /tmp/today.json > /tmp/sweep.txt 2>&1; head -6 /tmp/sweep.txt
   cd ~/Downloads/breakfast-briefing && python3 shortlist.py /tmp/today.json > /tmp/short.txt 2>&1; cat /tmp/short.txt
 
-The sweep fetches ~340 sources and keeps items published in the last 36 hours (84 on Mondays, to
-cover the weekend). **It now takes ~15 minutes rather than ~5**: since 25.08.2026 it also asks
-Google to decode every Google News redirect that index-scraping could not resolve, at roughly
-1.2s each. That is the single highest-value step in the pipeline — it took the share of leads
-the ranker can actually read from 26% to 72% in one change — so do not reach for `--no-decode`
-to save time. The header reports the two routes separately:
+The sweep fetches ~400 sources and keeps items published in the last 36 hours (84 on Mondays, to
+cover the weekend). Since 25.08.2026 it also asks Google to decode every Google News redirect
+that index-scraping could not resolve. That is the single highest-value step in the pipeline —
+it took the share of leads the ranker can actually read from 26% to 72% in one change — so do
+not reach for `--no-decode` to save time. Three changes on 27.09.2026 made it much cheaper:
 
-  gnews: N matched to a direct link, M decoded via Google, K still redirects
+- **Decodes are batched**: ten lookups per Google call instead of one (verified identical results
+  on live links, half the time). Results are matched by request id, never by position.
+- **Filler is not decoded**: an item that is chaff, blocked or matches no section is left as a
+  redirect (27% of decodes on 25.09.2026). It is reported separately, below.
+- **Article text is fetched DURING the decode** (the text prefetcher), into the same caches the
+  sheet reads, so the sheet no longer spends ~17 minutes fetching pages afterwards. A stderr
+  line `prefetch: N opening(s) + M paywall preview(s) fetched during the sweep` confirms it ran.
+
+The header reports the routes separately:
+
+  gnews: N matched to a direct link, M decoded via Google, K still redirects (+J filler not decoded)
 
 K should be single digits. If it is in the hundreds the decoder has broken, which is a
 RESOLVER DEGRADED-class problem: say so prominently, because every undecoded redirect is a
-story the ranker will judge on its headline alone.
+story the ranker will judge on its headline alone. J is expected and is NOT a failure: those
+items never reach a section. (If a whole spam domain floods K - czechinvest.gov.cz did on
+26.09.2026 - block it in extra_feeds.txt rather than reading it as a decoder fault.)
 
 Stories a previous briefing already published are **kept and flagged**
 `[ran MM-DD]`, not dropped — a running story can legitimately appear on consecutive days, so a
@@ -64,6 +75,20 @@ pastor's 7-year sentence as the same story as an Indonesian pastor's. That is th
 override: check whether the actors and the event really match before dropping, and drop when
 they do. A same-outlet, same-headline flag (City Journal's WPATH piece, Iona's Tánaiste piece,
 both 31.08) needs no thought at all.
+
+**A new step in a running fight is a new event, not a repeat — above all a court step**
+(Chris, 24.09.2026). "Same actors, same event" means the same EVENT: a lawsuit being filed, a
+hearing, a ruling and an appeal are four events in one fight, and each can run. On 24.09.2026
+the White House media ban (ran 21–22.09) had its court hearing, where the judge questioned
+whether the administration had followed due process. It arrived as ~15 separate lines,
+several flagged SAME STORY against the ban's announcement. Those flags were accepted and the
+hearing never ran; Chris named the Washington Post's piece on the ban being on shaky legal
+ground as a miss. The repeat check now treats a hearing report as a different moment from a
+headline that isn't about a hearing, but it only reads headlines. So before dropping a
+flagged item, ask what HAPPENED in it, not what it is about. If the answer is a new hearing,
+ruling, filing, vote, charge or sentencing, it is new news. Also watch for a big story that
+failed to cluster: fifteen x1 lines on one subject are an x15 story that the sheet shows
+fifteen times, each looking small.
 
 The sweep does NOT mark anything itself, and
 neither does compose.py any more; marking happens in Step 7, after the doc verifies. Do not pass
@@ -205,11 +230,15 @@ the entire day; the 17-slice subagent fan-out it replaced cost roughly 250-300k,
 of it per-subagent scaffolding plus the same brief repeated seventeen times. Reading
 headlines was never the expensive part.
 
-**The sheet is now ~195k tokens on a heavy day** (246k on a Monday's 84-hour window), because
-it carries article text rather than headlines (25.08.2026). Generating it takes ~10 minutes of
-fetching on top of the sweep. It is still one pass and still cheaper than the fan-out, but it
-is no longer a cheap read: budget for it, and do not re-generate the sheet casually once you
-have it.
+**The sheet is ~770KB (~190k tokens) on a heavy day** — 1.12MB before tiered text depth came in
+on 27.09.2026 (see below) — and more on a Monday's 84-hour window. It carries article text, not
+just headlines (25.08.2026). Generating it now takes ~2-5 minutes, because the sweep has already
+fetched the text. It is still one pass and still cheaper than the fan-out, but it is not a cheap
+read: budget for it, and do not re-generate the sheet casually once you have it.
+
+**It is too big for one tool output, so read it with the Read tool in chunks** (~190 lines per
+call; a longer chunk is refused for size). Do not `cat` it and do not truncate it with your own
+script to make it fit - that silently changes what you judged on. Every line gets read.
 
 **Re-running a past day: use `--new-only`.** It prints only the leads `tiers.json` has no
 verdict on, or whose article text has changed since it was judged:
@@ -237,7 +266,9 @@ compose.py then runs a **COVERAGE check** and warns when a watched source filed 
 nothing of theirs was picked — treat that warning as a question you must answer, either by
 picking one or by saying in the final message why not. It is the only thing in the pipeline
 that catches a source that filed and was read past; check_sources.py only catches one that
-stopped filing.
+stopped filing. A source whose only items already ran in an earlier edition is NOT flagged
+(27.09.2026) - it is listed on a separate `coverage: not flagged` line, because the edition had
+already answered the question.
 
 **The `> is:` line is the article's own opening, read back as flags** (built 24.08.2026,
 options 1/3/5): `report` or `comment`, `doc` when the piece names a document it rests on,
@@ -252,7 +283,7 @@ now — but `TEXT_SIGNAL_WEIGHT` stays 0, because the residue is still not rando
 unreadable is disproportionately paywalled commentary, so a comment penalty would still fall
 hardest on the outlets that charge. Measured effect of turning it on is in rank_eval_log.txt.
 
-Three things the sheet gives you that the section lists do not:
+Four things the sheet gives you that the section lists do not:
 
 - **`xN` is the corroboration count** — how many outlets filed on that story, computed
   across all sections. It is the only free measure of how big a story actually is, and the
@@ -260,17 +291,36 @@ Three things the sheet gives you that the section lists do not:
   led the day correctly, where keyword scoring had it mid-pack.
 - **One line per story, not per item.** Same-story duplicates are collapsed into their
   best-outlet lead, so `x5` is one line to judge, not five to compare.
+- **`eN`, where shown after xN, is the size of a NAMED EVENT** (27.09.2026): items sharing a
+  proper name and an event word ("Sheen" + "beatification", "Overton" + "hearing") however
+  differently they are worded. Line collapse is by word overlap only, so a big story in many
+  wordings arrives as many small lines: on 25.09.2026 the White House media-ban ruling was 16
+  lines, most of them x1-x4. `x2 e16` means "this line is small, the event is not". **eN merges
+  nothing** - every line is still a separate piece and may be the one worth running - and it is
+  deliberately NOT in the iN score yet, so the sheet is not reordered by it. Use it to weigh a
+  line, and to look for the event's other lines before you pick one of them.
 - **Article text, under nearly every line** (added 18.08.2026 — Chris: assess on the text,
   not just the headline; widened 25.08.2026 — rank on the article, not the headline). Four
   kinds of line, and the difference between them matters:
 
-    - `> text:` — the article's own opening, up to 900 chars, scrubbed of nav and script
-      furniture. **This is the one to rank on.**
+    - `> text:` — the article's own opening, scrubbed of site furniture (menus, login
+      notices, share bars, publisher blurbs - `boilerplate.py`, 27.09.2026) and of the
+      repeated standfirst. **This is the one to rank on.** Depth is TIERED: 900 chars for UK
+      and Irish stories, anything x2 or more, any e3+ event and every ★ source; 320 chars for
+      the rest (single-outlet, non-UK). The 320 is the opening, which carries the fact and the
+      report/comment signal; on 25.09.2026 all 8 tier-1 picks in the short tier were decidable
+      from it. If a short line leaves you unsure, say so rather than guess -
+      `--text-short 0` prints everything at full depth.
     - `> preview (£, publisher's own summary):` — a PAYWALLED story's public preview, capped
       at 600 chars. Short *by design*, not because the story is thin: judge it against other
       previews, never against a full `> text:` line. The cap is a boundary, not a setting —
       several metered paywalls ship the whole article in the HTML and taking it would be
       circumventing the paywall.
+    - `> syndicated (Yahoo, syndicating the Telegraph's own copy):` — the PUBLISHER'S OWN
+      standfirst, from a partner that republishes it free under licence and credits it in its
+      structured data (27.09.2026). Used for Telegraph leads with no other text; the credit
+      is checked before anything is shown. It is the lead's own words, unlike the line below.
+      The briefing still links the Telegraph.
     - `> via <outlet> on the same story:` — a DIFFERENT outlet's account, read because the
       lead itself refuses machine access. It tells you what the story is. It is not the
       lead's words, and the briefing still links the lead.
@@ -301,14 +351,25 @@ Three things the sheet gives you that the section lists do not:
 
   This does NOT apply to the readable paywalled outlets — Spectator, Critic, UnHerd,
   Statement, Catholic Herald and the rest all produce a `> preview:` line now, so judge
-  those on what it says. **The Church Times is no longer in this group**: its own RSS was
-  added on 25.08.2026 and carries real standfirsts, so it should arrive with `> feed:` text.
-  If Church Times leads start showing `> NO TEXT` again, that feed has broken.
+  those on what it says. **The Church Times is no longer in this group**: its site now
+  answers every request with a Cloudflare bot challenge, so since 27.09.2026 its RSS is read
+  through Feedly (`feedly` mode in extra_feeds.txt), which still polls it and returns the
+  publisher's own standfirsts. It should arrive with `> feed:` text. If Church Times leads
+  start showing `> NO TEXT` again, run `python3 check_sources.py --quiet`: it reports the
+  Feedly route as "stale in Feedly" once Feedly stops reaching the publisher.
+
+  **Where the Telegraph's text now comes from** (27.09.2026): its own pages answer 402
+  (Tollbit, a pay-per-crawl licence - a spending decision, never something to route
+  around, and that includes reading someone else's copy of its gated RSS). Two free routes
+  carry its OWN text: thirteen single-topic Bing searches (Bing publishes the standfirst;
+  the sweep keeps the copy with text when a story arrives twice) and Yahoo's licensed
+  syndication (the `> syndicated` line). Measured: readable Telegraph leads 43% -> ~60%. The
+  benefit-of-the-doubt rule above still applies to the ones that stay blind.
 
   **Read the text before tiering**: it is what separates an interview with new content from
-  a rehash, and a report from commentary wearing a news headline. The sheet runs ~195k
-  tokens on a heavy day — up from ~100k before the text was widened, and still one pass,
-  still far below the fan-out it replaced. Keyword scoring deliberately ignores this text
+  a rehash, and a report from commentary wearing a news headline. The sheet runs ~190k
+  tokens on a heavy day with tiered depth, and is still one pass, still far below the
+  fan-out it replaced. Keyword scoring deliberately ignores this text
   (measured 18.08.2026: body text rewards commentary that narrates outcomes), so the text
   lines exist for YOUR judgement only.
 
@@ -486,6 +547,19 @@ reading. finish_edition.sh needs only /tmp/today.json, /tmp/picks.json, /tmp/lea
 the files on disk.
 
 `--dry-run` composes and stops before publishing, changing no state.
+
+**If it stops AFTER the doc is published, resume with `--from`, never by hand** (27.09.2026):
+
+  cd ~/Downloads/breakfast-briefing && ./finish_edition.sh --from mark
+
+(`--from tiers|archive|backup` resume later.) It skips compose and publish, but FIRST
+re-verifies the doc already in Drive with `verify_doc.sh` - href-to-href against
+/tmp/briefing.html - so a resume can never mark against a doc whose links have not verified.
+Built because on 25.09.2026 the verifier misread a correct link (a ")" inside
+`utm_source=(direct)`), stopped the tail on a byte-exact doc, and marking, tiers, archive and
+both backups were then run by hand. Before resuming, establish that the stop WAS a false alarm
+(verify_doc.sh says so, or explains what is actually missing); if a link is genuinely wrong,
+the Step 6 republish rules apply instead.
 
 ## Step 5: Publish the Google Doc
 
@@ -720,7 +794,9 @@ refuses a story that already ran in one of the last 10 fives unless you pass
 `--allow-repeat`. It writes `five/<date>.json`, which is the only record of this list that
 has ever existed — the Doc gets tiers.json, archive/ and rank_eval; the five got nothing, so
 Chris replacing three of five on 25.08 and cutting a repeat on 31.08 taught the pipeline
-nothing. **Post the emitted text VERBATIM.** Retyping any part of it restores the exact
+nothing. When a slot has no `note`, slack_five prints what the sheet read for that lead
+(27.09.2026) as material to write one from - never paste it in, write your own sentence from
+it, and leave the note empty if the sheet had no text. **Post the emitted text VERBATIM.** Retyping any part of it restores the exact
 hand-copying that fabricated four links on 31.08.2026.
 
 Post to **#campaigns-en-gb** (`C9RH217PZ`) with `slack_send_message`. The message is short and
@@ -791,10 +867,11 @@ clearly in your final message that the upload failed and point to that file.
 Report: feeds ok/failed, candidates returned, how many carried a `[ran]` flag, how many were
 dropped as cut by an earlier cap, items per section, **the link-diff result from Step 6
 (N/N verified)**, the resolver line (`resolved N; M could not be resolved` — a healthy day is
-M=0, and a `RESOLVER DEGRADED` warning means say so prominently), **the sweep's decode line and
-how many leads the ranker could actually read** (the `text: N lede(s), M paywalled preview(s),
-K read via another outlet` line from Step 3 — a healthy day reads ~89% of leads, and a sharp
-drop there means the day was ranked on headlines whatever else went right), whether Step 7
+M=0, and a `RESOLVER DEGRADED` warning means say so prominently), **the sweep's decode line
+(K still redirects, J filler not decoded) and the prefetch line, and how many leads the ranker
+could actually read** (the `text coverage: N/M leads readable` line from Step 3, which now also
+counts `syndicated copy` — a healthy day reads ~87% of leads, and a sharp drop there means the
+day was ranked on headlines whatever else went right), whether Step 7
 marking, Step 8
 archiving, both halves of Step 9 (state push, archive upload) and the Step 10 Slack post each
 ran, the Doc link, and anything that looked wrong.
