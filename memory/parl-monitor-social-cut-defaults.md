@@ -35,11 +35,9 @@ blur vs crop, Hansard vs spoken) are all things a tool can default.
 and write the article to the brief; only ask about order and passages.
 See [[parl-monitor-debate-pack]].
 
-**Friday 11 Sept 2026 run (scheduled).** One-time scheduled task `tia-second-reading-debate-pack`
-fires 18:30 London: builds the TIA Second Reading pack, pulls and transcribes the whole
-sitting, writes a PROVISIONAL sequence.md from the pass (never confirms the checklist),
-drafts article.md + article-800.md to the brief, commits, DMs Christopher. Retries itself
-+90 min if Hansard is late, gives up after 22:00. Runs only while the desktop app is open.
-`--draft` writes sequence.md from quotes.md; `--transcribe` caches whole-debate words;
-template at docs/sequence-template.md.
-
+**Standing task (12 Sept 2026; flagged days only from 14 Sept).** "Debate day" fires
+weekdays 18:30 London but reads `config/debate_watch.yaml` first: no watch today, it ends
+with no Hansard and no store (Christopher: no daily pulls unless a day is flagged). On a
+flagged day: `tools/debate_today.py` confirms Hansard has it, then the eight-step order of
+work with DMs only, never --publish, never Drive. Flag with `tools/debate_watch.py add`
+(`suggest` reads the week-ahead). Runs only while the desktop app is open.

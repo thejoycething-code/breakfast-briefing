@@ -44,3 +44,5 @@ independent `count=exact`, which needs no rows and so cannot itself be truncated
 them", which is how a partial answer gets quoted as a complete one. Same principle
 as the briefing project's rule against silent suppression
 ([[briefing-silent-suppression]]).
+
+**Sixth (15 Sept 2026): `data_health` aged silently.** `igCoverage` folded the Instagram metrics history down itself with `limit=20000&order=collected_date.asc`; PostgREST capped it at 1000 and the ascending order made those the OLDEST rows, so it reported "696 of 698, as of 2026-08-30" when the truth was 860 of 863 current to the 14th — drifting a day further every night. The guard already existed: `readAll`'s comment documents this exact cap. `igCoverage` was written later and did not route through it. There is now a shared `readPaged()`; `pageCoverage` had the same bug and used it too. When adding a reader, page it — never pass a big `limit`.

@@ -31,3 +31,12 @@ and exactly ONE candidate — two candidates is unresolved, never guessed.
 Llywydd, neither a person. See [[parl-monitor-lords-inversion]] for the
 sibling rule on what a division MEANS, and
 [[parl-monitor-everyone-who-voted]] for who gets listed.
+
+**Citizen Space finders paginate with `b_start` (21 Sept 2026).** NI's listing
+served 107 open consultations over 4 pages and `dg_consultations.fetch_open`
+read page one, so 56 were never stored; items rise onto page one only as those
+above close, so the monitor met each near the end of its life. Crucially the
+site IGNORES an unknown parameter and re-serves page one, which is how the
+paging stayed hidden (`?page=2` returns the same 30 rows) -- so any pager here
+must stop on "nothing new", never on "empty page". Scotland (13) fits one page;
+Wales has its own `?page=` parameter and always paged.

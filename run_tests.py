@@ -586,7 +586,8 @@ def run(verbose=False, known_red=None):
                      (test_event_sizes, "event-size problem"),
                      (test_feedly_parse, "Feedly-route problem"),
                      (test_batched_decode_mapping, "batched-decode problem"),
-                     (test_syndicated_credit, "syndicated-copy problem")):
+                     (test_syndicated_credit, "syndicated-copy problem"),
+                     (test_decoded_link_tidy, "decoded-link tidy problem")):
         got = fn()
         if not got:
             passed += 1
@@ -1487,18 +1488,22 @@ def test_cluster_lead_prefers_an_issuing_primary():
     a change that satisfies one by dropping the other is not a fix.
     """
     bad = []
-    # The real pair, with the scores classify() actually gave them on 15.09.2026.
+    # The real pair, with the scores classify() actually gave them on 15.09.2026 and the
+    # times the 15.09 sweep recorded (archive/20260915/sweep.json.gz): Sex Matters 08:09,
+    # the Telegraph 09:37, both on 14.09.
     sm = {"outlet": "Sex Matters",
           "headline": "NSPCC’s changing-room guidance fails girls",
           "summary": "The National Society for the Prevention of Cruelty to Children (NSPCC) "
                      "is the country's best-known child-protection charity, and the only one "
                      "with statutory powers.",
           "url": "https://sex-matters.org/posts/updates/nspccs-changing-room-guidance-fails-girls",
+          "published": "2026-09-14T08:09:12+00:00", "age_h": 20.1,
           "_score": 1, "_section": "Gender, Identity & Sexuality"}
     tel = {"outlet": "The Telegraph",
            "headline": "Male teachers can supervise girls in changing rooms under NSPCC guidance",
            "summary": "",
            "url": "https://www.telegraph.co.uk/news/2026/09/14/nspcc-changing-rooms-guidance/",
+           "published": "2026-09-14T09:37:00+00:00", "age_h": 18.7,
            "_score": 5, "_section": "Gender, Identity & Sexuality"}
 
     # Neither is relaying: Sex Matters is reading the guidance, not a newsroom. If this
@@ -1513,9 +1518,18 @@ def test_cluster_lead_prefers_an_issuing_primary():
             bad.append("sheet lead is %s, want Sex Matters (%s, corroborate path)"
                        % (lead.get("outlet"), label))
 
-    # ...and the ordering stated directly, so a fix cannot pass by input-order luck.
-    if shortlist.cluster_lead_key(sm) > shortlist.cluster_lead_key(tel):
-        bad.append("cluster_lead_key still sorts the Telegraph's write-up above the release")
+    # ...and the selection stated directly, so a fix cannot pass by input-order luck.
+    # Chris, 27.09.2026: the rule is "favour the earliest publisher" - so the same pair
+    # with the times swapped must go to the Telegraph, and an undated release, which cannot
+    # show it came first, must fall back to the old key (the Telegraph, on score).
+    if shortlist.choose_cluster_lead([tel, sm])[0] is not sm:
+        bad.append("choose_cluster_lead still puts the Telegraph's later write-up first")
+    sm_late = dict(sm, published="2026-09-14T10:15:00+00:00")
+    if shortlist.choose_cluster_lead([sm_late, tel])[0] is not tel:
+        bad.append("a release published AFTER the Telegraph still leads it")
+    sm_undated = dict(sm, age_h=None)
+    if shortlist.choose_cluster_lead([sm_undated, tel])[0] is not tel:
+        bad.append("an undated release is treated as first")
 
     # The August relay case must survive the fix: a RELAYING primary still sorts last.
     spuc = {"outlet": "SPUC", "headline": "Andy Burnham will NOT vote on assisted suicide",
@@ -1528,6 +1542,11 @@ def test_cluster_lead_prefers_an_issuing_primary():
             "_score": 10, "_section": "Life"}
     if shortlist.cluster_lead_key(spuc) < shortlist.cluster_lead_key(tel2):
         bad.append("fixing issuing broke relaying: SPUC's relay leads the Telegraph again")
+    # ...even when the relay is the earlier of the two: relaying is never issuing.
+    spuc_early = dict(spuc, published="2026-08-30T07:00:00+00:00", age_h=30.0)
+    tel2_late = dict(tel2, published="2026-08-30T09:00:00+00:00", age_h=28.0)
+    if shortlist.choose_cluster_lead([spuc_early, tel2_late])[0] is not tel2_late:
+        bad.append("an early relay is promoted as if it issued the story")
     return bad
 
 
@@ -2077,6 +2096,65 @@ def test_batched_decode_mapping():
         bad.append("parse_batch_response: %r" % got)
     if "2" in got:
         bad.append("an unanswered request was given a URL")
+    return bad
+
+
+def test_decoded_link_tidy():
+    """A decoded link gets the same tracker strip a feed link gets, and an AMP copy is
+    swapped for the publisher's OWN canonical - read off the page, never constructed
+    (27.09.2026).
+
+    The 27.09 test sweep decoded 474 links: 4 carried utm_/ref= trackers that clean_url
+    strips from every feed link, and 9 were AMP copies (Live Law, Verdictum, Deccan
+    Chronicle, The Hindu, WION). An AMP URL keys differently from its canonical, so the
+    same story from the outlet's feed and from Google did not dedupe. Rewriting /amp/ by
+    pattern would be authoring a link; the page's rel=canonical is the publisher's own.
+    """
+    import resolve as rv
+    bad = []
+    # 1. Trackers go; an identifying query (?p=, ?id=) stays.
+    for raw, want in (
+            ("https://www.brusselstimes.com/belgium/2335327/pay/?utm_term=Autofeed&utm_medium=x",
+             "https://www.brusselstimes.com/belgium/2335327/pay"),
+            ("https://www.straitstimes.com/world/pope-leo?ref=latest",
+             "https://www.straitstimes.com/world/pope-leo"),
+            ("https://www.pressherald.com/?p=7729825", "https://www.pressherald.com/?p=7729825"),
+            ("https://abcnews.com/Health/sues/story?id=136489875",
+             "https://abcnews.com/Health/sues/story?id=136489875")):
+        got = rv.tidy_decoded(raw, fetch=lambda u: "")
+        if got != want:
+            bad.append("tidy %s -> %s, want %s" % (raw, got, want))
+    # 2. AMP -> the page's own canonical, same site only.
+    amp = "https://www.livelaw.in/amp/high-court/uttarakhand-high-court/maintenance-551935"
+    canon = "https://www.livelaw.in/high-court/uttarakhand-high-court/maintenance-551935"
+    page = '<html><head><link rel="canonical" href="%s"/></head></html>' % canon
+    if rv.tidy_decoded(amp, fetch=lambda u: page) != canon:
+        bad.append("AMP copy was not swapped for its rel=canonical")
+    hindu = "https://www.thehindu.com/news/national/trans-law/article71512778.ece/amp/"
+    hpage = "<link href='https://www.thehindu.com/news/national/trans-law/article71512778.ece' rel='canonical'>"
+    if rv.tidy_decoded(hindu, fetch=lambda u: hpage) != \
+            "https://www.thehindu.com/news/national/trans-law/article71512778.ece":
+        bad.append("trailing /amp/ with href-before-rel canonical not handled")
+    # 3. ...and it keeps the AMP link rather than guess when the page will not say.
+    for label, pg in (("no canonical", "<html></html>"),
+                      ("fetch failed", None),
+                      ("canonical on another site",
+                       '<link rel="canonical" href="https://example.com/other"/>'),
+                      ("canonical is an index", '<link rel="canonical" href="https://www.livelaw.in/"/>'),
+                      ("canonical is still AMP",
+                       '<link rel="canonical" href="https://www.livelaw.in/amp/x-1"/>')):
+        def f(u, pg=pg):
+            if pg is None:
+                raise OSError("blocked")
+            return pg
+        if rv.tidy_decoded(amp, fetch=f) != amp:
+            bad.append("AMP swapped although %s" % label)
+    # 4. A non-AMP link is never fetched.
+    calls = []
+    rv.tidy_decoded("https://www.bbc.co.uk/news/articles/c62enegxyl9o",
+                    fetch=lambda u: calls.append(u) or "")
+    if calls:
+        bad.append("a plain article link was fetched")
     return bad
 
 
