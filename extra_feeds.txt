@@ -33,7 +33,16 @@ pass   | Issues: Religious Freedom | Open Doors UK             | https://www.ope
 pass   | Media: Alternative      | The Daily Signal            | https://www.dailysignal.com/feed/
 pass   | Media: Alternative      | National Review             | https://www.nationalreview.com/feed/
 pass   | Issues: Life            | SPUC                        | https://www.spuc.org.uk/feed
-pass   | Media: Christian        | EWTN Great Britain          | https://ewtn.co.uk/feed/
+# EWTN Great Britain, 27.09.2026: every path on ewtn.co.uk - the feed, the WordPress API,
+# the homepage, even robots.txt - now answers a Cloudflare bot challenge (HTTP 403, "Just a
+# moment..."), which check_sources.py had reported as BLOCKED for 9 days. A challenge is an
+# access control and is not something to get past. Google News still indexes the site (28
+# items) and Bing does too, with the standfirst attached (14 of 14), so the source is carried
+# by search routes instead. The dead feed stays below as a comment, to re-enable if the
+# challenge is lifted - check with: curl -sI https://ewtn.co.uk/feed/
+# pass   | Media: Christian        | EWTN Great Britain          | https://ewtn.co.uk/feed/
+gnews  | Media: Christian        | EWTN Great Britain          | ewtn.co.uk
+bing   | Media: Christian        | EWTN Great Britain          | ewtn.co.uk
 pass   | Media: Christian        | OSV News                    | https://www.osvnews.com/feed/
 pass   | Advocacy: Christian     | Christian Concern           | https://christianconcern.com/feed/
 filter | Media: US and World     | New York Post               | https://nypost.com/feed/
@@ -91,6 +100,14 @@ filter | Media: UK Mainstream    | Sky News                    | https://feeds.s
 filter | Media: UK Mainstream    | The Scotsman                | https://www.scotsman.com/rss
 filter | Media: UK Mainstream    | Belfast News Letter         | https://www.newsletter.co.uk/rss
 filter | Media: UK Mainstream    | Nation.Cymru                | https://nation.cymru/feed/
+# Chris, 23.09.2026, "You missed all of these important stories?": two of the nine were in no
+# feed at all. The Yorkshire Post's opinion column on palliative care after the assisted
+# dying vote (Victoria Wharton), and the Irish Times on the Oireachtas committee told there is
+# "no clinical reason" for the three-day abortion wait. The Irish Times had no feed here, so
+# Irish legislative news reached the sweep only second-hand via Gript and Iona. Both feeds
+# verified live that day and carrying the missed story.
+filter | Media: UK Mainstream    | Yorkshire Post              | https://www.yorkshirepost.co.uk/news/opinion/rss
+filter | Media: UK Mainstream    | The Irish Times             | https://www.irishtimes.com/arc/outboundfeeds/rss/category/politics/?outputType=xml
 filter | Media: UK Periodicals   | Quillette                   | https://quillette.com/rss/
 
 # --- paywalled outlets ----------------------------------------------------
@@ -109,6 +126,43 @@ filter | Media: UK Periodicals   | Quillette                   | https://quillet
 # re-enable these and do not treat the 402 as transient.
 bingf  | Media: UK Mainstream    | The Telegraph               | telegraph.co.uk
 gnewsf | Media: UK Mainstream    | The Telegraph               | telegraph.co.uk
+# Chris, 24.09.2026: the Telegraph arrived as 15 items. Google News answers a search with
+# at most 100 results, and the site-wide query's 100 were 88 from the last 36h out of a far
+# larger output, 14 of them on-beat - the rest is sport, money and travel, correctly
+# filtered. So on-beat Telegraph stories past the 100th result never reached the sweep.
+# Six topic-scoped queries, measured that morning: 12 on-beat items the site-wide route
+# lacked, including the judge ordering the White House ban lifted, the IRA civil-servant
+# killing and the Sri Lanka Easter bombing sentences. Google matches article BODIES, so
+# these return plenty of noise (Cantona, Lucerne city breaks); gnewsf keeps the keyword
+# filter on them, and testcases.txt pins that it still drops those. The credit line comes
+# from the publisher, not this label, so the Doc still says "The Telegraph".
+gnewsf | Media: UK Mainstream    | The Telegraph (life)        | kw:(abortion OR "assisted dying" OR "assisted suicide" OR euthanasia OR IVF OR surrogacy OR pregnancy) site:telegraph.co.uk
+gnewsf | Media: UK Mainstream    | The Telegraph (gender)      | kw:(transgender OR trans OR gender OR "puberty blockers" OR "single-sex" OR LGBT) site:telegraph.co.uk
+gnewsf | Media: UK Mainstream    | The Telegraph (faith)       | kw:(Christian OR church OR Muslim OR Islam OR mosque OR religious OR bishop OR "Church of England") site:telegraph.co.uk
+gnewsf | Media: UK Mainstream    | The Telegraph (speech)      | kw:("free speech" OR censorship OR Ofcom OR "hate speech" OR arrested OR "non-crime") site:telegraph.co.uk
+gnewsf | Media: UK Mainstream    | The Telegraph (family)      | kw:(marriage OR divorce OR children OR schools OR teachers OR parents OR family) site:telegraph.co.uk
+gnewsf | Media: UK Mainstream    | The Telegraph (migration)   | kw:(migrants OR asylum OR "small boats" OR immigration OR deportation OR "migrant hotel") site:telegraph.co.uk
+# 27.09.2026: the same topics again via BING, because Bing is the only route that carries the
+# Telegraph's own standfirst. Google News gives a headline and nothing else, and the page
+# itself answers 402 (Tollbit), so on 25.09.2026 most Telegraph leads reached the ranker as
+# "NO TEXT". Every item of these searches came with the publisher's summary (31 distinct
+# fresh Telegraph stories on a Sunday, measured). Bing answers ONE term per query - an
+# OR-query returned a single result - hence one line per topic. fetch_feeds' dedup keeps the
+# longer summary when the same story also arrives via Google, so these do not add duplicate
+# lines to the sheet; they add text to the lines already there.
+bingf  | Media: UK Mainstream    | The Telegraph (bing: migrants)   | kw:site:telegraph.co.uk migrants
+bingf  | Media: UK Mainstream    | The Telegraph (bing: asylum)     | kw:site:telegraph.co.uk asylum
+bingf  | Media: UK Mainstream    | The Telegraph (bing: abortion)   | kw:site:telegraph.co.uk abortion
+bingf  | Media: UK Mainstream    | The Telegraph (bing: assisted)   | kw:site:telegraph.co.uk "assisted dying"
+bingf  | Media: UK Mainstream    | The Telegraph (bing: trans)      | kw:site:telegraph.co.uk transgender
+bingf  | Media: UK Mainstream    | The Telegraph (bing: gender)     | kw:site:telegraph.co.uk gender
+bingf  | Media: UK Mainstream    | The Telegraph (bing: Christian)  | kw:site:telegraph.co.uk Christian
+bingf  | Media: UK Mainstream    | The Telegraph (bing: church)     | kw:site:telegraph.co.uk church
+bingf  | Media: UK Mainstream    | The Telegraph (bing: Muslim)     | kw:site:telegraph.co.uk Muslim
+bingf  | Media: UK Mainstream    | The Telegraph (bing: Islamist)   | kw:site:telegraph.co.uk Islamist
+bingf  | Media: UK Mainstream    | The Telegraph (bing: speech)     | kw:site:telegraph.co.uk "free speech"
+bingf  | Media: UK Mainstream    | The Telegraph (bing: schools)    | kw:site:telegraph.co.uk schools
+bingf  | Media: UK Mainstream    | The Telegraph (bing: marriage)   | kw:site:telegraph.co.uk marriage
 filter | Media: UK Periodicals   | The Economist               | https://www.economist.com/britain/rss.xml
 filter | Media: US and World     | The Wall Street Journal     | https://feeds.a.dj.com/rss/RSSWorldNews.xml
 filter | Media: US and World     | The New York Times          | https://rss.nytimes.com/services/xml/rss/nyt/World.xml
@@ -190,6 +244,25 @@ gnewsf | Media: Christian        | CBN News                    | cbn.com
 gnewsf | Media: Alternative      | WORLD                       | wng.org
 gnewsf | Media: Alternative      | The Heritage Foundation     | heritage.org
 gnewsf | Media: UK Mainstream    | The Times                   | thetimes.com
+# Chris, 24.09.2026: six topic-scoped Google News searches, the Telegraph fix applied to the
+# Times. These query Google, not thetimes.com, so they are within its robots.txt. Measured:
+# on-beat Times items 11 -> 45, including the judge ordering the White House ban lifted,
+# "Potty humour no answer to single-sex spaces debate" and the Police Scotland trafficking
+# operation. Noise they bring: the job board (blocked as "Times Appointments") and the
+# notices pages (Births, marriages and deaths; Court Circular - chaffed in shortlist.py).
+gnewsf | Media: UK Mainstream    | The Times (life)            | kw:(abortion OR "assisted dying" OR "assisted suicide" OR euthanasia OR IVF OR surrogacy OR pregnancy) site:thetimes.com
+gnewsf | Media: UK Mainstream    | The Times (gender)          | kw:(transgender OR trans OR gender OR "puberty blockers" OR "single-sex" OR LGBT) site:thetimes.com
+gnewsf | Media: UK Mainstream    | The Times (faith)           | kw:(Christian OR church OR Muslim OR Islam OR mosque OR religious OR bishop OR "Church of England") site:thetimes.com
+gnewsf | Media: UK Mainstream    | The Times (speech)          | kw:("free speech" OR censorship OR Ofcom OR "hate speech" OR arrested OR "non-crime") site:thetimes.com
+gnewsf | Media: UK Mainstream    | The Times (family)          | kw:(marriage OR divorce OR children OR schools OR teachers OR parents OR family) site:thetimes.com
+gnewsf | Media: UK Mainstream    | The Times (migration)       | kw:(migrants OR asylum OR "small boats" OR immigration OR deportation OR "migrant hotel") site:thetimes.com
+# Chris, 24.09.2026: the Times' news sitemap was measured and REJECTED - do not add it.
+# It is complete for 48h (53 on-beat items that morning against 11 from the search above)
+# but thetimes.com/robots.txt disallows every user agent not on its named list
+# ("User-agent: * / Disallow: /"), states it does not permit unlicensed use of its
+# content, and fronts requests with a device-verification check. The sitemap is published
+# for the named search crawlers, not for us. Like the Telegraph's Tollbit gate, this is a
+# licensing position, not an outage: no UA or retry change is an acceptable fix.
 
 # --- index pages scraped only to turn gnews redirects into direct links ---
 scrape | -                       | Catholic Herald             | https://thecatholicherald.com/
@@ -205,6 +278,11 @@ scrape | -                       | Heritage Foundation         | https://www.her
 # --- aggregators and reprint mills: never include -------------------------
 # Daily Pioneer: link integrity not trustworthy (Chris, 13.08.2026) - the URL that
 # reached the 13.08 briefing was a resolver guess that does not resolve.
+# 27.09.2026: a hijacked government domain serving porn-spam listings through Google News -
+# all 50 of the test sweep's undecodable redirects that night were this one outlet, which
+# inflated the "K still redirects" health count the brief treats as a decoder alarm. PORN_SPAM
+# already chaffs the items; blocking at fetch time keeps them out of the count.
+block | czechinvest.gov.cz
 block | dailypioneer.com
 block | Daily Pioneer
 block | msn.com
@@ -388,6 +466,12 @@ gnews  | Media: UK Religious     | Independent Catholic News   | indcatholicnews
 filter | Media: Europe           | The Local Sweden            | https://feeds.thelocal.com/rss/se
 filter | Media: Europe           | The Local (Europe)          | https://feeds.thelocal.com/rss/
 gnewsf | Media: US and World     | The Hill (state watch)      | kw:abortion OR transgender OR religious site:thehill.com@US
+# Chris, 24.09.2026: missed "US warns Australia's social media reforms 'facilitating
+# censorship'". The Hill's own news feed holds only its latest 15 items (~7 hours), so a
+# Wednesday-morning story was gone by the 04:25 sweep - feed depth, not the keyword filter,
+# which the headline passes. This query returned it first, with the media-ban hearing
+# coverage behind it.
+gnewsf | Media: US and World     | The Hill (speech watch)     | kw:censorship OR "free speech" OR "First Amendment" OR "press freedom" site:thehill.com@US
 # Added 13.08.2026 after Chris asked for newsletters: these had working RSS, so no signup
 # is needed. Single-issue advocacy bodies are `pass` (their headlines are allusive and all
 # of their output is on-topic); the general think tanks are `filter` because they also
@@ -587,7 +671,13 @@ disable | adfinternational.org/feed/
 # of its leads unreadable. The native feed carries real standfirsts: 96 of 100 items with a
 # description, mean 240 chars. The gnews route stays as well - it finds Church Times stories
 # syndicated elsewhere, and a duplicate costs nothing because dedup prefers the direct link.
-pass   | Media: Christian        | Church Times                | https://www.churchtimes.co.uk/rss
+# 27.09.2026: the native RSS above now answers a Cloudflare bot challenge (403 "Just a
+# moment..."), as does every other churchtimes.co.uk path - so the Church Times reached the
+# 25.09.2026 sheet as bare Google News headlines. Feedly still polls the same feed, and its
+# stream returns the publisher's own items with their standfirsts (40 of 40 with a 250-char
+# summary). The direct line is kept, commented, to restore if the challenge is lifted.
+# pass   | Media: Christian        | Church Times                | https://www.churchtimes.co.uk/rss
+feedly | Media: Christian        | Church Times                | https://www.churchtimes.co.uk/rss
 gnews  | Media: Christian        | Church Times                | churchtimes.co.uk
 disable | bing.com/news/search?q=site%3Achurchtimes.co.uk
 
@@ -751,6 +841,11 @@ block | صوت الإمارات
 block | rediff
 block | chinadaily.com
 block | China Daily
+# The Times' job board (24.09.2026). Google files it as its own source, "The Times
+# Appointments", under the same site:thetimes.com search, and its teacher and care-worker
+# adverts pass the keyword filter. Blocked as a source; the journalism is untouched.
+block | Times Appointments
+block | appointments.thetimes
 block | aol.com
 
 # The domain above was written as anglicanmainstream.NET on 24.08.2026; the configured feed is
@@ -886,3 +981,26 @@ filter | Media: UK Mainstream     | The Independent (Asia)      | https://www.in
 # else's story. Publishes 2-3 times a week, so window=168h: at the default 36h the sweep
 # would see her most days as silence, which is the failure check_sources.py exists to stop.
 pass   | Issues: Gender & Identity | Charlotte Gill              | https://www.charlottecgill.co.uk/feed | window=168h
+
+# --- Chris, 08.09.2026: "You missed some big stories" (Free Speech) ------------------------
+# Three misses, three different coverage holes, none of them a ranking or classification
+# fault - the stories were never in the sweep to be judged. Each feed below was checked to
+# carry the specific piece Chris flagged before being added.
+#
+# The Economist was already subscribed, but only its BRITAIN feed - so "Speech in China is in
+# the deep freeze" could never have arrived. Its China feed carries it.
+filter | Media: UK Periodicals   | The Economist               | https://www.economist.com/china/rss.xml
+# The Herald (Scotland) reaches us only through a Bing site search, which this file's own
+# header calls thin (~14 items), and its viewpoint columns are not in it. The opinion feed
+# carries the 60,000-arrests column; /politics/viewpoint/rss/ and /comment/rss/ carry it too,
+# and appear to be the same aggregate, so only the broadest is added.
+filter | Media: UK Mainstream    | The Herald (Scotland)       | https://www.heraldscotland.com/opinion/rss/
+# Chris, 24.09.2026: missed the Herald's "Scotland's ethics body faces probe over 'shredding'
+# of 'freedom of speech' case files". Bing plus the opinion feed brought 4 Herald items that
+# day. The news and politics feeds (50 items each; 16 and 26 pass the keyword filter) both
+# carried it and the Peggie tribunal coverage. /news/scottish_news/rss/ and
+# /news/politics/rss/ return HTML, not feeds.
+filter | Media: UK Mainstream    | The Herald (Scotland)       | https://www.heraldscotland.com/news/rss/
+filter | Media: UK Mainstream    | The Herald (Scotland)       | https://www.heraldscotland.com/politics/rss/
+# Troy Media was not covered at all.
+filter | Media: Alternative      | Troy Media                  | https://troymedia.com/feed/

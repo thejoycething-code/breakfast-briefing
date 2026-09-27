@@ -26,10 +26,11 @@ never opens the store, resumable, ~4,029 questions at 0.2 s each.
 coverage (`pq_detail_coverage`). Re-derivation is authoritative only when it
 reads at least what the ingest read.
 
-**Recall limit, noted 6 Sept:** the ingest filter runs on the SEARCH STUB before
-the detail fetch, so a question whose only matching phrase lies past the
-~255-char cut is never fetched or stored. Fixing it means fetching detail for
-every search result (~240 calls/week, under a minute) — a decision, not made.
+**Recall fixed 6 Sept (Christopher: "Make the change"):** the sweep now fetches
+the detail for EVERY search result in the date window and filters on the full
+question + answer (~240 calls/week, under a minute). A failed detail fetch
+falls back to filtering the stub. First live exercise: the scheduled Sunday
+pull of 13 Sept 2026.
 
 **Dispatch trap:** `gh workflow run sunday-pull.yml` after the scheduled Sunday
 run is a NO-OP ("already pulled … use --force"); it proves nothing. The

@@ -15,6 +15,7 @@ Usage:
 """
 
 import argparse
+import collections
 import datetime as dt
 import html
 import json
@@ -80,6 +81,28 @@ ORDER = [
 SECTION_CAPS = {"Politics, Government & Society": 40, "Church & Religion": 30,
                 "Immigration & Asylum": 30}
 
+# Soft caps: WARN, never trim. Chris, 10.09.2026.
+#
+# Why they exist. SECTION_CAPS bites in three sections; in the other six, tier 1/2/3 changes
+# almost nothing observable, because everything published either way and regions.sort_by_region
+# is the outer key so tier only reorders inside a region block. On 10.09.2026 that showed up
+# concretely: the picks came to 334 items and the only thing that brought them to 304 was the
+# curator noticing and hand-culling about thirty. Nothing in the pipeline had an opinion.
+#
+# So these are a prompt, not a rule. A section over its soft cap is being TOLD, at the moment
+# the decision is still cheap, that today is unusually heavy there - and then it publishes
+# anyway, because "there is no overall volume cap, do not trim to a number" is settled and a
+# hard cap here would retire good stories on an arithmetic argument.
+#
+# The numbers are the 90th percentile of each section's own history across the 18 archived
+# editions on 10.09.2026, not invented: medians were Life 39, Marriage 33, RF 25, Gender 23,
+# Other 19, Free Speech 17. At p90 they would have flagged three of the six that day - Free
+# Speech 25, Marriage 44, Other 36 - which is about the right sensitivity for a nudge.
+SECTION_SOFT_CAPS = {"Life": 50, "Marriage, Family & Education": 42,
+                     "Religious Freedom & Persecution": 32,
+                     "Gender, Identity & Sexuality": 30, "Other": 28,
+                     "Free Speech & Civil Liberties": 24}
+
 # Domains that republish other outlets' work. Their feeds credit the ORIGINAL publisher, so
 # the item arrives as "The Telegraph" and sails past the outlet block in shortlist.py, but its
 # URL points at the repost. The briefing would then print "- The Telegraph (£)" over a link to
@@ -130,6 +153,18 @@ OUTLET_FIXES = {
     # when the source list genuinely has no host to resolve against - that, and renaming a
     # masthead we simply want to read differently, is what is left for this map to do.
     "breitbart.com": "Breitbart",
+    # Chris's markup on the 08.09.2026 edition. All three reach us through Google News SEARCH
+    # feeds, which hand over a bare host or the hosting platform's name rather than a
+    # masthead - so this is one fault with three faces, not three unrelated renames.
+    # "'- billygraham.org' should always read as 'Decision Magazine'" - and the article's own
+    # path says so too: /decision-magazine/articles/...
+    "billygraham.org": "Decision Magazine",
+    # "FoRB in Full should always be read as Christian Solidarity Worldwide." The feed agrees:
+    # the author field on their Sudan piece is the literal string "cswpress".
+    "FoRB in Full": "Christian Solidarity Worldwide",
+    # "This source should always be called The Lilypad" - Sites@Duke Express is Duke's blog
+    # PLATFORM, so it is the publisher of nothing and would relabel every Duke title alike.
+    "Sites@Duke Express": "The Lilypad",
     # The OPML calls it "NSS", which reads as an unexplained acronym in the credit line.
     "NSS": "National Secular Society",
     # The feed titles itself in Arabic; the organisation's own English name is this.
@@ -232,11 +267,17 @@ PAYWALLED_OUTLETS = re.compile(
     r"^(the telegraph|telegraph|the times|the sunday times|ny times|new york times"
     r"|daily wire|the globe and mail|globe and mail|world|wng\.org|the spectator"
     r"|spectator|the critic|unherd|spiked|the catholic herald|catholic herald"
-    r"|church times|the economist|new statesman|the australian|financial times"
+    # "the church times" 27.09.2026: only the bare form was here, so the 25.09.2026 Doc
+    # credited "The Church Times (£)" on one line and "The Church Times" on the next.
+    r"|church times|the church times|the economist|new statesman|the australian|financial times"
     r"|the wall street journal|the washington post|the atlantic"
     # Chris, 27.08.2026: "have a paywalled (£) with it". Keyed on the RENAMED form, which is
     # what tidy_outlet has produced by the time credit() tests this.
     r"|premier christianity"
+    # Chris, 08.09.2026: "As a paid source this should be Sydney Morning Herald (£)". The
+    # masthead already resolved correctly, so this table was the only gap - which is exactly
+    # why the fixture states naming and paywall as separate cases.
+    r"|sydney morning herald|the sydney morning herald"
     r"|the scotsman|scotsman)$", re.I)   # Chris, 17.08.2026
 
 
@@ -287,6 +328,10 @@ COMMENTARY_OUTLETS = re.compile(
     # dropped at the credit line, so six essays ran as a bare "- RealClearPolicy" with no
     # author and no sign of where they first appeared. Matched on the family, not the one
     # title, because RCI and RealClearPolitics file the same shape.
+    # Chris, 08.09.2026: "This source should always be called The Lilypad and include the
+    # author's name". A student publication files analysis, not wire copy, so the byline is
+    # the point of it - same fault as Statement and RealClear above.
+    r"|the lilypad"
     r"|realclear", re.I)
 # Section names that mean "this is a column". Anchored, so "culture-war" and "news-analysis"
 # do not match on a substring - the Brussels Signal report whose section is "culture-war" is
@@ -310,7 +355,17 @@ COMMENTARY_URL = re.compile(
 def is_commentary(item):
     if COMMENTARY_URL.search(item.get("url") or ""):
         return True
-    if COMMENTARY_OUTLETS.search(item.get("outlet") or ""):
+    # Test the RAW name and the tidied one. This list is written in mastheads, but the outlet
+    # field often holds a bare host or a platform name ("Sites@Duke Express" for The Lilypad,
+    # "billygraham.org" for Decision Magazine), so an entry keyed on the masthead alone never
+    # fired for exactly the sources whose aliases OUTLET_FIXES exists to resolve. Adding the
+    # tidied form can only ADD matches, so no byline that prints today stops printing. Found
+    # 08.09.2026 while fixing The Lilypad: an entry for the masthead would have made the
+    # fixture case pass while the pipeline stayed broken, which is the FIRE trap recorded in
+    # tidy_outlet and in testcases.txt.
+    raw_outlet = item.get("outlet") or ""
+    if (COMMENTARY_OUTLETS.search(raw_outlet)
+            or COMMENTARY_OUTLETS.search(tidy_outlet(raw_outlet))):
         return True
     # The article's own opening, when we have one. Chris, 28.08.2026: Brussels Signal's "From
     # Pakistan to Nigeria" is a comment piece and should have carried Konstantinos Bogdanos's
@@ -898,6 +953,18 @@ def main():
                                     ", ".join(str(n) for n in t1_cut)))
             cut_by_cap[section] = chosen[cap:]
             chosen = chosen[:cap]
+
+        # Soft cap: says so, changes nothing. Checked AFTER the hard cap so a capped section
+        # is never told off twice for the same surplus, and reported with the section's own
+        # median so the number means something to whoever reads it.
+        soft = SECTION_SOFT_CAPS.get(section)
+        if soft and len(chosen) > soft:
+            sys.stderr.write(
+                "%s: %d items, over its soft cap of %d - heavy for this section (p90 of its "
+                "own history). Nothing was trimmed and nothing needs to be: check the tail is "
+                "genuinely worth running rather than filler that had nowhere else to go.\n"
+                % (section, len(chosen), soft))
+
         if not args.no_region_sort:
             # Stable, so any deliberate ordering inside a region survives.
             chosen = regions.sort_by_region(
@@ -1022,7 +1089,7 @@ def main():
     # noticed. check_sources.py catches a source that stopped FILING; nothing caught a source
     # that filed and was then read past. This is that check, and it runs at compose time - the
     # last point before publishing, where it can still be acted on.
-    picked_outlets, cand = set(), {}
+    picked_outlets, cand, ran_only = set(), {}, collections.Counter()
     for sec in ORDER:
         for n in composed_out.get(sec, []):
             picked_outlets.add((items[n].get("outlet") or "").lower())
@@ -1031,8 +1098,20 @@ def main():
         if not it.get("_section") or shortlist.is_blocked_outlet(outlet.lower()):
             continue
         if any(t in outlet.lower() for t in shortlist.COVERAGE_WATCH):
+            # An item that already ran in an earlier edition is not a miss (27.09.2026). On
+            # 25.09 ChinaAid and the Iona Institute were each flagged for one unpicked item,
+            # and both items had run the day before - the warning asked a question the
+            # edition had already answered. Counted, so a source that filed ONLY repeats is
+            # still visible, but not reported as read past.
+            if it.get("seen_on"):
+                ran_only[outlet] += 1
+                continue
             cand.setdefault(outlet, []).append(it["headline"][:58])
     missed = {o: hs for o, hs in cand.items() if o.lower() not in picked_outlets}
+    quiet = sorted(o for o in ran_only if o not in cand and o.lower() not in picked_outlets)
+    if quiet:
+        sys.stderr.write("\ncoverage: not flagged - %d watched source(s) filed only items that "
+                         "already ran: %s\n" % (len(quiet), ", ".join(quiet)))
     if missed:
         sys.stderr.write(
             "\nCOVERAGE - %d watched source(s) filed today and NOTHING of theirs was picked.\n"

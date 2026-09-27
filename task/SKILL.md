@@ -88,7 +88,17 @@ Identity & Sexuality" are part of the key.** Both were written here without them
 as misfiled ("classifier says Marriage, Family & Education"), so 49 of the 55 lines looked
 like transposed indexes when the only fault was one missing comma in the section name.
 
-Four caps apply and are enforced by compose.py, so do not hand-trim to hit them:
+**Six SOFT caps also apply, and they only ever warn** (10.09.2026): Life 50, Marriage 42,
+Religious Freedom 32, Gender 30, Other 28, Free Speech 24. They exist because the hard caps
+bite in three sections and in the other six nothing had an opinion at all — on 10.09.2026 the
+picks came to 334 and the only thing that brought them to 304 was noticing and hand-culling
+thirty. A section over its soft cap is told so and **publishes anyway**: nothing is trimmed,
+because "there is no overall volume cap, do not trim to a number" is settled. Treat it as
+"check the tail of this section is worth running rather than filler with nowhere else to go".
+The numbers are each section's own 90th percentile across the 18 archived editions, not
+invented; at that setting they flagged Free Speech, Marriage and Other on 10.09.2026.
+
+Four HARD caps apply and are enforced by compose.py, so do not hand-trim to hit them:
 **Politics, Government & Society is capped at 40** (Chris, 15.08.2026), **Church & Religion at
 30** (Chris, 23.08.2026), **Immigration & Asylum at 30** (Chris, 27.08.2026, after an edition
 ran 45 of them), and **US stories may not exceed 30% of any section** — the figure
@@ -121,6 +131,18 @@ Each line is:
 
   N | headline | outlet | author | age    (£ = paywalled, ↗ = Google News redirect link,
                                            "new" = source publishes no dates)
+
+**`[low-frequency source, NNNh window]` after the age is context, not a warning** (added
+10.09.2026). A handful of sources declare their own longer window in `extra_feeds.txt` —
+FoRB in Full, Charlotte Gill, ADF International, all `window=168h` — because they publish
+two or three times a week and at the default 36h the sweep would miss them entirely. Their
+items therefore arrive legitimately old: 63h to 157h on 10.09.2026. The age is normal and
+the piece is not a leftover; **do not treat the flag as a reason to drop the story.** It
+exists because the sheet printed a bare "63.2h" with nothing to say that was normal, and a
+63.2h FoRB in Full piece was published that morning as though it were breaking news. The
+genuine leak — an item older than its *own* source's window, which would mean a broken
+cutoff or date parse — is a separate `WINDOW LEAK:` line on the sweep header, and was empty
+on 10.09.2026.
 
 N is the item's index — you will pass these numbers to compose.py, which copies the fields
 verbatim. Never retype a headline, URL, outlet or author by hand.
@@ -418,9 +440,9 @@ publish.sh --verify diffs the Doc byte-exact, but the five links in Slack are co
 hand afterwards and `URLs N/N verified` says nothing about them. On 31.08.2026 four of five
 were typed from memory and were fabricated — an invented BBC article ID, an invented domain
 for Decision Magazine, and two wrong path segments — and a correction had to be posted to
-the channel. Build that list by looking each index up in /tmp/today.json and pasting the
-`url` field verbatim. Never reconstruct a URL from an outlet and a headline slug, however
-obvious the pattern looks.
+the channel. **Since 10.09.2026 you do not build that list by hand at all — `slack_five.py`
+does, and Step 10 says how.** Never reconstruct a URL from an outlet and a headline slug,
+however obvious the pattern looks.
 
 compose.py resolves what it can and prints
 `KEEP AS-IS` beside every Google News redirect it could not convert. Keep those redirects.
@@ -514,8 +536,8 @@ only expected_urls.txt catches an *invented* one that compose.py never emitted. 
 was written 1 byte long, i.e. empty, so that check was silently unavailable. Check its size
 before trusting it, and report it if it is empty.
 
-Read the new doc back with read_file_content (its text export contains every URL, headline and
-source), then:
+Read the new doc back with read_file_content (its markdown contains every URL as a real
+`[title](url)` link, so the regex below finds all of them), then:
 
   python3 - <<'EOF'
   import json,re,html,sys
@@ -531,6 +553,19 @@ source), then:
 If a large result is written to a file instead of returned, run the diff against that file rather
 than pasting it back into context. Also confirm every headline and source string appears
 (`Word\&Way` mismatches are a false positive — the export escapes `&`).
+
+**Use read_file_content, not a plain-text export, and do not "improve" this recipe into one.**
+A `text/plain` export of a Google Doc keeps the visible link text and discards every href, so
+the diff finds zero URLs in the doc and reports every link corrupted on a doc that is
+byte-perfect. publish.sh hit this on 17.08.2026 (0 of 246) and exports `text/html` for exactly
+this reason; on 10.09.2026 the same trap was walked into again from the other direction — a
+hand-rolled `export?mimeType=text/plain` diff was run *instead of* this recipe, reported
+`0/304 ok, 304 corrupted`, and that was briefly written up as a flaw in Step 6 rather than in
+the substitute. The recipe as printed above is correct and returned 304/304 on that same doc.
+If you do diff outside the connector, use `mimeType=text/html` and unwrap Docs' redirector
+(`https://www.google.com/url?q=…`) the way publish.sh does — but note that an authenticated
+export is not available on this path anyway, because the fallback only runs when publish.sh
+reported no credential. So: run the recipe as written.
 
 Then the structural checks: a heading for every section you picked for, item count per section
 matches your picks,
@@ -586,6 +621,32 @@ correctness, and a bug that correlates with a favoured beat can score well (prov
 18.08.2026). testcases.txt keeps veto power. Do not run rank_eval as part of the morning
 briefing; it is for sessions that change scoring.
 
+**Nor do you need to: `eval_week.sh` runs both scorers every Saturday 08:00** (the
+`briefing-eval-week` scheduled task, added 10.09.2026). Barring them from the morning path
+was right and also meant nothing ever ran them — `rank_eval_log.txt` had not been written
+since 31.08 and `repeat_eval_log.txt` since 28.08, while the corpus grew from 4 archived
+editions to 18. Saturday because the briefing is weekdays only, so the archive is complete
+through Friday and nothing contends. It exits non-zero only on a real crash; `repeat_eval.py`
+exiting 1 on a failing GOLD case is the standing state, because testcases.txt is written
+red-first — see `known_red.txt` for which failures are deliberate.
+
+**When Chris marks up a PUBLISHED edition, run `markup.py`** (10.09.2026) — until then the
+judgement loop only ran one way, and nothing recorded what he would have changed in an edition
+that actually shipped:
+
+  cd ~/Downloads/breakfast-briefing && python3 markup.py <YYYYMMDD> \
+      --should-have 417,1265 --should-not 248 --note "his words" --dry-run
+
+It prints WHY each one landed where it did, read off the archive — the tier it was given, its
+importance rank that morning, whether anything of its text was readable, its section. That is
+what turns "you missed this" into something fixable: a story missed at rank 1,165 with no
+readable text is a different bug from one missed at rank 12. It records the correction in
+`markup/<date>.json` and overrides those verdicts in `tiers.json`, because Chris's label beats
+the curator's and a correction that does not reach tiers.json is one the pipeline forgets by
+morning. It **suggests** testcases and writes none until `--write-testcases`: a "should have
+run" does not say by itself which rule was wrong, so it proposes the ABOVE pairs and names the
+kinds that look more likely, and the choice stays human.
+
 If archiving fails, the edition is still fine — say so in the final message and move on.
 
 ## Step 9: Back up state, judgements and the archive to Drive
@@ -612,7 +673,13 @@ That the scripts are in there is not decoration: on 20.08.2026 a `cp` that follo
 overwrote five of them with an older copy, and this push was the only thing that got them back.
 
 The second command backs up `archive/` — the ranking corpus Step 8 just wrote — as one tarball
-per edition. It is separate from `state_sync.sh` because the two have different shapes:
+per edition, **and since 10.09.2026 also `five/` and `markup/`** as plain JSON via
+upload-dir-to-drive.sh. Those two were created that day and were backed up NOWHERE: state_sync
+takes a flat file list and cannot express a directory, so neither list caught them, and `five/`
+is the only record of the Slack five that has ever existed. Note the ordering — `five/<date>.json`
+is written at Step 10, *after* this command runs, so today's five goes up on tomorrow's run and
+Friday's on Saturday's eval_week. The uploader is idempotent, so catching up costs nothing.
+`run_tests.py` now asserts that any corpus directory is carried by an uploader. It is separate from `state_sync.sh` because the two have different shapes:
 state_sync overwrites a fixed list of files every day, while an archived edition is written once
 and never touched again, so the archive upload is incremental and skips days already in Drive.
 Added 20.08.2026, when Step 9 pushed state faithfully every morning and left the labels — the
@@ -637,8 +704,27 @@ Only for an edition that reached Step 7 — a verified doc that was marked. No v
 no Slack post, for the same reason it means no marking: an announcement pointing at a briefing
 that does not exist is worse than silence.
 
+**Do not compose the message by hand. `slack_five.py` builds it** (10.09.2026). Write your
+choices to a spec — a list of slots, each a lead index plus optional nested indexes, with
+`note` for your own prose — then:
+
+  cd ~/Downloads/breakfast-briefing && python3 slack_five.py --history          # what the last fives ran
+  cd ~/Downloads/breakfast-briefing && python3 slack_five.py --spec /tmp/five.json \
+      --doc-url "<the published Doc URL>"
+
+It refuses a pick that did not actually publish (a cap loser included — on 10.09.2026 it
+caught index 921, which was in the picks and then retired by the Church cap, so the link
+would have pointed at a story absent from the Doc), refuses a URL that is not in
+`expected_urls.txt`, refuses a URL smuggled into a note, warns on anything over 36h, and
+refuses a story that already ran in one of the last 10 fives unless you pass
+`--allow-repeat`. It writes `five/<date>.json`, which is the only record of this list that
+has ever existed — the Doc gets tiers.json, archive/ and rank_eval; the five got nothing, so
+Chris replacing three of five on 25.08 and cutting a repeat on 31.08 taught the pipeline
+nothing. **Post the emitted text VERBATIM.** Retyping any part of it restores the exact
+hand-copying that fabricated four links on 31.08.2026.
+
 Post to **#campaigns-en-gb** (`C9RH217PZ`) with `slack_send_message`. The message is short and
-has a fixed shape:
+has a fixed shape, which is the shape the script emits:
 
 - one line saying the briefing is out, that it is automated, and linking the Doc
 - **the top five stories**, each as a headline link with the outlet after it

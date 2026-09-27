@@ -14,6 +14,15 @@
 #
 #   ./finish_edition.sh                       # normal run
 #   ./finish_edition.sh --dry-run             # compose only, no publish, no state change
+#   ./finish_edition.sh --from mark           # resume after a publish that stopped the tail
+#                                             # (also: --from tiers|archive|backup)
+#
+# --from (27.09.2026). On 25.09.2026 publish.sh's link check misread a correct link and
+# stopped the tail after the doc was already in Drive; marking, tiers, archive and both
+# backups then had to be run by hand. --from skips compose and publish and resumes at the
+# named step - but it FIRST re-verifies the doc that is already published (verify_doc.sh),
+# so a resume can never mark against a doc whose links have not verified. The flag only
+# changes where the run starts, never what it is allowed to skip checking.
 #
 # compose.py is ALWAYS called with --allow-reclass (Chris, 26.08.2026: "make it
 # unconditional, I always check the numbers anyway"). Without it, compose refuses to build
@@ -40,19 +49,34 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 DRY=0
-for arg in "$@"; do
-    case "$arg" in
-        --dry-run)       DRY=1 ;;
-        --allow-reclass) ;;   # now the default; accepted so old invocations still work
-        *) echo "unknown option: $arg" >&2
-           echo "usage: $0 [--dry-run]" >&2
-           exit 2 ;;
+FROM=""
+usage() { echo "usage: $0 [--dry-run] [--from mark|tiers|archive|backup]" >&2; exit 2; }
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --dry-run)       DRY=1; shift ;;
+        --allow-reclass) shift ;;   # now the default; accepted so old invocations still work
+        --from)          [[ $# -ge 2 ]] || usage; FROM="$2"; shift 2 ;;
+        *) echo "unknown option: $1" >&2; usage ;;
     esac
 done
+case "$FROM" in
+    ""|mark|tiers|archive|backup) ;;
+    *) echo "--from must be one of: mark tiers archive backup" >&2; usage ;;
+esac
+[[ -z "$FROM" || $DRY -eq 0 ]] || { echo "--from and --dry-run do not combine" >&2; usage; }
+
+# Step numbers for --from: a step runs when its number is at or after the resume point.
+step_no() { case "$1" in mark) echo 1 ;; tiers) echo 2 ;; archive) echo 3 ;; backup) echo 4 ;; *) echo 0 ;; esac; }
+START=$(step_no "$FROM")
+runs() { [[ $(step_no "$1") -ge $START ]]; }
 
 DATE="$(python3 -c "import json,datetime as dt;d=json.load(open('/tmp/today.json'));print(dt.datetime.fromisoformat(d['generated']).strftime('%Y%m%d'))")"
 echo "== edition $DATE"
 
+if [[ -n "$FROM" ]]; then
+    echo "== resume from '$FROM': re-verifying the published doc first"
+    ./verify_doc.sh --date "$DATE"
+else
 mkdir -p out
 echo "== compose"
 # --allow-reclass is unconditional: see the header. compose's mismatch report still prints
@@ -72,13 +96,17 @@ fi
 # run against a doc whose links did not verify.
 echo "== publish + verify"
 ./publish.sh --verify
+fi
 
+if runs mark; then
 echo "== mark published"
 python3 mark_published.py /tmp/today.json /tmp/picks.json
+fi
 
 # The judgement, not just the picks. Needs the leads manifest that --sheet writes; if
 # curation was run without --leads-json there is nothing to record and we say so rather
 # than silently skipping, because a missing day leaves those stories permanently "new".
+if runs tiers; then
 echo "== record tiers"
 if [[ -f /tmp/leads.json ]]; then
     REASONS=()
@@ -93,10 +121,13 @@ else
     echo "   shortlist.py, so this day's judgement is NOT recorded and every one of its"
     echo "   stories will look unjudged to a later --new-only run."
 fi
+fi
 
+if runs archive; then
 echo "== archive"
 python3 archive_day.py /tmp/today.json /tmp/picks.json || \
     echo "   archive failed - edition is still fine, but the day's labels are lost"
+fi
 
 echo "== back up"
 ./state_sync.sh push || echo "   state push failed - un-backed-up until the next one"

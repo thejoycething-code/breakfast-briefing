@@ -18,6 +18,7 @@ his own words, dated. Run it before and after any change to the patterns:
 Exit status is 1 if anything fails, so it can gate a commit or a scheduled run.
 """
 
+import datetime as dt
 import os
 import sys
 
@@ -73,7 +74,7 @@ def parse(path=CASES):
             yield n, kind, expected, parts, rest.strip()
 
 
-def run(verbose=False):
+def run(verbose=False, known_red=None):
     passed, failed = 0, []
     for n, kind, expected, parts, rest in parse():
         try:
@@ -249,27 +250,35 @@ def run(verbose=False):
                 detail = "%s -> %s" % (ha.strip()[:46], got)
             elif kind in ("RANBEFORE", "NOTRANBEFORE"):
                 # RANBEFORE | <headline today> ::was:: <headline in a recent edition>
-                # Same section assumed on both sides: that is the case the strict path is
-                # for, and asserting the cross-section rejection separately would only be
-                # re-testing same_story's guard.
+                #            [::sections:: <today section> >> <past section>]
+                # Both sides default to one section. That default used to be justified here
+                # as "asserting the cross-section rejection would only be re-testing
+                # same_story's guard" - which assumed the guard was right. On 08.09.2026 it
+                # cost a real repeat, so the sections are now settable and the guard is
+                # asserted rather than assumed. See the 08.09.2026 block in testcases.txt.
                 joined = "|".join(parts)
                 today_h, _, past_h = joined.partition("::was::")
                 flags = {}
                 if "::entity::" in past_h:
                     past_h = past_h.replace("::entity::", "")
                     flags["ENTITY"] = True
+                sec_today = sec_past = "Life"
+                if "::sections::" in past_h:
+                    past_h, _, secspec = past_h.partition("::sections::")
+                    a, _, b = secspec.partition(">>")
+                    sec_today, sec_past = a.strip(), b.strip()
                 today_h, past_h = today_h.strip(), past_h.strip()
                 # ENTITY on the kind line turns the entity arm on for that case, by
                 # building an index over the pair. Two documents is a degenerate corpus, so
                 # this asserts the ARM fires, not that a real DF gate would keep the token -
                 # repeat_eval.py is what measures the gate over a real corpus.
-                hist = [{"date": "20260825", "section": "Life",
+                hist = [{"date": "20260825", "section": sec_past,
                          "headline": past_h, "outlet": "x", "key": ""}]
                 ents = (shortlist.entity_index(
                             [{"headline": today_h}, {"headline": past_h}])
                         if flags.get("ENTITY") else None)
                 hit = shortlist.ran_before(
-                    {"headline": today_h, "_section": "Life"}, hist, ents=ents)
+                    {"headline": today_h, "_section": sec_today}, hist, ents=ents)
                 got = "RANBEFORE" if hit else "NOTRANBEFORE"
                 ok = (got == kind)
                 detail = "%s -> %s" % (today_h[:46], got)
@@ -452,6 +461,28 @@ def run(verbose=False):
         failed.append(("smoke", "SEEN_RETENTION_DAYS (%dd) must exceed the longest per-feed "
                                 "window (%dh)" % (fetch_feeds.SEEN_RETENTION_DAYS, longest)))
 
+    # A genuinely undated item must age out on the date we FIRST SAW it, not on the run time.
+    # Chris, 08.09.2026: "Why do you keep including this every single day? What in the
+    # deduplication process has broken?" - the Spectator's surrogacy piece had been in every
+    # sweep from 18.08 to 08.09. Nothing in dedup was broken. Dateless scrapesrc items were
+    # stamped published=now, so they never left the window, and the only thing holding them
+    # back was seen.json - which records PUBLISHED items only, so anything offered and passed
+    # over stayed "new" for ever. 41 items carried age_h=None in the 08.09 sweep alone.
+    try:
+        cutoff = dt.datetime(2026, 9, 7, tzinfo=dt.timezone.utc)
+        old = {fetch_feeds.url_key("https://spectator.com/article/x"):
+               dt.datetime(2026, 8, 18, tzinfo=dt.timezone.utc).isoformat()}
+        stale = fetch_feeds.dateless_is_new("https://spectator.com/article/x", old, cutoff)
+        fresh = fetch_feeds.dateless_is_new("https://spectator.com/article/y", old, cutoff)
+        if (not stale) and fresh:
+            passed += 1
+        else:
+            failed.append(("smoke", "dateless freshness: first seen 18.08 against a 07.09 "
+                                    "cutoff must NOT be new (got new=%s), and an unseen link "
+                                    "must be new (got new=%s)" % (stale, fresh)))
+    except Exception as exc:  # noqa: BLE001
+        failed.append(("smoke", "dateless freshness: %s: %s" % (type(exc).__name__, exc)))
+
     # The shell tail must survive `set -u` on this Mac's bash. See the two functions below.
     bad_syntax = test_shell_syntax()
     if not bad_syntax:
@@ -503,6 +534,31 @@ def run(verbose=False):
                        % (len(orphans),
                           "; ".join("%s (%dd)" % (n, f) for n, _u, f in orphans[:6]))))
 
+    # repeat_eval's GOLD veto must not read a harness marker as a word. See the function below.
+    gm = test_gold_pairs_strip_markers()
+    if not gm:
+        passed += 1
+    else:
+        failed.append(("smoke", "%d gold pair(s) still carry a harness marker: %s"
+                       % (len(gm), "; ".join(gm))))
+
+    # Every corpus DIRECTORY must be carried by an uploader. See the function below.
+    corp = test_corpus_dirs_backed_up()
+    if not corp:
+        passed += 1
+    else:
+        failed.append(("smoke", "%d corpus director(y/ies) backed up NOWHERE: %s"
+                       % (len(corp), "; ".join(corp))))
+
+    # The age gloss must fire only where the printed age actually misleads, and the window
+    # leak guard must stay quiet on a legitimate long window. See the function below.
+    agef = test_age_flag_and_window_leak()
+    if not agef:
+        passed += 1
+    else:
+        failed.append(("smoke", "%d age-flag/window-leak problem(s): %s"
+                       % (len(agef), "; ".join(agef))))
+
     # The gnews decoder must not truncate a URL at its query value. See the function below.
     trunc = test_gnews_decode_unescape()
     if not trunc:
@@ -511,6 +567,31 @@ def run(verbose=False):
         failed.append(("smoke", "%d gnews payload(s) decoded to a truncated URL: %s"
                        % (len(trunc), "; ".join("got %s, want %s" % (g, w)
                                                 for g, w in trunc))))
+
+    # publish.sh --verify must see URLs containing ")" and still catch real losses.
+    pv = test_publish_verify_parens()
+    if not pv:
+        passed += 1
+    else:
+        failed.append(("smoke", "%d publish --verify misjudgement(s): %s"
+                       % (len(pv), "; ".join(pv))))
+
+    # 27.09.2026 additions: the resume path's verifier, the text scrubber, the paywall
+    # re-check after decoding, and the Bing topic routes. See each function below.
+    for fn, what in ((test_verify_links, "verify_links (--from) misjudgement"),
+                     (test_boilerplate_scrub, "boilerplate scrub problem"),
+                     (test_paywall_rechecked_after_decode, "paywall re-check problem"),
+                     (test_bing_topic_routes, "Bing topic-route problem"),
+                     (test_finish_edition_from_guards, "finish_edition --from guard problem"),
+                     (test_event_sizes, "event-size problem"),
+                     (test_feedly_parse, "Feedly-route problem"),
+                     (test_batched_decode_mapping, "batched-decode problem"),
+                     (test_syndicated_credit, "syndicated-copy problem")):
+        got = fn()
+        if not got:
+            passed += 1
+        else:
+            failed.append(("smoke", "%d %s(s): %s" % (len(got), what, "; ".join(got))))
 
     # A decode that is really a paginated index must not be trusted. See the function below.
     idx = test_gnews_index_decode_flagged()
@@ -527,6 +608,21 @@ def run(verbose=False):
     else:
         failed.append(("smoke", "%d cluster-provenance failure(s): %s"
                        % (len(relay), "; ".join(relay))))
+
+    # An issuing primary source must LEAD a cluster on the sheet. See the function below.
+    issuing = test_cluster_lead_prefers_an_issuing_primary()
+    if not issuing:
+        passed += 1
+    else:
+        failed.append(("smoke", "%d cluster-provenance failure(s), issuing: %s"
+                       % (len(issuing), "; ".join(issuing))))
+
+    # A stock topic phrase must not glue a day's stories together. See the function below.
+    phrase = test_common_words_do_not_cluster()
+    if not phrase:
+        passed += 1
+    else:
+        failed.append(("smoke", "%d topic-phrase merge(s): %s" % (len(phrase), "; ".join(phrase))))
 
     # SOURCE_TIER must not substring-match a different masthead. See the function below.
     tiermatch = test_source_tier_not_substring()
@@ -556,6 +652,13 @@ def run(verbose=False):
         passed += 1
     else:
         failed.append(("smoke", "wpjson feed mode: %s" % "; ".join(wpj)))
+
+    # A Google News sitemap must parse as a feed. See the function below.
+    nsm = test_news_sitemap_parses_as_a_feed()
+    if not nsm:
+        passed += 1
+    else:
+        failed.append(("smoke", "news sitemap: %s" % "; ".join(nsm)))
 
     # The sheet's coverage line must measure readability, not fetch work. See below.
     cov = test_text_coverage_line_counts_openings()
@@ -588,7 +691,78 @@ def run(verbose=False):
         # reporter with a TypeError instead of reporting the failure - the one moment the
         # harness exists for. Found by deliberately breaking the new self-block assertion.
         print("  FAIL  %-9s %s" % ("line %d" % n if isinstance(n, int) else n, msg))
+
+    if known_red is not None:
+        return _known_red_verdict(failed, known_red)
     return 1 if failed else 0
+
+
+def _known_red_verdict(failed, path):
+    """Exit 0 if every failure is a WAIVED one, 1 otherwise. Opt-in, via --known-red.
+
+    Chris, 10.09.2026. Why this exists. testcases.txt works failing-first: a correction is
+    written as a red case BEFORE the rule is edited, which is what stops the fix being a
+    special case for one headline. The cost is that the fixture is legitimately red for as
+    long as the fix takes - the cross-section RANBEFORE case sat red from 08.09 to 10.09 -
+    and hooks/pre-commit gates on the fixture. So for those two days EVERY commit needed
+    --no-verify, which also skipped the step BEFORE the fixture: the drift check on
+    SKILL.md and memory/, the two least replaceable files in the setup. A deliberate red
+    case was silently disarming an unrelated backup guarantee. Splitting the two gates is
+    not enough on its own, because the thing you actually want is for a NEW red to keep
+    blocking while a KNOWN one does not.
+
+    Two properties make the waiver safe to have at all:
+
+      - it is matched on the failure MESSAGE, not the line number, because a line number
+        moves the moment anyone edits testcases.txt above it and a waiver that drifts onto
+        a different case is worse than no waiver;
+      - a waiver that matches nothing is itself a failure. Otherwise the fix lands, nobody
+        removes the entry, and the allowlist quietly grows into permission for that whole
+        class of failure to come back unnoticed.
+    """
+    patterns = []
+    try:
+        for raw in open(path, encoding="utf-8"):
+            line = raw.split("#", 1)[0].strip()
+            if line:
+                patterns.append(line)
+    except IOError as exc:
+        print("\n  known-red list %s could not be read: %s" % (path, exc))
+        return 1
+    if not patterns:
+        return 1 if failed else 0
+
+    waived, unexpected, used = [], [], set()
+    for n, msg in failed:
+        hit = next((p for p in patterns if p in msg), None)
+        if hit:
+            waived.append((n, msg))
+            used.add(hit)
+        else:
+            unexpected.append((n, msg))
+
+    if waived:
+        print("\n  %d WAIVED failure(s) - known red, see %s:" % (len(waived), path))
+        for n, msg in waived:
+            print("    %-9s %s" % ("line %d" % n if isinstance(n, int) else n, msg[:96]))
+        print("  These are red on purpose. They do not block, and they are the reason the")
+        print("  fixture must not be the only thing standing between you and a commit.")
+
+    stale = [p for p in patterns if p not in used]
+    if stale:
+        print("\n  %d STALE waiver(s) in %s - they match no current failure, so the case they"
+              % (len(stale), path))
+        print("  covered is fixed. Delete them; a waiver nobody removed is permission for")
+        print("  that failure to come back unnoticed:")
+        for p in stale:
+            print("    %s" % p[:96])
+
+    if unexpected:
+        print("\n  %d UNEXPECTED failure(s) - these block:" % len(unexpected))
+        for n, msg in unexpected:
+            print("    %-9s %s" % ("line %d" % n if isinstance(n, int) else n, msg[:96]))
+
+    return 1 if (unexpected or stale) else 0
 
 
 
@@ -848,6 +1022,52 @@ def test_url_key_keeps_article_ids():
     return bad
 
 
+def test_news_sitemap_parses_as_a_feed():
+    """News-sitemap parsing (24.09.2026). Returns a list of problems; empty means pass.
+
+    A Google News sitemap lists every article of the last 48 hours, where a Google News
+    search stops at 100 results. The fixture is modelled on the Times' - which was measured
+    and then NOT added, because its robots.txt disallows us (see extra_feeds.txt). The
+    parser is kept for publishers that do permit it. Entries must come out shaped exactly
+    like parse_feed's RSS entries, or the sweep would drop them silently.
+    """
+    import fetch_feeds
+    raw = (b'<?xml version="1.0" encoding="UTF-8"?><urlset '
+           b'xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" '
+           b'xmlns:news="http://www.google.com/schemas/sitemap-news/0.9"><url>'
+           b'<loc>https://www.thetimes.com/uk/article/trump-media-ban-judge-abc123</loc>'
+           b'<lastmod>2026-09-24T08:02:47.000Z</lastmod><news:news><news:publication>'
+           b'<news:name>The Times</news:name><news:language>en</news:language>'
+           b'</news:publication><news:publication_date>2026-09-24T06:10:00.000Z'
+           b'</news:publication_date><news:title><![CDATA[Trump ordered to lift White '
+           b'House media ban by judge &amp; told why]]></news:title>'
+           b'<news:keywords>media, courts</news:keywords></news:news></url></urlset>')
+    try:
+        rows = fetch_feeds.parse_feed(raw)
+    except Exception as exc:  # noqa: BLE001
+        return ["parse_feed raised %s on a news sitemap" % type(exc).__name__]
+    if len(rows) != 1:
+        return ["parsed %d rows, expected 1" % len(rows)]
+    r = rows[0]
+    bad = []
+    for k in ("title", "link", "date", "author", "source", "feed_title", "summary",
+              "categories"):
+        if k not in r:
+            bad.append("missing the %r key parse_feed emits" % k)
+    if not (r.get("title") or "").startswith("Trump ordered to lift"):
+        bad.append("title not read from news:title, got %r" % r.get("title"))
+    if "&amp;" in (r.get("title") or ""):
+        bad.append("entities not unescaped - the doc quotes headlines verbatim")
+    if r.get("link") != "https://www.thetimes.com/uk/article/trump-media-ban-judge-abc123":
+        bad.append("link not read from loc")
+    d = r.get("date")
+    if d is None or d.tzinfo is None:
+        bad.append("date must be tz-aware or the window filter compares naive to aware")
+    elif d.hour != 6:
+        bad.append("publication_date must win over lastmod, got hour=%d" % d.hour)
+    return bad
+
+
 def test_wpjson_parses_as_a_feed():
     """The ADF route. Returns a list of problems; empty means pass.
 
@@ -923,6 +1143,139 @@ def test_text_coverage_line_counts_openings():
     for route in ("_opening", "_preview", "real_summary", "_lede", "_sibtext"):
         if route not in block:
             bad.append("coverage route %s missing from _text_route" % route)
+    return bad
+
+
+def test_gold_pairs_strip_markers():
+    """repeat_eval's GOLD veto must strip every ::marker:: before comparing.
+
+    Chris, 10.09.2026. This is the SECOND time the same bug has been found. repeat_eval's own
+    comment records the first: leaving ::entity:: in the string "made it a word in the
+    comparison, which is how it first showed up as a phantom GOLD failure". On 08.09.2026 the
+    RANBEFORE cases gained a ::sections:: marker for run_tests, repeat_eval was not taught
+    about it, and the result was two GOLD failures that were not real - reported as a VETO,
+    which is the strongest signal the scorer has, every time the job ran.
+
+    So this asserts the general property rather than the specific marker: no gold pair may
+    contain "::" by the time it reaches the comparison. Any marker added to testcases.txt in
+    future fails here on the day it is added, rather than quietly becoming a word.
+    """
+    try:
+        import repeat_eval
+    except ImportError as exc:
+        return ["could not import repeat_eval: %s" % exc]
+    bad = []
+    for today, past, _want in repeat_eval.gold_pairs():
+        for side, text in (("today", today), ("past", past)):
+            if "::" in text:
+                bad.append("%s side still has a marker: %r" % (side, text[:70]))
+    return bad
+
+
+def test_corpus_dirs_backed_up():
+    """A directory of write-once day records must be carried by an uploader.
+
+    Chris, 10.09.2026. CODE_FILES has caught the same mistake three times - a new script
+    written straight into ~/Downloads and backed up nowhere (textsignals/tier_model 24.08,
+    sync_docs 26.08, slack_five 10.09). The same afternoon it missed that mistake in a
+    different shape: five/ and markup/ were created and neither was in any backup list,
+    because state_sync.sh takes a flat FILE list and cannot express a directory at all. So
+    the guard that existed for scripts had no counterpart for corpora, and five/ - the only
+    record of the Slack five that has ever existed - was one rm from gone.
+
+    It PARSES the uploader's own corpus list rather than grepping for the name. The first
+    version of this test grepped, and its own mutation test caught it out: removing five/
+    from the uploader left the test GREEN, because the substring "five" also occurs in
+    slack_five.py and in the prose of both scripts. A guard that cannot fail is worse than
+    none, because it reports a guarantee it is not providing.
+    """
+    import re
+    here = os.path.dirname(os.path.abspath(__file__))
+    # Directories the pipeline WRITES and would want back. Not a glob of everything on disk:
+    # __pycache__ and out/ are derived and deliberately not backed up.
+    corpora = ["archive", "five", "markup"]
+
+    uploader = os.path.join(here, "upload-archive-to-drive.sh")
+    if not os.path.exists(uploader):
+        return ["upload-archive-to-drive.sh is missing, so no corpus is backed up at all"]
+    text = open(uploader, encoding="utf-8").read()
+
+    covered = set()
+    # archive/ is this script's whole reason for existing; it tars archive/<day>/ directly.
+    if re.search(r"archive/\*/|\$HERE/archive", text):
+        covered.add("archive")
+    # the rest come from the explicit list it loops over
+    m = re.search(r"for\s+corpus\s+in\s+([^;\n]+?)\s*;\s*do", text)
+    if m:
+        covered.update(t for t in m.group(1).split() if t)
+
+    bad = []
+    for d in corpora:
+        if not os.path.isdir(os.path.join(here, d)):
+            continue          # not created yet; nothing to lose, and markup/ is written lazily
+        if d not in covered:
+            bad.append("%s/ is written by the pipeline and no uploader carries it" % d)
+    return bad
+
+
+def test_age_flag_and_window_leak():
+    """The age gloss is context, not an alarm, and the leak guard is not the same thing.
+
+    Chris, 10.09.2026. Four items in that day's sweep were older than the 36h window - 63h to
+    157h - and the obvious reading was a leak. It was not: FoRB in Full and Charlotte Gill both
+    declare window=168h in extra_feeds.txt because they publish two or three times a week, so
+    at 36h the sweep would miss them entirely. The mistake was the other way round - the sheet
+    printed a bare "63.2h" with nothing to say that was normal for that source, and the piece
+    got published as that morning's news.
+
+    So two separate things, and this asserts they stay separate:
+
+      - age_flag() glosses an age that has run past the sweep window for a source allowed a
+        longer one. It must NOT fire on a young item from the same source, because there is
+        nothing misleading about "4h", and it must not fire on an ordinary source at all. A
+        flag on every long-window line every day would be noise on exactly the ★ primary and
+        low-frequency sources the brief says get read past.
+      - outside_own_window() is the actual leak guard: older than the item's OWN allowance,
+        which means a cutoff or a date parse is wrong. It was empty on 10.09.2026 and should
+        stay empty.
+    """
+    bad = []
+    try:
+        import shortlist
+        import fetch_feeds
+    except ImportError as exc:
+        return ["could not import: %s" % exc]
+
+    fetch_feeds.load_extra()
+    long_src = next((k for k, v in fetch_feeds.FEED_WINDOWS.items() if v > shortlist.SWEEP_WINDOW_H),
+                    None)
+    if not long_src:
+        return ["no source in extra_feeds.txt declares a window longer than the sweep's, so "
+                "the age gloss has nothing to explain - did a window= line get dropped?"]
+    win = fetch_feeds.FEED_WINDOWS[long_src]
+
+    old_item = {"feed": long_src, "age_h": shortlist.SWEEP_WINDOW_H + 20.0}
+    if "low-frequency source" not in shortlist.age_flag(old_item):
+        bad.append("a %.0fh item from %r (window %dh) got no age gloss" %
+                   (old_item["age_h"], long_src, win))
+
+    young = {"feed": long_src, "age_h": 4.0}
+    if shortlist.age_flag(young):
+        bad.append("a 4h item from %r was glossed; nothing about '4h' misleads" % long_src)
+
+    plain = {"feed": "no such feed declares a window", "age_h": shortlist.SWEEP_WINDOW_H + 20.0}
+    if shortlist.age_flag(plain):
+        bad.append("an ordinary source was glossed as low-frequency")
+
+    # The leak guard: inside its own window is fine, past it is not.
+    inside = {"_i": 1, "feed": long_src, "age_h": win - 1.0}
+    if shortlist.outside_own_window([inside]):
+        bad.append("a %.0fh item inside its own %dh window was called a leak" %
+                   (inside["age_h"], win))
+    beyond = {"_i": 2, "feed": long_src, "age_h": win + 50.0}
+    if not shortlist.outside_own_window([beyond]):
+        bad.append("a %.0fh item past its own %dh window was NOT reported as a leak" %
+                   (beyond["age_h"], win))
     return bad
 
 
@@ -1103,6 +1456,145 @@ def test_cluster_relay_not_primary():
     return bad
 
 
+def test_cluster_lead_prefers_an_issuing_primary():
+    r"""A primary source ISSUING its own analysis must lead the sheet over a write-up of it.
+
+    Chris, 15.09.2026, from his markup of the 15.09 edition. Sex Matters published "NSPCC's
+    changing-room guidance fails girls" - their own analysis of the charity's new schools
+    guidance. The Telegraph filed its own story on the same guidance. corroborate() collapsed
+    the two and printed the Telegraph's line, so the only version on the sheet was a
+    paywalled headline with no readable text, it read as a story that had already run the day
+    before, and the whole cluster was dropped. The compose-time COVERAGE check caught it -
+    "Sex Matters 1 unpicked" - and the piece had to be added to the Doc after publication.
+
+    This is the MIRROR of the 31.08.2026 relay case above, and the half that case did not
+    cover. Both selections were wired then, but only in one direction:
+
+      cluster_rank      has a PRIMARY_SOURCE term, so it promotes an issuing primary. The
+                        section shortlist got this right and even printed
+                        "<<< TAKE THIS ONE of 2 on this story" against the Sex Matters line.
+      cluster_lead_key  has no PRIMARY_SOURCE term at all. Its first term only DEMOTES a
+                        relaying primary; nothing promotes an issuing one, so the tie falls
+                        through to rank_score - 11 for the Telegraph against 7 for Sex
+                        Matters, on keyword vocabulary alone - and the newsroom wins.
+
+    So the two paths disagree on the same cluster, and the sheet is the one the curator
+    reads. Fixing cluster_rank in August did not touch this, exactly as the comment in
+    corroborate() warns.
+
+    The relay guard must keep working while this is fixed: an issuing primary leads, a
+    relaying one still sorts last. Those are the two halves of the same provenance rule, and
+    a change that satisfies one by dropping the other is not a fix.
+    """
+    bad = []
+    # The real pair, with the scores classify() actually gave them on 15.09.2026.
+    sm = {"outlet": "Sex Matters",
+          "headline": "NSPCC’s changing-room guidance fails girls",
+          "summary": "The National Society for the Prevention of Cruelty to Children (NSPCC) "
+                     "is the country's best-known child-protection charity, and the only one "
+                     "with statutory powers.",
+          "url": "https://sex-matters.org/posts/updates/nspccs-changing-room-guidance-fails-girls",
+          "_score": 1, "_section": "Gender, Identity & Sexuality"}
+    tel = {"outlet": "The Telegraph",
+           "headline": "Male teachers can supervise girls in changing rooms under NSPCC guidance",
+           "summary": "",
+           "url": "https://www.telegraph.co.uk/news/2026/09/14/nspcc-changing-rooms-guidance/",
+           "_score": 5, "_section": "Gender, Identity & Sexuality"}
+
+    # Neither is relaying: Sex Matters is reading the guidance, not a newsroom. If this
+    # trips, the failure below is about the relay guard and not about issuing.
+    if shortlist.relays_another_outlet(sm):
+        bad.append("Sex Matters' own analysis is being read as a relay")
+
+    # THE SHEET's collapse, which is what a curator actually sees.
+    for order, label in (([sm, tel], "issuing first"), ([tel, sm], "write-up first")):
+        lead = shortlist.corroborate(order)[id(order[0])][1]
+        if lead is not sm:
+            bad.append("sheet lead is %s, want Sex Matters (%s, corroborate path)"
+                       % (lead.get("outlet"), label))
+
+    # ...and the ordering stated directly, so a fix cannot pass by input-order luck.
+    if shortlist.cluster_lead_key(sm) > shortlist.cluster_lead_key(tel):
+        bad.append("cluster_lead_key still sorts the Telegraph's write-up above the release")
+
+    # The August relay case must survive the fix: a RELAYING primary still sorts last.
+    spuc = {"outlet": "SPUC", "headline": "Andy Burnham will NOT vote on assisted suicide",
+            "summary": "According to Politics UK, Andy Burnham has told Labour MPs that he "
+                       "will not be voting on the Bill.",
+            "_score": 40, "_section": "Life"}
+    tel2 = {"outlet": "The Telegraph",
+            "headline": "Burnham to abstain from assisted dying vote",
+            "summary": "Burnham to abstain from assisted dying vote The Telegraph",
+            "_score": 10, "_section": "Life"}
+    if shortlist.cluster_lead_key(spuc) < shortlist.cluster_lead_key(tel2):
+        bad.append("fixing issuing broke relaying: SPUC's relay leads the Telegraph again")
+    return bad
+
+
+
+def test_common_words_do_not_cluster():
+    r"""Words half the day shares are not evidence that two headlines are one story.
+
+    Chris, 23.09.2026, marking up that morning's edition: "You missed all of these important
+    stories?" Christianity Today's "Does Trump 2.0 Care About Religious Freedom Abroad?" (the
+    Cissie Graham Lynch / IRF office piece) never reached the sheet. corroborate() had built
+    an x19 "story" anchored on First Liberty's three-word "Reflecting on Religious Freedom":
+    every headline containing "religious freedom" shared 2 of that anchor's 3 significant
+    words, cleared the 0.55 ratio, and collapsed under one line - the Pakistan Ahmadi ruling,
+    Trump appointing a pastor jailed in Turkey to USCIRF, Yom Kippur synagogue threats, a
+    Fiji constitution story, the CT piece and 13 more. Eighteen unrelated stories, one line,
+    and the one line's borrowed text was First Liberty on the Founders. same_story() had the
+    same flaw per section: the CT piece was flagged a duplicate of "A book for those who care
+    about religious freedom" on {about, care, freedom, religious}.
+
+    The corpus is built so the phrase words are COMMON (as they were: "religiou" 31, "freedom"
+    26, "care" 28, "about" 43 of 1,752 that morning). Genuine duplicates must still merge.
+    """
+    filler = ["Religious freedom report number %d from region %s" % (i, w)
+              for i, w in enumerate("alpha bravo charlie delta echo foxtrot golf hotel india "
+                                    "juliet kilo lima mike november oscar papa quebec romeo "
+                                    "sierra tango uniform victor whisky xray yankee zulu".split())]
+    filler += ["Why we care about %s this week" % w for w in
+               "housing parks roads buses trains water power schools clinics libraries "
+               "museums bridges ports airports canals farms fishing forests mines rivers "
+               "lakes beaches".split()]
+    pairs_apart = [
+        ("Reflecting on Religious Freedom",
+         "Rights body condemns Pakistan court ruling upholding ban on Ahmadi literature, "
+         "warns of threat to religious freedom"),
+        ("Reflecting on Religious Freedom",
+         "Trump appoints pastor jailed in Turkey to US religious freedom commission"),
+        ("A book for those who care about religious freedom",
+         "Does Trump 2.0 Care About Religious Freedom Abroad?"),
+    ]
+    pairs_together = [
+        ("Supreme Court declines to intervene in custody dispute between California parents "
+         "and surrogate",
+         "US Supreme Court won't intervene in custody dispute between California couple and "
+         "surrogate"),
+        ("Two men arrested over suspected terror plot to target Jewish community in Manchester",
+         "Two arrested over suspected terrorist plot to target the Jewish community in "
+         "Manchester"),
+    ]
+    bad = []
+    for want, pairs in (("apart", pairs_apart), ("together", pairs_together)):
+        for ha, hb in pairs:
+            rows = [{"headline": h, "outlet": "o%d" % i, "_section": "Life", "_score": 5}
+                    for i, h in enumerate(filler)]
+            a = {"headline": ha, "outlet": "xa", "_section": "Life", "_score": 5}
+            b = {"headline": hb, "outlet": "xb", "_section": "Life", "_score": 5}
+            rows = [a] + rows + [b]
+            corr = shortlist.corroborate(rows)
+            merged_corr = corr[id(a)][1] is corr[id(b)][1]
+            marks = shortlist.cluster_duplicates(rows)
+            merged_dup = (id(a) in marks and id(b) in marks
+                          and ("TAKE THIS ONE" in marks[id(a)]) != ("TAKE THIS ONE" in marks[id(b)]))
+            for path, merged in (("corroborate", merged_corr), ("same_story", merged_dup)):
+                if merged != (want == "together"):
+                    bad.append("%s %s, want %s: %s | %s"
+                               % (path, "merged" if merged else "apart", want, ha[:34], hb[:34]))
+    return bad
+
 def test_source_tier_not_substring():
     r"""SOURCE_TIER is matched by substring, and "the times" is a substring of others.
 
@@ -1126,6 +1618,77 @@ def test_source_tier_not_substring():
     for o in should_not:
         if shortlist.source_tier_pos(o) is not None:
             bad.append("%s must NOT match SOURCE_TIER" % o)
+    return bad
+
+
+def test_publish_verify_parens():
+    """publish.sh --verify must match hrefs whole, parentheses included, and nothing looser.
+
+    25.09.2026. The check built its set of exported URLs with a bare-URL regex that stopped at
+    ")", so the Jakarta Post link below - utm_source=(direct) - came back cut at "(direct" and
+    was reported MISSING. The doc was byte-exact (a substring check found 183/183), but the run
+    halted at 182/183 and finish_edition.sh stopped before marking. The fix reads hrefs out of
+    the export instead, after html.unescape and unwrapping google.com/url?q=.
+
+    Runs the Python heredoc straight out of publish.sh, so the test cannot drift from what
+    ships. The negative cases pin that the fix did not buy its green by loosening the match:
+    a truncated URL, a URL that is only a PREFIX of an exported one, and a URL present only as
+    visible link text (not as an href) must all still fail.
+    """
+    import re
+    import subprocess
+    import tempfile
+    src = open(os.path.join(HERE, "publish.sh")).read()
+    m = re.search(r"<<'PY'\n(.*?)\nPY\n", src, re.S)
+    if not m:
+        return ["could not find the --verify heredoc in publish.sh"]
+    script = m.group(1)
+    jak = ("https://www.thejakartapost.com/indonesia/2026/09/25/tangerang-church-disruption-"
+           "rekindles-fears-among-minorities?utm_source=(direct)&utm_medium=single_latest")
+    # How the Docs HTML export writes it: redirector-wrapped, query percent-encoded, &amp;.
+    jak_wrapped = ("https://www.google.com/url?q=https://www.thejakartapost.com/indonesia/"
+                   "2026/09/25/tangerang-church-disruption-rekindles-fears-among-minorities"
+                   "?utm_source%3D(direct)%26utm_medium%3Dsingle_latest&amp;sa=D&amp;"
+                   "source=editors&amp;ust=1758800000000000&amp;usg=AOvVaw0abc")
+    paren_path = "https://en.wikipedia.org/wiki/Tangerang_(city)"
+    plain = "https://example.com/story?id=1&page=2"
+
+    def verify(want_urls, doc_body):
+        sent = "".join('<p><a href="%s">x</a></p>' % u.replace("&", "&amp;")
+                       for u in want_urls)
+        with tempfile.TemporaryDirectory() as d:
+            dp, sp = os.path.join(d, "doc.html"), os.path.join(d, "sent.html")
+            open(dp, "w").write("<html><body>%s</body></html>" % doc_body)
+            open(sp, "w").write("<html><body>%s</body></html>" % sent)
+            return subprocess.run([sys.executable, "-", dp, sp], input=script,
+                                  capture_output=True, text=True)
+
+    a = '<a class="c3" href="%s">link</a>'
+    cases = [
+        # (label, wanted, exported doc body, should pass)
+        ("paren query, redirector-wrapped", [jak], a % jak_wrapped, True),
+        ("paren query, bare href", [jak], a % jak.replace("&", "&amp;"), True),
+        ("paren in path", [paren_path], a % paren_path, True),
+        ("plain url, wrapped", [plain],
+         a % "https://www.google.com/url?q=https://example.com/story?id%3D1%26page%3D2&amp;sa=D",
+         True),
+        ("genuinely missing", [jak, plain], a % jak_wrapped, False),
+        ("truncated at the paren", [jak],
+         a % "https://www.thejakartapost.com/indonesia/2026/09/25/tangerang-church-disruption-"
+             "rekindles-fears-among-minorities?utm_source=", False),
+        ("wanted is only a prefix of the export", ["https://example.com/story"],
+         a % plain.replace("&", "&amp;"), False),
+        ("present as link text only, href differs", [jak],
+         '<a href="https://example.com/other">%s</a>' % jak.replace("&", "&amp;"), False),
+    ]
+    bad = []
+    for label, want, body, ok in cases:
+        proc = verify(want, body)
+        if (proc.returncode == 0) != ok:
+            bad.append("%s: expected %s, got rc=%d (%s)"
+                       % (label, "pass" if ok else "MISSING", proc.returncode,
+                          (proc.stdout + proc.stderr).strip().splitlines()[0][:80]
+                          if (proc.stdout + proc.stderr).strip() else "no output"))
     return bad
 
 
@@ -1252,5 +1815,300 @@ def test_all_data_files_backed_up():
     return (missing, orphans)
 
 
+def test_boilerplate_scrub():
+    """boilerplate.scrub removes site furniture and nothing else (27.09.2026).
+
+    Measured on 18,276 cached openings: the Independent's login notice opened 346 of 346 of its
+    entries, GB News's 60-word menu 232 of 232, and the sheet printed them as article text. The
+    negative cases pin the three ways the first draft of the scrubber damaged real prose: a
+    case-insensitive "COMMENTS" rule that took the noun out of "his comments", a learned
+    6-gram that cut ADF's "the U.S. Court of Appeals for the" out of a sentence (hence
+    MIN_RUN), and a punctuation tidy-up that rewrote text containing no furniture at all.
+    """
+    import boilerplate as bp
+    bad = []
+    prose = ("The Home Office initially rejected her asylum application, citing suspicions "
+             "that the marriage was not legitimate, the tribunal heard on Thursday afternoon.")
+    notice = ("Please refresh the page or navigate to another page on the site to be "
+              "automatically logged in Please refresh your browser to be logged in")
+    gb_menu = ("US Edition UK Edition Home GBN Shop YourSay YouDecide Support Us News Alerts "
+               "Latest Puzzles Win Tickets News UK News US News Cost of Living Energy Bills "
+               "I'm A Celeb! with Stephen and Anne You are about to be charged £0.00 *")
+    cases = [
+        ("independent notice only", "independent.co.uk/x", notice, None),
+        ("independent notice + prose", "independent.co.uk/x", notice + " " + prose, prose),
+        # The prose repeats either side of the menu, so drop_standfirst_echo keeps one copy.
+        ("gb news menu, closed", "gbnews.com/x", prose + " " + gb_menu + " " + prose, prose),
+        ("standfirst echo", "example.com/x",
+         prose[:120] + " " + prose + " It continues with a second sentence of real detail.",
+         prose + " It continues with a second sentence of real detail."),
+        ("gb news menu, runs to end", "gbnews.com/x",
+         prose + " US Edition UK Edition Home GBN Shop YourSay YouDecide Support Us News "
+         "Alerts Latest Puzzles Win Tickets", prose),
+        ("guardian fullscreen", "theguardian.com/x",
+         "View image in fullscreen " + prose, prose),
+    ]
+    for label, key, text, want in cases:
+        got = bp.scrub(key, text)
+        if got != want:
+            bad.append("%s: got %r" % (label, (got or "None")[:90]))
+    # Untouched when nothing is furniture - byte-identical, not merely similar.
+    plain = "He defended his comments , and said 0 people were hurt; the comments stood."
+    plain = plain + " " + prose
+    if bp.scrub("example.com/x", plain) is not plain:
+        bad.append("text with no furniture was rewritten: %r" % bp.scrub("example.com/x", plain)[:90])
+    # Learned/day furniture: host-scoped, run-length gated, opinion markers kept.
+    furniture = ("EWTN News, Inc. is the world's largest Catholic news organization, comprised "
+                 "of television, radio, print and digital media outlets")
+    texts = [prose + " " + furniture + " story %d continues here with more words." % i
+             for i in range(8)]
+    grams = bp.learn_grams(texts, 0.4, 4)
+    if bp.scrub("ncregister.com/x", texts[0], extra=grams) == texts[0]:
+        bad.append("a 20-word recurring blurb was learned but not cut")
+    court = ("ADF attorneys asked the U.S. Court of Appeals for the Ninth Circuit to act, "
+             "arguing the rule was unconstitutional and harmed the athletes involved.")
+    topics = ["a school board", "a florist", "a pregnancy centre", "a chaplain", "a baker",
+              "a campus ministry", "a counsellor", "a wrestler"]
+    short_grams = bp.learn_grams(
+        ["Lawyers for %s filed with the U.S. Court of Appeals for the circuit number %d on "
+         "a different day entirely." % (t, i) for i, t in enumerate(topics)], 0.4, 4)
+    got = bp.scrub("adflegal.org/x", court, extra=short_grams)
+    if "Court of Appeals" not in (got or ""):
+        bad.append("a short recurring phrase was cut (MIN_RUN): %r" % (got or "None")[:90])
+    op = "CP VOICES do not necessarily reflect the views of The Christian Post editors"
+    if any("necessarily reflect" in g for g in bp.learn_grams(
+            [op + " piece %d about something else entirely." % i for i in range(8)], 0.4, 4)):
+        bad.append("an opinion marker was learned as furniture")
+    return bad
+
+
+def test_verify_links():
+    """verify_links.py (finish_edition.sh --from) matches hrefs whole, parentheses included.
+
+    Same cases as test_publish_verify_parens, run against the resume path's own verifier, so
+    `--from mark` cannot mark against a doc a looser check would have waved through.
+    """
+    import tempfile
+    import verify_links as vl
+    jak = ("https://www.thejakartapost.com/indonesia/2026/09/25/tangerang-church-disruption-"
+           "rekindles-fears-among-minorities?utm_source=(direct)&utm_medium=single_latest")
+    jak_wrapped = ("https://www.google.com/url?q=https://www.thejakartapost.com/indonesia/"
+                   "2026/09/25/tangerang-church-disruption-rekindles-fears-among-minorities"
+                   "?utm_source%3D(direct)%26utm_medium%3Dsingle_latest&amp;sa=D&amp;usg=x")
+    a = '<a href="%s">link</a>'
+    cases = [
+        ("paren query, wrapped", [jak], a % jak_wrapped, 0),
+        ("paren query, bare", [jak], a % jak.replace("&", "&amp;"), 0),
+        ("truncated at the paren", [jak],
+         a % jak.split("(")[0], 1),
+        ("prefix only", [jak + "&x=1"], a % jak.replace("&", "&amp;"), 1),
+        ("visible text, no href", [jak], "<p>%s</p>" % jak, 1),
+        ("nothing wanted", [], a % jak_wrapped, 1),
+    ]
+    bad = []
+    for label, want, doc, rc in cases:
+        sent = "".join('<a href="%s">x</a>' % u.replace("&", "&amp;") for u in want)
+        with tempfile.TemporaryDirectory() as d:
+            dp, sp = os.path.join(d, "doc.html"), os.path.join(d, "sent.html")
+            open(dp, "w").write(doc)
+            open(sp, "w").write(sent)
+            import io
+            import contextlib
+            with contextlib.redirect_stdout(io.StringIO()):
+                got = vl.main(["verify_links.py", dp, sp])
+        if got != rc:
+            bad.append("%s: exit %d, want %d" % (label, got, rc))
+    return bad
+
+
+def test_paywall_rechecked_after_decode():
+    """A decoded Google News item is re-checked for a paywall (27.09.2026).
+
+    Topic searches ("kw:... site:telegraph.co.uk") target no domain, so while the link was
+    still a redirect is_paywalled() had nothing to go on: 50 items on 25.09.2026 - 22 Times,
+    16 Telegraph, 5 Church Times - went to the text fetch as free pages.
+    """
+    import fetch_feeds as ff
+    bad = []
+    it = {"url": "https://news.google.com/rss/articles/CBMiabc", "paywalled":
+          ff.is_paywalled("https://news.google.com/rss/articles/CBMiabc", "")}
+    if it["paywalled"]:
+        bad.append("fixture: a bare redirect should not look paywalled")
+    it["url"] = "https://www.telegraph.co.uk/news/2026/09/24/story"
+    ff.recheck_paywall(it)
+    if not it["paywalled"]:
+        bad.append("decoded Telegraph URL was not flagged paywalled")
+    free = {"url": "https://www.bbc.co.uk/news/articles/x", "paywalled": True}
+    ff.recheck_paywall(free)
+    if not free["paywalled"]:
+        bad.append("recheck_paywall cleared a flag; it must only ever set one")
+    return bad
+
+
+def test_bing_topic_routes():
+    """Bing topic searches build the right query and credit the real outlet (27.09.2026)."""
+    import fetch_feeds as ff
+    bad = []
+    u = ff.bing_url("kw:site:telegraph.co.uk migrants")
+    if "site%3Asite" in u or "site%3Atelegraph.co.uk%20migrants" not in u:
+        bad.append("kw: Bing query malformed: %s" % u)
+    if "site%3Aewtn.co.uk" not in ff.bing_url("ewtn.co.uk"):
+        bad.append("plain Bing site: query changed")
+    for raw, want in [("The Telegraph (bing: church)", "The Telegraph"),
+                      ("The Post (New Zealand)", "The Post (New Zealand)"),
+                      ("The Independent (Asia)", "The Independent (Asia)")]:
+        if ff.feed_outlet_label(raw) != want:
+            bad.append("feed_outlet_label(%r) = %r" % (raw, ff.feed_outlet_label(raw)))
+    return bad
+
+
+def test_finish_edition_from_guards():
+    """finish_edition.sh --from rejects what it cannot do, BEFORE touching anything (27.09.2026).
+
+    The resume path skips compose and publish, so its argument guards are the only thing that
+    stands between a typo and a half-run tail. Both cases below must exit 2 without reading
+    /tmp/today.json - they fail at argument parsing, so this is safe to run any time.
+    """
+    import subprocess
+    bad = []
+    for args in (["--from", "bogus"], ["--from", "mark", "--dry-run"], ["--from"]):
+        r = subprocess.run(["bash", os.path.join(HERE, "finish_edition.sh")] + args,
+                           capture_output=True, text=True, timeout=30)
+        if r.returncode != 2 or "==" in r.stdout:
+            bad.append("%s -> exit %d, stdout %r" % (" ".join(args), r.returncode,
+                                                      r.stdout[:60]))
+    return bad
+
+
+def test_event_sizes():
+    """event_sizes links one NAMED event across wordings, and nothing else (27.09.2026).
+
+    Built from 25.09.2026's real headlines: the FDA nominee's hearing arrived in wordings too
+    different for word overlap, and the fix links them on "Overton" + an event word. The
+    negatives are the three ways the first drafts chained unrelated stories: a title-case
+    common noun ("Judge"), a capitalised legal word ("Amendment", 22.09.2026), and an
+    institution ("Senate") shared by two different hearings.
+    """
+    import shortlist as sl
+    heads = [
+        "STAT+: Heidi Overton, Trump's pick for FDA head, faced questions at Senate hearing",
+        "Dr. Heidi Overton appears before Senate committee for confirmation hearing",
+        "Opinion | The deceptively high stakes of Heidi Overton's Senate hearing",
+        "Senate hearing probes claims of Flock camera Fourth Amendment violations",
+        "Parliament passes Transgender Persons Amendment Bill after heated debate",
+        "On the 50th anniversary of the Hyde Amendment, what the vote meant",
+        "Judge orders Trump to lift White House media ban on CNN and Politico",
+        "Judge dismisses Ohio lawmakers' lawsuit challenging abortion amendment",
+        "a judge said the ruling would stand, and the judge declined to comment",
+        "the judge who heard the case said the judge's order stood",
+    ]
+    rows = [{"headline": h} for h in heads]
+    size = sl.event_sizes(rows)
+    got = [size[id(r)] for r in rows]
+    bad = []
+    if got[0] < 3 or got[1] < 3 or got[2] < 3:
+        bad.append("the three Overton reports did not form one event: %s" % got[:3])
+    if got[3] != 1:
+        bad.append("a different Senate hearing joined the Overton event (%d)" % got[3])
+    if got[4] != 1 or got[5] != 1:
+        bad.append("'Amendment' chained two unrelated stories: %s" % got[4:6])
+    if got[6] != 1 or got[7] != 1:
+        bad.append("'Judge' linked two unrelated court stories: %s" % got[6:8])
+    return bad
+
+
+def test_feedly_parse():
+    """The Church Times arrives through Feedly's stream of its RSS (27.09.2026).
+
+    Pins the fields the sweep relies on: the publisher's canonical link (not a Feedly URL),
+    a timezone-aware date so the window test works, the standfirst as the summary, and that
+    an error body raises rather than looking like an empty feed.
+    """
+    import json as _json
+    import fetch_feeds as ff
+    bad = []
+    body = _json.dumps({"id": "feed/https://www.churchtimes.co.uk/rss", "items": [{
+        "title": "City of London churches sever ties with bishops",
+        "published": 1790290380000,
+        "alternate": [{"href": "https://www.churchtimes.co.uk/articles/2026/25-september/"
+                               "news/uk/city-of-london-churches-sever-ties-with-bishops"}],
+        "summary": {"content": "<p>THE Rector of St Helen&#8217;s, Bishopsgate, has "
+                               "characterised the bishops...</p>"}}]}).encode()
+    ents = ff.parse_feedly(body, "Church Times")
+    e = ents[0] if ents else {}
+    if not e.get("link", "").startswith("https://www.churchtimes.co.uk/articles/"):
+        bad.append("link is not the publisher's: %r" % e.get("link"))
+    if not e.get("date") or e["date"].tzinfo is None:
+        bad.append("date missing or naive: %r" % e.get("date"))
+    if "St Helen\u2019s" not in e.get("summary", "") or "<p>" in e.get("summary", ""):
+        bad.append("summary not unescaped/stripped: %r" % e.get("summary", "")[:60])
+    try:
+        ff.parse_feedly(b'{"errorCode": 401, "errorMessage": "unauthorized"}', "x")
+        bad.append("an error body parsed as an empty feed")
+    except ValueError:
+        pass
+    if "streamId=feed%2Fhttps%3A%2F%2Fwww.churchtimes.co.uk%2Frss" not in ff.feedly_url(
+            "https://www.churchtimes.co.uk/rss"):
+        bad.append("feedly_url malformed: %s" % ff.feedly_url("https://www.churchtimes.co.uk/rss"))
+    return bad
+
+
+def test_batched_decode_mapping():
+    """Batched Google decodes are matched by request id, never by position (27.09.2026).
+
+    The response below is the shape Google returned live that day: rows out of request order
+    (3, 1, 4) and request 2 - a lookup Google could not answer - present with no payload.
+    Matching by position would give request 2 the URL of request 3.
+    """
+    import resolve as rv
+    bad = []
+    raw = (")]}'\n\n"
+           '[["wrb.fr","Fbv4je",null,null,null,[3],"2"],'
+           '["wrb.fr","Fbv4je","[\\"garturlres\\",\\"https://example.com/three?x=1\\",1]",'
+           'null,null,null,"3"],'
+           '["wrb.fr","Fbv4je","[\\"garturlres\\",\\"https://example.com/one\\",1]",'
+           'null,null,null,"1"],'
+           '["wrb.fr","Fbv4je","[\\"garturlres\\",\\"https://example.com/four(a)\\",1]",'
+           'null,null,null,"4"],["di",12]]')
+    got = rv.parse_batch_response(raw)
+    want = {"1": "https://example.com/one", "3": "https://example.com/three?x=1",
+            "4": "https://example.com/four(a)"}
+    if got != want:
+        bad.append("parse_batch_response: %r" % got)
+    if "2" in got:
+        bad.append("an unanswered request was given a URL")
+    return bad
+
+
+def test_syndicated_credit():
+    """A syndicated copy is used only when the partner credits the publisher (27.09.2026).
+
+    Yahoo republishes some Telegraph journalism with JSON-LD provider "The Telegraph"; the
+    same page shape carries other providers' stories too, and a similar headline from the
+    Mail must never be shown on the sheet as the Telegraph's own words.
+    """
+    import json as _json
+    import shortlist as sl
+    def page(provider, desc):
+        return ('<script type="application/ld+json">%s</script>'
+                % _json.dumps({"@type": "NewsArticle", "provider": {"name": provider},
+                               "publisher": {"name": "Yahoo News"}, "description": desc}))
+    desc = "Zohran Mamdani has hit back at Benjamin Netanyahu after the Israeli prime minister attacked him."
+    bad = []
+    if sl.credited_description(page("The Telegraph", desc), "Telegraph") != desc:
+        bad.append("a Telegraph-credited copy was not accepted")
+    if sl.credited_description(page("Daily Mail", desc), "Telegraph") is not None:
+        bad.append("a copy credited to another provider was accepted")
+    if sl.credited_description("<html>no structured data</html>", "Telegraph") is not None:
+        bad.append("a page with no JSON-LD was accepted")
+    return bad
+
+
 if __name__ == "__main__":
-    sys.exit(run(verbose="-v" in sys.argv))
+    # --known-red FILE softens the exit code for failures the file waives, and ONLY those.
+    # Without the flag the behaviour is exactly what it always was: any red exits 1.
+    kr = None
+    if "--known-red" in sys.argv:
+        i = sys.argv.index("--known-red")
+        kr = sys.argv[i + 1] if i + 1 < len(sys.argv) else "known_red.txt"
+    sys.exit(run(verbose="-v" in sys.argv, known_red=kr))

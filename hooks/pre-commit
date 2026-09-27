@@ -21,8 +21,19 @@
 #      arrives without you having touched anything. A commit now contains exactly what you
 #      staged; if the copies are stale you are told, and you run ./sync_docs.sh yourself.
 #
-#   2. python3 run_tests.py - 0.84s, and it is the only thing standing between a pattern
-#      edit and a silently wrong briefing at 6am. A failing fixture blocks the commit.
+#   2. python3 run_tests.py --known-red known_red.txt - 0.84s, and it is the only thing
+#      standing between a pattern edit and a silently wrong briefing at 6am. A failing
+#      fixture blocks the commit - UNLESS every failure is waived in known_red.txt.
+#
+#      The waiver exists because these two steps used to share one fate (10.09.2026).
+#      testcases.txt works failing-first, so the fixture is legitimately red for as long as
+#      a correction waits for its fix; the cross-section RANBEFORE case sat red from 08.09.
+#      For those two days every commit needed --no-verify, and --no-verify skips step 1 as
+#      well - so a deliberate red case was quietly switching off the drift guard on
+#      SKILL.md and memory/, the two files this repo calls the least replaceable it has.
+#      Both gates still block. What changed is that a KNOWN red no longer forces you to
+#      bypass the other one, while a NEW red blocks exactly as before, and a waiver that
+#      has stopped matching anything is itself a failure so the list cannot rot.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
@@ -35,11 +46,15 @@ if ! ./sync_docs.sh check > /tmp/precommit-sync.log 2>&1; then
     exit 1
 fi
 
-echo "pre-commit: run_tests.py"
-if ! python3 run_tests.py > /tmp/precommit-tests.log 2>&1; then
-    tail -20 /tmp/precommit-tests.log | sed 's/^/  /'
+echo "pre-commit: run_tests.py --known-red known_red.txt"
+if ! python3 run_tests.py --known-red known_red.txt > /tmp/precommit-tests.log 2>&1; then
+    tail -24 /tmp/precommit-tests.log | sed 's/^/  /'
     echo "pre-commit: FIXTURE FAILED - commit aborted. Full log: /tmp/precommit-tests.log" >&2
-    echo "            Fix it, or commit with --no-verify if you know why it is red." >&2
+    echo "            Either fix it, or - if it is red on purpose - add it to known_red.txt" >&2
+    echo "            with the date and what has to be true before the waiver is deleted." >&2
+    echo "            Prefer that to --no-verify: --no-verify also skips the drift check" >&2
+    echo "            above, which is how a red fixture came to disarm the SKILL.md and" >&2
+    echo "            memory/ backup guard for two days (10.09.2026)." >&2
     exit 1
 fi
 tail -1 /tmp/precommit-tests.log | sed 's/^/  /'

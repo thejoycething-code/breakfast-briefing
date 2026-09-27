@@ -82,3 +82,5 @@ CI is the truth. Do not run anything locally that WRITES to the store until
 and the next weekly overwrites the asset without them.
 
 See [[parl-monitor-build]].
+
+**Update 2026-09-07:** the raw archive followed the store out of git; see [[parl-monitor-raw-archive]].

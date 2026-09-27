@@ -55,6 +55,19 @@ def probe(feed):
         except Exception as exc:  # noqa: BLE001
             return name, url, mode, False, 0, "wpjson: %s" % str(exc)[:24]
         return name, url, mode, n > 0, n, "" if n else "0 items"
+    if mode == "feedly":
+        # A feed read through Feedly (27.09.2026). Feedly keeps serving a feed's last items
+        # long after it stops polling it - EWTN GB's copy still answered with ten items, all
+        # from 05.08.2026 - so "has items" proves nothing. Healthy means it has items from
+        # the last three days, i.e. Feedly is still reaching the publisher.
+        try:
+            import datetime as _dt
+            ents = fetch_feeds.parse_feedly(raw, name)
+            cut = _dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(days=3)
+            n = sum(1 for e in ents if e["date"] and e["date"] >= cut)
+        except Exception as exc:  # noqa: BLE001
+            return name, url, mode, False, 0, "feedly: %s" % str(exc)[:24]
+        return name, url, mode, n > 0, n, "" if n else "stale in Feedly"
     if mode.startswith("scrape"):
         # Scrape sources are HTML index pages, not feeds. Counting <item> on one reports
         # every single one as dead - the first run of this check called The Spectator broken

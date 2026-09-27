@@ -127,6 +127,21 @@ def gold_pairs():
                 if "::entity::" in past:
                     skipped.append(today.strip())
                     continue
+                # ::sections:: is the same bug one marker later (10.09.2026). It was added on
+                # 08.09.2026 so run_tests could assert the cross-section case, repeat_eval was
+                # not taught about it, and the marker text became words in the comparison -
+                # exactly as ::entity:: had. The result was two GOLD failures that were not
+                # real, reported as a VETO, every time the job ran.
+                #
+                # Unlike ::entity:: these are NOT excluded: the section is genuinely
+                # irrelevant here, because ran_before stopped guarding on it on 10.09.2026,
+                # so the pair is corpus-independent and belongs in the veto. Only the marker
+                # goes.
+                #
+                # Split on the generic "::" rather than this one name, so the next marker
+                # someone adds cannot repeat the bug a third time. run_tests asserts the same
+                # property from the outside.
+                past = past.split("::")[0]
                 if past.strip():
                     out.append((today.strip(), past.strip(), kind == "RANBEFORE"))
     except OSError:
@@ -191,8 +206,22 @@ def cluster_pairs():
     return pos, neg
 
 
-def crossday_suspects(limit=30000):
-    """Cluster leads from DIFFERENT days, same section: the real cross-day population.
+def crossday_suspects(limit=30000, cross_section=False):
+    """Cluster leads from DIFFERENT days: the real cross-day population.
+
+    `cross_section` picks the OTHER half - pairs whose sections differ. That half became
+    real on 10.09.2026, when ran_before stopped guarding on the section, and until then it
+    was unreachable by construction: the matcher skipped a differing section outright, so a
+    pair like this could never be flagged and sampling it would have measured nothing.
+    Sampled separately rather than folded into XDAY, so XDAY keeps measuring the population
+    it always did.
+
+    But note what the reservoir switch below cost, because it is easy to misread: with the
+    same seed, shuffle-then-slice and reservoir sampling draw DIFFERENT 30,000 pairs. So XDAY
+    is NOT comparable across the 10.09.2026 entries in repeat_eval_log.txt - it reads 0.0002
+    (6/30000) in the later one against 0.0003 (10/30000) in the earlier one, with no change
+    to the matcher between them. Comparability resumes after that entry. A rate this low
+    invites reading noise as movement, which is the whole reason to say so here.
 
     Deliberately NOT called a negative set, because it cannot be one. Some of these pairs
     genuinely ARE the same running story - that is the whole thing being detected - so the
@@ -215,15 +244,29 @@ def crossday_suspects(limit=30000):
                 clusters[lead].append(it)
         by_day[date] = [(v[0].get("_section"), v[0]["headline"]) for v in clusters.values()]
     days = sorted(by_day)
-    out = []
+    # RESERVOIR sampled, not built-then-shuffled (10.09.2026). The same-section cross product
+    # was small enough to materialise; the cross-section one is not - 18 days at ~250 clusters
+    # each is on the order of 9.5M pairs, which is minutes of wall clock and gigabytes of
+    # tuples before the shuffle even starts, in a job that has to finish on a Saturday
+    # morning. Reservoir sampling gives the identical uniform sample in one pass and constant
+    # memory, and keeps the seed meaningful so the number stays comparable run to run.
+    out, seen = [], 0
     for i, a in enumerate(days):
         for b in days[i + 1:]:
             for sec_a, ha in by_day[a]:
                 for sec_b, hb in by_day[b]:
-                    if sec_a and sec_a == sec_b:
+                    if not (sec_a and sec_b):
+                        continue
+                    if (sec_a == sec_b) == bool(cross_section):
+                        continue
+                    seen += 1
+                    if len(out) < limit:
                         out.append((ha, hb, sec_a))
-    rng.shuffle(out)
-    return out[:limit]
+                    else:
+                        j = rng.randrange(seen)
+                        if j < limit:
+                            out[j] = (ha, hb, sec_a)
+    return out
 
 
 # --- archive plumbing -----------------------------------------------------------------------
@@ -398,6 +441,9 @@ def score(show_misses=False, use_entities=True):
     fp = [p for p in neg if _match(p[0], p[1], p[2] or "Life")]
     xday = crossday_suspects()
     xflag = [p for p in xday if _match(p[0], p[1], p[2] or "Life")]
+    # The population the section guard used to make unreachable. See crossday_suspects.
+    xsec = crossday_suspects(cross_section=True)
+    xsflag = [p for p in xsec if _match(p[0], p[1], p[2] or "Life")]
 
     recall = len(tp) / len(pos) if pos else 0.0
     fpr = len(fp) / len(neg) if neg else 0.0
@@ -414,7 +460,10 @@ def score(show_misses=False, use_entities=True):
         % (recall, len(tp), len(pos), fpr, len(fp), len(neg)),
         "CLUSTER precision %.3f   F1 %.3f" % (precision, f1),
         "XDAY    flag rate %.4f (%d/%d) on real cross-day same-section pairs"
-        % (len(xflag) / max(1, len(xday)), len(xflag), len(xday))
+        % (len(xflag) / max(1, len(xday)), len(xflag), len(xday)),
+        "XSEC    flag rate %.4f (%d/%d) on cross-day DIFFERENT-section pairs - the surface "
+        "the section guard used to hide (10.09.2026)"
+        % (len(xsflag) / max(1, len(xsec)), len(xsflag), len(xsec))
         + "   -- an upper bound on FP, not an FPR: some are genuine repeats",
         "thresholds: overlap>=%.2f  words>=%d  min-words>=%d  entity-words>=%s"
         % (shortlist.CROSSDAY_OVERLAP, shortlist.CROSSDAY_WORDS,

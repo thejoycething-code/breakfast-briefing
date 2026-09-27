@@ -1193,3 +1193,348 @@ SECTION Free Speech & Civil Liberties | Charlotte Gill | From Hacked Off to Exti
 # Word-bounded, per the FireRescue1/FIRE bug the docstring records: a longer name that merely
 # contains hers must not inherit her section.
 SECTION None | Charlotte Gillingham Associates | Quarterly results announced for the partnership
+
+# --- Chris, 08.09.2026: "add the six repeats to testcases.txt as failing cases" ------------
+# The six were: First Liberty's "7 First Liberty Cases Are Now at the U.S. Supreme Court"
+# (ran 02.09), FoRB in Full's Sudan piece (04.09), the Spectator's "Texas was right to save
+# baby Gabriel-Rumi", "The young men of Middlesbrough just don't care" and "Smarter machines
+# are going to need wiser humans" (07.09, 07.09, same URL 26.08), and the Christian Post's
+# write-up of the dehydration case Christian Concern had run on 07.09.
+#
+# FIVE OF THE SIX ARE NOT WRITTEN HERE, on purpose. ran_before already returns RANBEFORE for
+# every one of them - checked before writing this - so as cases they would pass on arrival.
+# Six passing cases in a set that has VETO over repeat_eval.py is not a record of a
+# correction, it is dilution: the next matching change would have to keep them green while
+# they assert nothing that was ever broken. The matcher saw all six. The edition shipped them
+# anyway, and the two reasons are below.
+#
+# 1. THE ONE REAL DEFECT, asserted. ran_before is section-gated, so a story that changes
+#    section between editions loses its flag. Christian Concern's version was filed one way
+#    on 07.09; the Christian Post's wording classified into Marriage, Family & Education on
+#    08.09, and the ranking sheet therefore showed NO repeat flag against it. compose caught
+#    it later by a path that does not apply the guard - which is why the same matcher gave
+#    two different answers on one story in one morning. The section default in run_tests.py
+#    used to be justified as "asserting the cross-section rejection would only be re-testing
+#    same_story's guard"; that assumed the guard was right. Sections are settable now.
+RANBEFORE | Mother pleads for brain-damaged son to be spared from death by dehydration ::was:: Mother pleads for son not to be dehydrated to death ::sections:: Marriage, Family & Education >> Life
+#    The same pair inside one section already passes. Kept as the contrast, so a future
+#    reader can see the section is the only difference between red and green.
+RANBEFORE | Mother pleads for brain-damaged son to be spared from death by dehydration ::was:: Mother pleads for son not to be dehydrated to death ::sections:: Life >> Life
+#    Asserted in both directions, per the 27.08 block: the fix must not be "drop the guard".
+#    Two different surrogacy stories across two sections must stay unlinked - dropping the
+#    section check wholesale would start collapsing pairs like this one, and losing a story
+#    that never ran is the expensive error.
+NOTRANBEFORE | Middle-aged men ‘buying babies’: Concerns raised over UK surrogacy applicants ::was:: Surrogacy magnate to bring child trafficking to Poland ::sections:: Marriage, Family & Education >> Life
+#
+# 2. NOT ASSERTABLE IN THIS FILE, recorded so it is not lost. The other five all came from
+#    the two SUPPRESSED blocks, which print bare "N | headline | outlet" lines and run no
+#    cross-day check at all - so at the point of decision there is no flag to ignore. This is
+#    the trap already recorded once: the one block you must pick from is the one block with no
+#    [ran] history. There is no assertion kind for "the printed sheet carries a flag", and
+#    inventing one to cover a display gap would be a fixture testing its own output format.
+#    The fix belongs in shortlist.py's suppressed-block printer, and it needs its own
+#    measurement of how many flags that adds to a 356-line block before it is worth reading.
+
+# --- Chris, 08.09.2026: markup on the 08.09 edition -----------------------------------------
+# OUTLET NAMING. Four corrections, and all four sources reach us through Google News search
+# feeds, which is why they arrive as a bare hostname or as the hosting platform's name rather
+# than the masthead a reader would recognise. That is the pattern to watch, not four unrelated
+# renames: anything arriving from a "<country> <beat>" query feed is liable to it.
+OUTLET Decision Magazine | billygraham.org
+# "FoRB in Full should always be read as Christian Solidarity Worldwide." Corroborated by the
+# feed itself - the author field on their Sudan piece is the literal string "cswpress" - so
+# this is CSW's own outlet and the credit was pointing readers at a masthead CSW does not use.
+OUTLET Christian Solidarity Worldwide | FoRB in Full
+# The Lilypad, three separate faults on one item. Chris: "This source should always be called
+# The Lilypad and include the author's name and just the headline".
+OUTLET The Lilypad | Sites@Duke Express
+# ...the publisher stacks its own suffix with an en-dash AND a middot, and strip_outlet_suffix
+# cuts on neither today. Asserted in the source's own capitalisation, not the sentence case
+# Chris typed: headlines are copied verbatim and nothing in the pipeline recases them.
+HEADCLEAN The Erosion of Free Speech in Hong Kong | The Erosion of Free Speech in Hong Kong – The Lilypad · DKU's Independent Student-led Publication
+# ...and the byline is dropped even when credit() is handed one. Two layers here: authors.py
+# cannot extract it (the page carries it in an Elementor author block, byline() returns None),
+# and credit() would suppress it anyway. This case pins the second; the first needs the
+# extractor to learn that block, and the name on this article is Roy Liu.
+BYLINE shown | The Lilypad | Roy Liu | https://sites.duke.edu/thelilypad/2026/09/07/the-erosion-of-free-speech-in-hong-kong
+# Sydney Morning Herald: the masthead already tidies correctly, so the only fault was the
+# missing paywall mark ("As a paid source this should be Sydney Morning Herald (£)"). Stated
+# as PAYWALL, with the naming pinned alongside it so it cannot regress while that table is
+# edited - the two are set by different tables, per the 27.08 note.
+PAYWALL yes | SMH.com.au
+OUTLET Sydney Morning Herald | SMH.com.au
+#
+# TWO MISSES THAT WERE IN THE SWEEP, so these are classification failures and not coverage
+# ones. CBN's piece classified to Church & Religion and I passed over it; the NSS piece
+# reached no section at all, and I rescued it into Life by hand - which is why it appeared in
+# the wrong section rather than not at all. Both belong in Religious Freedom & Persecution:
+# a conversion story out of the Middle East, and an MP legislating on a religious rite.
+SECTION Religious Freedom & Persecution | cbn.com | Visions of Jesus: Many Muslims Turning to Christ Amid Middle East Conflict
+SECTION Religious Freedom & Persecution | NSS | MP acts to regulate circumcision following child deaths
+
+# 10.09.2026 - "gets N years" and "sentenced to N years" are one moment, not two stages.
+#
+# Found by eval_week.sh's first scheduled run, not by a markup: DEV COLLISIONS went from 1
+# after the 27.08 stem/class fix to 24, and get/gets vs sentenc was 13 of the 24. Both pairs
+# below are the same sentencing, worded twice, and is_development_of was calling them
+# different stages - so word overlap wanted to merge them and the guard blocked it, which is
+# how a repeat reaches an edition.
+#
+# Written RED before _DEV_CLASSES is touched.
+DEVELOPMENT no  | 2 Women Who Killed Transgender Man Are Sentenced to Life in Prison ::vs:: Two women get life in prison for brutally torturing transgender man to death
+DEVELOPMENT no  | Unification Church leader gets two years in prison ::vs:: Unification Church leader Hak Ja Han sentenced to 2 years in prison
+# The guard on the same fix. Charge and sentence ARE different stages, and the arrest/charge
+# pair is blocked deliberately (27.08.2026), so grouping the sentencing words must not
+# collapse the arc that leads to a sentencing.
+DEVELOPMENT yes | Man charged over arson at historic church ::vs:: Man sentenced to five years over arson at historic church
+DEVELOPMENT yes | Pastor arrested in Shanghai house church raid ::vs:: Pastor gets three years after Shanghai house church raid
+# 10.09.2026 - "dies at 92" and "has died at 92" are one death, not two stages.
+# The last real synonym miss in the DEV COLLISIONS list after the get/sentenc fix. _dev_stem
+# handles regular -s (loses->lose, resigns->resign) and cannot reach an irregular form: it
+# protects stems under four characters, so die/dies/died/dying stay four separate keys. Same
+# reason win/wins are enumerated rather than stemmed. Steinem's death is a live case, not a
+# hypothetical - it will be reported for days.
+DEVELOPMENT no  | Gloria Steinem, feminist and abortion-rights advocate, dies at 92 ::vs:: Pro-abortion feminist icon Gloria Steinem has died at 92
+# The two collisions left in that list are NOT synonym misses and must stay blocked:
+# "Trump returns from golf club" vs "Trump Loses It at Judge" are not the same verb, and the
+# two ABVP marches are genuinely different events. Asserted so a later widening cannot quietly
+# swallow them.
+DEVELOPMENT yes | Trump returns from golf club to gripe on Truth Social about Kennedy Center ::vs:: Trump Loses It at Judge in Unhinged Kennedy Center Meltdown
+
+# 14.09.2026 - "etimes" was unanchored, so thetimes.com matched ENTERTAINMENT_DESKS.
+#
+# Found on the morning the Commons rejected the assisted dying bill: seven Times pieces on
+# that vote - the single biggest UK story of the weekend - were sitting in the CHAFF bucket,
+# along with every other thetimes.com item that did not happen to trip CIVIC_MARRIAGE. The
+# token is the Times of India's entertainment vertical (etimes.indiatimes.com); as a bare
+# substring it is inside "th-etimes-.com", so the block had been silent and total since the
+# outlet started arriving under that display name. This is the failure the Telegraph/Times
+# benefit-of-the-doubt rule assumes cannot happen: that rule only helps an item that REACHES
+# the sheet, and these never did.
+#
+# Written RED before ENTERTAINMENT_DESKS is touched. Anchor the token, do not special-case
+# the headline - the Times of India vertical must stay blocked.
+KEEP | thetimes.com | Britain once led but assisted dying vote is backwards step
+KEEP | thetimes.com | The fatally flawed assisted dying bill should not be resurrected
+KEEP | thetimes.com | Times letters: Doctors' qualms about assisted dying
+KEEP | thetimes.com | Assisted dying campaigner plans 'Swiss pop-up advice office' in UK
+# The guard: the vertical this token was written for stays suppressed.
+SUPPRESS | etimes | Inside Virat Kohli and Anushka Sharma's marriage: the hidden detail fans missed
+SUPPRESS | etimes.indiatimes.com | Bollywood star opens up about her marriage and dating history
+
+# --- 16.09.2026: a public inquiry reporting reached NO SECTION AT ALL -----------------------
+# The Thirlwall Inquiry into Lucy Letby reported on 15.09 and the whole cluster - both GOV.UK
+# primary documents, the Times, BBC and Telegraph reports and the doctor's reaction - landed in
+# NO SECTION MATCHED. Only the Guardian's version classified, on "ministers". The edition ran
+# them only because they were rescued by hand from the suppressed block.
+#
+# The gate was NOT OTHER_ALLOW, which every one of these already matched ("inquiry", "NHS",
+# "hospital", "nurse"). They passed it, routed to plain "Other" because no OTHER_SPLIT theme
+# claimed them, and were then refused because "Other" additionally demands a positive subject
+# of its own (16.08.2026). So the fix belongs in the Politics split: a statutory inquiry
+# reporting, and a government answering one, is a question about public accountability, which
+# is what that split's institutional half is for.
+SECTION Politics, Government & Society | GOV.UK news | Government response to the Thirlwall Inquiry
+SECTION Politics, Government & Society | GOV.UK news | Government to act on Thirlwall patient safety recommendations
+SECTION Politics, Government & Society | The Times | Lucy Letby inquiry: staff could have stopped three murders
+SECTION Politics, Government & Society | BBC UK | Baby 'cot cams' plan after inquiry finds Lucy Letby crimes could have been prevented
+SECTION Politics, Government & Society | The Telegraph | Letby hospital could have saved three babies, inquiry finds
+SECTION Politics, Government & Society | BBC UK | Letby doctor says inquiry 'grim reading' and he wishes 'we had been brave enough to follow suspicion'
+# The boundary that stops this becoming a bare "inquiry|probe|investigation". Politics is a
+# residual split nothing else may lose items to (14.08.2026), and an ordinary police or
+# coronial investigation is not public accountability - it is crime reporting. These four must
+# stay unsectioned, exactly as they were before the fix.
+SECTION None | Belfast News Letter | Police probe into death of man in Co Down
+SECTION None | Sky News | Investigation launched by police after British man dies in Sicily
+SECTION None | WQAD | Man accused of murdering Trudy Appleby clashes with judge during latest court hearing
+# The one sense of "inquiry" that is ordinary crime reporting rather than public
+# accountability: a police homicide inquiry. Measured across the 19 archived editions, this
+# is the ONLY false positive a bare "inquiry" produces - 2 of the 59 items it moves.
+SECTION None | NZ Herald | Body found in Rotorua lake believed to be person linked to homicide inquiry
+SECTION None | Belfast News Letter | Man charged after murder inquiry launched into city centre death
+# Written as a negative first and corrected on the measurement: an official inquiry into a
+# fatal hospital fire is the same shape as Thirlwall - an institution investigated over deaths
+# in its care - and the archive carries the earlier half of the same story ("PM forms
+# four-member inquiry committee", 27.08). Foreign and minor, but section is not importance;
+# ranking is what handles that.
+SECTION Politics, Government & Society | The News International | Electrical failure most likely cause of deadly Pims blaze, says inquiry report
+
+# --- Chris, 24.09.2026: markup of the 24.09 edition ----------------------------------------
+# (1) A court HEARING in a running fight is a new event, not a repeat of the fight. The White
+# House media ban ran 21-22.09; the hearing on 23.09 arrived as ~15 separate lines and three
+# of them were flagged SAME STORY against the ban's announcement, which read as "already
+# covered" and the hearing never ran. Chris named WaPo's piece on the ban standing on shaky
+# legal ground. These are the three flagged pairs, verbatim from the 24.09 sheet.
+NOTRANBEFORE | Judge hears arguments without immediately ruling in lawsuit over White House ban on 3 news outlets ::was:: Trump To Ban Left-Wing News Outlets From White House ::entity::
+NOTRANBEFORE | Judge Will Not Yet Rule on White House Stripping Media Outlets of Credentials: 'As Soon As I Can' ::was:: Trump To Ban Left-Wing News Outlets From White House ::entity::
+NOTRANBEFORE | Judge Rebukes Trump Over Botched White House Media Ban ::was:: Obama blasts Trump’s ‘unimaginable’ White House media ban ::entity::
+# ...but two reports of the SAME hearing are one story and must still match.
+RANBEFORE | Judge skeptical of Trump's White House media ban at hearing ::was:: Trump-appointed judge skeptical of White House media ban at hearing
+# (2) Censorship is a Free Speech story wherever it happens. Both of these reached no
+# section at all or were read past; the Australia story sat in NO SECTION MATCHED.
+SECTION Free Speech & Civil Liberties | wng.org | U.S. criticizes Australia’s proposed digital safety legislation
+SECTION Free Speech & Civil Liberties | The Hill | US warns Australia over social media censorship
+SECTION Free Speech & Civil Liberties | The Economist | Is China easing some online censorship?
+
+# --- Chris, 24.09.2026: sweep keyword filter gains vocabulary from the parl-monitor taxonomy -
+# Ofcom was requested by name: Guido's piece below reached the Doc only because the Daily
+# Sceptic's write-up of it happened to say "BBC". The rest were chosen from parl-monitor's
+# config/taxonomy.yaml v1.8 by measurement: of 2,556 in-window headlines from the filtered
+# feeds on 24.09, 1,862 were dropped. These six were dropped and are on-beat, verbatim.
+KEYWORD keep | Ofcom Accused of Covering Up Data Showing Viewers Trust GB News More Than BBC
+KEYWORD keep | Andy Burnham announces new unit to tackle Russian ‘lies and disinformation’
+KEYWORD keep | 19 Glasgow properties raided in massive operation to curb human trafficking gang
+KEYWORD keep | EU accused of hypocrisy after bloc copies Britain's Rwanda scheme despite labelling it 'extreme'
+KEYWORD keep | Prospect of social media company directors being held criminally liable raised by TDs
+# Precise taxonomy terms that matched nothing that day but name a live campaign front. A
+# headline carrying only this vocabulary would be dropped before any section saw it.
+KEYWORD keep | Grooming gangs inquiry chair named
+KEYWORD keep | Small boats: 600 cross in a single day
+KEYWORD keep | Cass Review author warns NHS on adult gender clinics
+KEYWORD keep | Stillbirth registration bill clears the Lords
+KEYWORD keep | Two-child limit to be scrapped in the Budget
+# ...and it is still a filter. Both of these came back from the new Telegraph topic searches
+# (Google matches the article body) and must die at fetch time.
+KEYWORD drop | Eric Cantona: I would never have signed for Man Utd under Sir Jim Ratcliffe
+KEYWORD drop | An insider’s guide to planning the perfect winter city break in Lucerne
+
+# --- Chris, 24.09.2026: Times topic searches, and what they drag in ------------------------
+# The Times reaches the sweep only via Google News (its sitemap is off-limits, see
+# extra_feeds.txt). Topic-scoped searches took on-beat items from 11 to 45, and brought two
+# kinds of noise with them. Its job board sits under the same site: and Google files it as
+# a separate source, "The Times Appointments" - teacher and care-worker adverts that pass
+# the keyword filter on "teacher", "school" or "church" - so it is blocked as a source.
+BLOCKED | The Times Appointments
+# The daily notices pages match "marriage", "death" and "church" and are not news.
+SUPPRESS | The Times | Births, marriages and deaths: September 24, 2026
+SUPPRESS | The Times | Court Circular: September 24, 2026
+# ...and the journalism must still come through - these arrived by the same searches.
+KEEP | The Times | Potty humour no answer to single-sex spaces debate
+KEEP | The Times | Marriages are lasting longer. Marrying later in life could be key
+
+# --- 25.09.2026 edition: rescued by hand from NO SECTION MATCHED and CHAFF -----------------
+# Chris, 27.09.2026: fix what fell through. Every one of these was real news on the day and
+# reached the edition only because it was picked out of the two SUPPRESSED blocks by hand;
+# one (the Union flags trial) went on to lead the Slack five. Most are WORD-FORM misses in
+# patterns that already name the subject: the Life pattern had "assisted (dying|suicide)"
+# with a SPACE, so AP's "Assisted-dying law goes into effect in Illinois" scored nothing;
+# "euthanas" matched euthanasia but not euthanized; "aborted" was absent; the Church
+# pattern's church(es|goer|going)? had no plural, so "churchgoers" missed.
+SECTION Life | AP News | Assisted-dying law goes into effect in Illinois after impassioned debate
+SECTION Life | KHQA | More local hospitals opt out of IL medical aid in dying law
+SECTION Life | MedPage Today | Medical Aid in Dying Keeps Expanding to More States
+SECTION Life | liveaction.org | UNPRECEDENTED: Aborted baby's estate is awarded monetary damages in lawsuit
+SECTION Life | New York Post | Grandma allegedly euthanized against her will died 'covered in her own blood' after botched first attempt
+SECTION Life | Christian Action Research and Education | Government announce bereavement leave for pregnancy loss
+SECTION Life | The Indian Express | Can’t be compelled to carry pregnancy, says J&K High Court on 11-year-old girl’s case
+SECTION Church & Religion | The Christian Post | Half of younger churchgoers say culture change makes some biblical truths 'obsolete'
+# An attack on a place of worship is persecution whichever faith it is. Only "church
+# (attack|burn|...)" existed, so two reports of the Ontario synagogue shooting had no section.
+SECTION Religious Freedom & Persecution | The Independent | Police say gunman shouted antisemitic threat before opening fire outside Ontario synagogue
+SECTION Religious Freedom & Persecution | The Globe and Mail | Belleville synagogue shooting was a ‘hate-motivated’ crime, police say
+# The Easter Sunday bombings targeted churches; a sentencing in that case is the persecution
+# beat, and neither headline says "church" or "Christian".
+SECTION Religious Freedom & Persecution | Christian Today | Cautious welcome as 15 men sentenced over Sri Lanka Easter Sunday bombings
+SECTION Religious Freedom & Persecution | Christian Solidarity Worldwide | High Court sentences 15 men for involvement in Easter Sunday bombings
+# State power over speech, in the shapes the Free Speech pattern did not have: security and
+# cyber laws, jailing over private communications, detaining journalists, and platform
+# bosses facing criminal liability.
+SECTION Free Speech & Civil Liberties | UCA News | 4 Cambodian activists jailed for 7 years over private phone calls
+SECTION Free Speech & Civil Liberties | UCA News | Bangladesh’s proposed cyber security law denounced as ‘repressive’
+SECTION Free Speech & Civil Liberties | UCA News | Sri Lanka’s new anti-terror law sparks outrage, criticism
+SECTION Free Speech & Civil Liberties | The Irish Times | Prospect of social media company directors being held criminally liable raised by TDs
+SECTION Free Speech & Civil Liberties | Stockholm Center for Freedom | Turkish journalist couple detained after reporting AKP lawmaker’s remarks thanking Öcalan
+# The residual splits. Each passed OTHER_ALLOW, found no split theme, and was refused by
+# plain Other for lacking a subject of its own - the Thirlwall shape again (16.09.2026).
+SECTION Immigration & Asylum | BBC UK | Police in Scotland arrest 36 in raids on Vietnamese crime gangs linked to human trafficking
+SECTION Immigration & Asylum | Mail Online UK | British taxpayers may have to pay £1billion to renew the UK's Channel deal with France
+SECTION Immigration & Asylum | The Daily Signal | Tim Scott Seeks to Shut Down Birth Tourism Pipeline
+SECTION Politics, Government & Society | The Times | Conservatives pledge to cut benefits for the long-term unemployed
+SECTION Politics, Government & Society | The Telegraph | It’s a disgrace that 20 million adults don’t pay income tax
+SECTION Politics, Government & Society | GOV.UK news | UK Government offers over £1.5bn to the Northern Ireland Executive
+SECTION Politics, Government & Society | The Telegraph | Exclusive: Sir Ranulph Fiennes kept in care home illegally
+SECTION Politics, Government & Society | Mail Online UK | Masked men shouted 'Allahu Akbar' and 'Free Palestine' as they tore down and burned pub's Union flags in an 'attack on the British people' two weeks after October 7, court hears
+SECTION Other | Sky News | 'Gallant' Briton killed in terrorist attack gave up place on helicopter
+SECTION Other | jurist.org | UK court charges doctor for offenses linked to 1994 genocide in Rwanda
+# CHAFF over-match: GOSSIP's "cosy" is there for "cosy night out with new beau", and it
+# swallowed the political idiom "cosying up to". The celebrity sense must still be chaff.
+SECTION Politics, Government & Society | The Telegraph | Labour is playing a dangerous game by cosying up to the Muslim Council for Britain
+SUPPRESS | Daily Mail | Reality star and new boyfriend look cosy at London restaurant
+# The Church Times had no source hint, so an item with no church word in its headline had no
+# section - and its job board was the opposite problem: "Vicar vacancy in South East" ran
+# as a Church & Religion candidate three times on 25.09.2026.
+SECTION Church & Religion | The Church Times | Survivor Support Fund to be launched
+SUPPRESS | The Church Times | Vicar vacancy in South East
+SUPPRESS | The Church Times | Deputy Director for Apostolic Life vacancy in South East
+# ...guards. The widened words must not pull in the shapes they were kept narrow against.
+SECTION None | CBS News | Frost Fund helps save animals from euthanasia with shelter transport trips
+KEEP | The Telegraph | Vacancy rates in council housing hit record high
+# Guards found by replaying the widened patterns over 29 archived sweeps (27.09.2026).
+SECTION None | WTOV | Hancock County shelter officials say animals euthanized due to medical, behavioral issues
+SECTION None | The Herald Journal | Bear euthanized after capture in Logan
+SECTION Life | LifeNews.com | Canadian Family Files Complaint After Grandmother Euthanized Without Her Consent
+SECTION Religious Freedom & Persecution | Sky News | Scores of people kidnapped from mosque in Nigeria, residents say
+SECTION None | News On AIR | Nagaland: Mon Police bust inter-state drug trafficking network, seize 800 grams heroin
+KEEP | The Independent | Nine prisoners held on indefinite jail terms referred to Court of Appeal by miscarriage of justice watchdog
+SECTION None | Breitbart News | American Journalist Sentenced to Two Years in Prison for Spying for China
+SUPPRESS | The Church Times | Book review: Constable’s Year: An artist in changing seasons by Susan Owens
+SUPPRESS | The Church Times | Sunday’s Readings: 12th Sunday after Trinity
+# The Church Times fallback must not outrank the Politics split.
+SECTION Politics, Government & Society | Church Times | James Orr stands down as head of policy for Reform UK after Channel 4 investigation
+# Chris's rule that paid sources carry (£) must not depend on which route an item came by
+# (27.09.2026): on 25.09.2026 "The Church Times" was credited with (£) on one line and
+# without it on the next, because only the bare name was in the paywalled-outlet list.
+CREDIT The Church Times (£) | The Church Times | https://www.churchtimes.co.uk/articles/2026/25-september/news/uk/permission-granted-to-restore-burned-church
+
+# --- Leaks into the sections, sized over 29 archived sweeps (Chris, 27.09.2026) ----------
+# School sport arrives via "Christian" (a school's name) and via education words. ~5/day
+# each into Church & Religion and Marriage, Family & Education. A school-sport shape is not
+# redeemed by the faith word in its name - but the plural "Christians" is the faith, so
+# "Pakistani Christians Rally" must survive the sport vocabulary ("rally").
+SUPPRESS | WDBJ7 | 2026 Friday Football Extra team preview: Liberty Christian Bulldogs
+SUPPRESS | WABI | Bangor Christian comes into 2026 as defending 8-person girls soccer champions
+SUPPRESS | KOTA Territory News | Stevens girls tennis notches win over RC Christian
+SUPPRESS | Gwinnett Daily Post | Providence Christian defeats Greater Atlanta Christian in softball
+SUPPRESS | Rocky Mount Telegram | Faith Christian netters hand Warriors first loss
+SUPPRESS | TribLIVE.com | Jeannette downs rival Greensburg Central Catholic for 1st time in 13 years
+SUPPRESS | deseret.com | High school girls volleyball: Strong start pushes Corner Canyon past Orem in 4 sets
+SUPPRESS | WCIA.com | Highlights/scores: High school football (8-22-26)
+SUPPRESS | Pittsburgh Post-Gazette | High school sports results for Thursday, Sept. 24, 2026
+KEEP | pjmedia.com | Pakistani Christians Rally for Equal Rights
+KEEP | The Christian Post | 96 students baptized during high school worship events after games
+# "Christian" as somebody's first name, or a brand. NAME_COLLISION needed sport vocabulary as
+# proof of a person, so a memoir, a film remake, a share tip and an obituary all read as
+# church news. The fix adds the showbiz/finance/obituary shapes as evidence of a person.
+SUPPRESS | Motorsport.com | Christian Horner announces UK book tour for new memoir following Red Bull F1 exit
+SUPPRESS | IMDb | The Frontrunner to Replace Christian Bale in the 'American Psycho' Remake
+SUPPRESS | TradingView | ProCredit Holding AG: Christian Dagrosa, buy
+SUPPRESS | TradingView | Réorganisation de la structure de LVMH: la holding Christian Dior bondit de plus de 17% sur la Bourse de Paris
+SUPPRESS | Lindquist Mortuary | Christian Aaron Oviatt Obituary Aug 14, 2026
+KEEP | Jacobin | German Christian Democrats Are Paralyzed by a Far-Right Surge
+KEEP | Billy Graham Evangelistic Association | India Bill That Threatens Christian Ministries Paused Amid Outcry
+KEEP | KQED | Rep. Jared Huffman Warns about the Power of Christian Nationalism in Congress
+# Stonewall is a charity, an inn and a riot - and also a town, a school and a verb. Only the
+# first three are the Gender beat.
+SECTION None | The Ada News | Ada bats get hot in win at Stonewall
+SECTION None | dnronline.com | Stonewall Jackson football entering season with optimism
+SECTION Gender, Identity & Sexuality | The Telegraph | Stonewall accused of misleading schools over trans guidance
+SECTION Gender, Identity & Sexuality | Washington Blade | Victory: Trump Administration Agrees to Restore Pride Flag at Stonewall National Monument
+# Indian entertainment and crime desks: ~10/day reach Marriage, Family & Education on the
+# word "marriage" alone. Kept only when the marriage is public policy, law or a court case.
+SUPPRESS | The Times of India | 'Hum aur aap shaadi kar lete hai': Aamrapali Dubey's playful marriage proposal to Pawan Singh leaves fans excited
+SUPPRESS | NDTV | Man Kills Lover For Pressuring Him For Marriage, Hides Body In Gunny Bag
+SUPPRESS | The Times of India | Survey finds divorced singles taking a more practical view of love
+KEEP | India Today NE | Assam Cabinet approves Muslim marriage registration rules, Arunodoi Puja bonus
+KEEP | timesofindia.indiatimes.com | MPHC allows minor girl to return home after parents agree to future marriage
+KEEP | The Times of India | Himanta crackdown on child marriage, month-long drive from November 1
+# Guards from replaying the leak fixes over 29 archived sweeps (27.09.2026).
+KEEP | newscentermaine.com | Group continues push to ban transgender athletes from Maine high school sports
+KEEP | AppleValleyNewsNow.com | Student sues over alleged sexual assault during high school wrestling match with transgender athlete
+KEEP | LifeSiteNews | Bishop condemns Israel shutting down Christian village in West Bank
+KEEP | National Catholic Register | Bishop Boxie Shares Faith Journey From Practicing Law to Becoming Youngest U.S. Bishop
+KEEP | liveaction.org | Actor Christian Bale opens foster village to keep siblings together
+KEEP | The Christian Post | 'We will miss you down here': Christian artists react to Dolly Parton's death at 80
+KEEP | India Today | 'Robber Bride' gang busted in Bihar after luring Rajasthan family into sham wedding
+KEEP | The Times of India | Indian couple win payout after suing UK home office for 'unlawful' immigration detention
+KEEP | The Times of India | Pregnant Woman Killed For Refusing Abortion, Lover Arrested
+KEEP | bhaskarenglish.in | Germany’s far-right party wins poll for 1st time: Lesbian leader Weidel opposes same-sex marriage

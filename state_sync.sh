@@ -57,7 +57,14 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 # State lives in the briefing folder by default. Set BB_STATE_FOLDER to keep it elsewhere.
 FOLDER="${BB_STATE_FOLDER:-$BB_STATE_FOLDER_DEFAULT}"
 STATE_FILES="seen.json cut.json source_health.json resolved.json authors.json ledes.json \
-             openings.json previews.json"
+             openings.json previews.json firstseen.json boilerplate.json syndicated.json"
+# boilerplate.json added 27.09.2026: site furniture learned from the text caches. Rebuildable
+# (python3 boilerplate.py --learn) but only from the caches above, so it travels with them.
+# firstseen.json added 08.09.2026. It records when an UNDATED item was first offered, which is
+# the only thing that stops a dateless source's whole index counting as new every single day -
+# seen.json cannot, because it only ever knows what was published. Losing it would silently
+# reopen that hole rather than break anything loudly, and it can only be rebuilt from the
+# archive (backfill_firstseen.py), so it belongs here rather than being treated as a cache.
 
 # Chris's own judgements, added 19.08.2026. These are NOT state - nothing in the pipeline
 # writes them, he does - and they are the only files here that could not be reconstructed:
@@ -71,8 +78,12 @@ STATE_FILES="seen.json cut.json source_health.json resolved.json authors.json le
 # These are human-written and LOCAL is authoritative, so pull only bootstraps a machine that
 # has none - see the pull block. Pushing them is a backup and always safe.
 JUDGEMENT_FILES="testcases.txt exclusions.txt bylines.txt link_fixes.txt extra_feeds.txt \
-                 sources.opml tiers.json rank_eval_log.txt repeat_eval_log.txt"
+                 sources.opml tiers.json rank_eval_log.txt repeat_eval_log.txt known_red.txt"
 
+# known_red.txt added 10.09.2026. It is a judgement, not state: it records which fixture
+# failures are deliberate, who is waiting on each, and what must be true before the waiver is
+# deleted. Losing it would silently re-arm the fixture against work that is red on purpose.
+#
 # rank_eval_log.txt and repeat_eval_log.txt added 31.08.2026: neither had ever been backed up
 # by any of the three lists. The second was found by the test written to stop the first
 # recurring - shortlist.py:1764 cites repeat_eval_log.txt by name ("see repeat_eval_log.txt
@@ -122,7 +133,21 @@ CODE_FILES="shortlist.py run_tests.py regions.py compose.py fetch_feeds.py resol
 upload-archive-to-drive.sh upload-dir-to-drive.sh state_sync.sh gdrive_auth.sh \
 archive_day.py audit_feeds.py authors.py check_sources.py discover_feeds.py \
 mark_published.py publish.sh rank_eval.py slice_shortlist.py \
-textsignals.py tier_model.py sync_docs.sh"
+textsignals.py tier_model.py sync_docs.sh backfill_firstseen.py slack_five.py eval_week.sh markup.py \
+verify_doc.sh verify_links.py boilerplate.py"
+# verify_doc.sh and verify_links.py added 27.09.2026 for finish_edition.sh --from.
+# markup.py and eval_week.sh added 10.09.2026 alongside slack_five.py.
+#
+# tier_model.json is deliberately NOT here. `tier_model.py --save` can write one, but nothing
+# reads it: the second-opinion flag it was written for was measured on 10.09.2026 and did not
+# work (see tier_model.py's docstring for the numbers), so shipping a 1.2MB artefact nothing
+# consumes would be dead weight in every push. It is one command to regenerate if anyone
+# revisits the idea.
+# slack_five.py added 10.09.2026, and this list caught it: the fixture failed with "1
+# script(s) missing from state_sync.sh CODE_FILES, so they are backed up NOWHERE" within a
+# minute of the file being written. That is the third time the same guard has caught the same
+# mistake (textsignals/tier_model 24.08, sync_docs 26.08), which is the argument for the guard.
+# backfill_firstseen.py added 08.09.2026 - the "script added later" the note above predicts.
 # sync_docs.sh added 26.08.2026, and archive_day.py de-duplicated in the same edit - it was
 # listed twice, so every push uploaded it twice. sync_docs.sh is the script that copies
 # ~/.claude's SKILL.md and memory/ into the repo; it was written straight into ~/Downloads and

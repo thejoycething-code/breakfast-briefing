@@ -43,6 +43,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 OPML = os.path.join(HERE, "sources.opml")
 EXTRA = os.path.join(HERE, "extra_feeds.txt")
 SEEN_DB = os.path.join(HERE, "seen.json")
+FIRSTSEEN_DB = os.path.join(HERE, "firstseen.json")
 CUT_DB = os.path.join(HERE, "cut.json")
 
 UAS = [
@@ -200,6 +201,25 @@ KEYWORDS = [
     r"cristian", r"evang[eé]lic", r"evangelic", r"laicismo", r"laicit[aà]",
     r"misa\b", r"messa\b", r"oraci[oó]n", r"preghiera",
 
+    # From parl-monitor's config/taxonomy.yaml v1.8 (Chris, 24.09.2026). Measured first: of
+    # the taxonomy's ~390 terms, most are already caught here by a broader stem; these are
+    # the precise ones that are not. On 24.09 the filtered feeds dropped 1,862 of 2,556
+    # in-window headlines. The Ofcom, disinformation, human trafficking, Rwanda scheme and
+    # social media company lines in testcases.txt are dropped headlines from that day.
+    # The rest matched nothing that day and are here because each names a live campaign
+    # front. Every entry is a phrase or proper noun, so none can fire on ordinary traffic.
+    # Bare "social media" is NOT here: 4 matches that day, 1 on-beat (the same finding as
+    # the taxonomy's v1.8 note). It is only kept with a regulatory noun.
+    r"\bOfcom\b", r"\b(dis|mis)information\b", r"\bsmall[- ]boats?\b",
+    r"\bchannel crossings?\b", r"\b(grooming|rape) gangs?\b", r"\bonline safety\b",
+    r"\bage (verification|assurance)\b", r"\bdigital id\b", r"\bhate crimes?\b",
+    r"\bhuman trafficking\b", r"\bmodern slavery\b", r"\bbrothels?\b",
+    r"\bsex (work|workers?|buyers?)\b", r"\brwanda (scheme|plan|deal|policy)\b",
+    r"\b(forced|religious|anti-)conversions?\b", r"\bconversion (practices|therapy)\b",
+    r"\bcass review\b", r"\bistanbul convention\b", r"\bVAWG\b", r"\bequality act\b",
+    r"\bstill(birth|born)s?\b", r"\btwo-child (limit|benefit cap|cap)\b",
+    r"\bsocial media (bans?|laws?|rules|compan\w+|firms?|giants?|platforms?)\b",
+
     # Litigation. The ONLY procedural entry in this list — everything above names a subject,
     # these name a legal stage — so it was measured before being added rather than reasoned
     # about (Chris, 28.08.2026, on the Stars and Stripes lawsuit reaching us from nobody).
@@ -282,6 +302,8 @@ def fetch(url, retry_uas=2, data=None, headers=None):
         }
         if headers:
             hdrs.update(headers)
+        if "cloud.feedly.com" in url and os.environ.get("BB_FEEDLY_TOKEN"):
+            hdrs["Authorization"] = "OAuth " + os.environ["BB_FEEDLY_TOKEN"]
         req = urllib.request.Request(url, data=data, headers=hdrs)
         try:
             with _OPENER.open(req, timeout=TIMEOUT) as resp:
@@ -303,7 +325,7 @@ def fetch(url, retry_uas=2, data=None, headers=None):
 # Source loading
 # ---------------------------------------------------------------------------
 FEED_MODES = ("pass", "filter", "gnews", "gnewsf", "bing", "bingf",
-              "scrapesrc", "scrapesrcf", "wpjson", "wpjsonf")
+              "scrapesrc", "scrapesrcf", "wpjson", "wpjsonf", "feedly")
 # Modes that keep only items matching the topical keyword list.
 FILTERED_MODES = {"filter", "gnewsf", "bingf", "scrapesrcf", "wpjsonf"}
 
@@ -375,9 +397,19 @@ def gnews_url(target, days=2):
 
 def bing_url(domain):
     """Bing News site: search. Its links wrap the real publisher URL, which we
-    unwrap in unwrap_link(), so these come out as direct links."""
+    unwrap in unwrap_link(), so these come out as direct links.
+
+    "kw:" makes it a free query, as for gnews_url (27.09.2026). Bing is the one route that
+    carries the publisher's own standfirst for outlets that refuse machine access - every
+    item of `site:telegraph.co.uk migrants` came with one - but it answers a single term
+    and returns ~1 result for an OR-query, so topic searches are one term per line.
+    """
+    if domain.startswith("kw:"):
+        query = domain[3:].strip()
+    else:
+        query = "site:" + domain
     return ("https://www.bing.com/news/search?q=%s&format=RSS&count=40"
-            % urllib.parse.quote("site:" + domain))
+            % urllib.parse.quote(query))
 
 
 def unwrap_link(url):
@@ -418,6 +450,42 @@ def is_paywalled(url, src_domain=""):
     return False
 
 
+def feed_outlet_label(ftitle):
+    """The outlet name a feed's title stands for, when the item names no source itself.
+
+    A "(bing: topic)" suffix is this file's own label for one of several searches of the same
+    outlet (extra_feeds.txt, 27.09.2026), never part of the outlet's name. Bing items carry no
+    source field, so without this the credit read "The Telegraph (bing: church)". Only that
+    exact label is stripped: "The Post (New Zealand)" is a real name, and its bracket is what
+    places it.
+    """
+    return re.sub(r"\s*\(bing:[^)]*\)\s*$", "", ftitle or "")
+
+
+def _safe_reaches(it):
+    try:
+        return reaches_a_section(it)
+    except Exception:  # noqa: BLE001
+        return True
+
+
+def recheck_paywall(it):
+    """Re-derive the paywall flag once a Google News redirect has become a real URL.
+
+    Found 27.09.2026. is_paywalled() runs when the item is read, and for a Google News item
+    the URL is then an opaque redirect, so it falls back to the domain the search targeted.
+    A topic search ("kw:... site:telegraph.co.uk") targets no domain, so every Telegraph and
+    Times item from the 24.09.2026 topic searches was marked NOT paywalled: the sheet printed
+    them without the (£) mark, and the text fetch treated them as free pages and asked for
+    the full article rather than the capped public preview (fetch_article_preview's docstring
+    explains why that cap is a boundary). The Telegraph answers 402 regardless, but a metered
+    paywall that ships the whole article in its HTML would not have. Only ever sets the flag,
+    never clears it.
+    """
+    if not it.get("paywalled") and is_paywalled(it.get("url") or ""):
+        it["paywalled"] = True
+
+
 def load_feeds():
     extra, scrapes, disabled, blocked = load_extra()
     feeds, seen_urls = [], set()
@@ -451,6 +519,9 @@ def load_feeds():
             target = gnews_url(target) if mode.startswith("gnews") else bing_url(target)
         elif mode.startswith(("scrapesrc", "wpjson")):
             domain = urllib.parse.urlsplit(target).netloc
+        elif mode == "feedly":
+            domain = urllib.parse.urlsplit(target).netloc.replace("www.", "")
+            target = feedly_url(target)
         add(category, title, target, mode, domain)
 
     body = ET.parse(OPML).getroot().find("body")
@@ -517,6 +588,46 @@ def sanitise_xml(raw):
     return BARE_AMP.sub(b"&amp;", raw)
 
 
+# A publisher's RSS, read through Feedly (27.09.2026). The Church Times now answers every
+# request to its own site - the RSS included - with a Cloudflare bot challenge, so on
+# 25.09.2026 all of its news reached the sheet as bare Google News headlines. Feedly still
+# polls that same RSS (it is the reader Chris's OPML came from), and its stream endpoint
+# returns the publisher's own items, dates and standfirsts: 40 of 40 had a 250-char summary.
+# This reads the publisher's public feed via the reader it was written for; it does not
+# touch the publisher's site. $BB_FEEDLY_TOKEN, if set, is sent as the account's developer
+# token; without it the public endpoint is used, which is what worked when this was built.
+# Useless where Feedly is ALSO challenged - EWTN GB's Feedly copy stopped on 05.08.2026.
+FEEDLY_STREAM = "https://cloud.feedly.com/v3/streams/contents?streamId=%s&count=60"
+
+
+def feedly_url(feed_url):
+    return FEEDLY_STREAM % urllib.parse.quote("feed/" + feed_url, safe="")
+
+
+def parse_feedly(raw, feed_title=""):
+    data = json.loads(raw.decode("utf-8", "replace") if isinstance(raw, bytes) else raw)
+    if not isinstance(data, dict) or "items" not in data:
+        raise ValueError("feedly-no-items")
+    out = []
+    for x in data["items"]:
+        link = ((x.get("canonical") or x.get("alternate") or [{}])[0] or {}).get("href", "")
+        body = (x.get("summary") or x.get("content") or {}).get("content", "")
+        body = html_mod.unescape(re.sub(r"<[^>]+>", " ", body))
+        when = x.get("published") or x.get("crawled")
+        out.append({
+            "title": html_mod.unescape(x.get("title") or "").strip(),
+            "link": link,
+            "date": (dt.datetime.fromtimestamp(when / 1000, dt.timezone.utc) if when else None),
+            "author": (x.get("author") or "")[:40],
+            "source": feed_title,
+            "source_url": "",
+            "feed_title": feed_title,
+            "summary": re.sub(r"\s+", " ", body).strip(),
+            "categories": [],
+        })
+    return out
+
+
 def parse_wpjson(raw, feed_title=""):
     """Read a WordPress REST collection as feed entries.
 
@@ -580,6 +691,37 @@ def parse_feed(raw):
         root = ET.fromstring(sanitise_xml(raw))
     tag = root.tag.split("}")[-1]
     out = []
+    if tag == "urlset":
+        # A Google News sitemap (24.09.2026). Complete for the last 48 hours, where a Google
+        # News search stops at 100 results. Use ONLY where the publisher's robots.txt
+        # permits us: the Times' sitemap was measured and rejected for exactly that reason
+        # (see extra_feeds.txt). A plain sitemap (no news:news block) has no headline, so it
+        # yields nothing rather than URLs as titles.
+        sm = "{http://www.sitemaps.org/schemas/sitemap/0.9}"
+        nw = "{http://www.google.com/schemas/sitemap-news/0.9}"
+        for u in root.findall(sm + "url"):
+            news = u.find(nw + "news")
+            if news is None:
+                continue
+            title = html_mod.unescape(_text(news.find(nw + "title")))
+            if not title:
+                continue
+            pub = news.find(nw + "publication")
+            kw = _text(news.find(nw + "keywords"))
+            out.append({
+                "title": title,
+                "link": _text(u.find(sm + "loc")),
+                # publication_date, not lastmod: lastmod moves on every correction, and a
+                # corrected three-day-old piece would re-enter the window as new.
+                "date": parse_date(_text(news.find(nw + "publication_date"))),
+                "author": "",
+                "source": _text(pub.find(nw + "name")) if pub is not None else "",
+                "source_url": "",
+                "feed_title": "",
+                "categories": [k.strip() for k in kw.split(",") if k.strip()],
+                "summary": "",
+            })
+        return out
     if tag == "rss" or root.find("channel") is not None:
         channel = root.find("channel")
         feed_title = _text(channel.find("title")) if channel is not None else ""
@@ -743,7 +885,15 @@ def _strip_one_suffix(title, source="", allow_lowercase=True):
     # still resolves on " - " first and never reaches the dash forms. Chris spotted
     # "...persecution of believers – EWTN Great Britain" in the 20.08 edition; an en dash is
     # what EWTN's own feed uses, and no dash form was in this list.
-    for sep in (" - ", " | ", " – ", " — "):
+    # Middot added 08.09.2026, again appended so nothing already resolving changes. Chris:
+    # "just the headline which is 'The erosion of free speech in Hong Kong'". The raw title
+    # was "... – The Lilypad · DKU's Independent Student-led Publication": the en-dash pass
+    # DID find that suffix and rejected it for being 54 chars against the 45 cap, because the
+    # tail is a masthead AND its tagline. Splitting on the middot first leaves "... – The
+    # Lilypad", which the en-dash pass then takes on the stacking loop's second turn - so this
+    # relies on the stacking fixed 20.08.2026 rather than on widening the cap, which would
+    # have let genuine prose tails through everywhere else.
+    for sep in (" - ", " | ", " – ", " — ", " · "):
         head, found, tail = t.rpartition(sep)
         if not found:
             continue
@@ -1089,6 +1239,118 @@ def fetch_article_opening(url, max_len=4000, paras=10):
 
 
 # ---------------------------------------------------------------------------
+# Text prefetch - article text fetched DURING the sweep, not after it
+# ---------------------------------------------------------------------------
+# Why (27.09.2026). The morning ran two long waits back to back: the sweep (~31 min on
+# 25.09.2026, most of it decoding ~1,300 Google News redirects at ~1.2s each, which only
+# talks to Google) and then shortlist --sheet (~17 min, fetching ~750 article pages, which
+# never talks to Google). Nothing in the second depends on the first except which URL to
+# fetch - and most URLs are known before decoding starts. So the article fetches now run
+# alongside the decode: direct links are queued as soon as the feeds are read, and each
+# redirect is queued the moment Google decodes it.
+#
+# It writes the SAME caches the sheet reads (openings.json, previews.json), with the same
+# schema and the same never-cache-a-failure rule, so shortlist's attach_openings finds them
+# warm and only fetches what is left. Nothing here decides anything: it is the sheet's work,
+# done earlier. A miss costs nothing - the sheet fetches it as it always has.
+PREFETCH_WORKERS = 8
+PREFETCH_GRACE = 240   # seconds to let queued fetches finish after decoding is done
+
+
+def reaches_a_section(it):
+    """True if shortlist would put this item in a section - i.e. it can reach the sheet.
+
+    Shared by the text prefetcher and the decode filter so the two cannot disagree with each
+    other or with shortlist. Blocked sources and chaff never reach the sheet; nor does an item
+    no section wants (it is printed in NO SECTION MATCHED, headline only, and a rescue from
+    there is resolved at compose time like any other pick).
+    """
+    import shortlist as sl               # local: shortlist imports this module
+    outlet = it.get("outlet") or ""
+    if sl.is_blocked_outlet(outlet) or sl.is_chaff(it["headline"], outlet, it.get("categories")):
+        return False
+    sec, _ = sl.classify(it["headline"], outlet, it.get("categories"), sl.region_text(it))
+    return sec is not None
+
+
+class TextPrefetcher:
+    def __init__(self, workers=PREFETCH_WORKERS):
+        import shortlist as _sl          # local: shortlist imports this module
+        self.sl = _sl
+        self.caches = {}
+        for name, path in (("open", _sl.OPENINGS_CACHE), ("prev", _sl.PREVIEWS_CACHE)):
+            try:
+                c = json.load(open(path))
+            except (OSError, ValueError):
+                c = {}
+            if name == "open" and c.get("__schema__") != _sl.OPENINGS_SCHEMA:
+                c = {"__schema__": _sl.OPENINGS_SCHEMA}
+            self.caches[name] = c
+        self.new = {"open": {}, "prev": {}}
+        self.queued = set()
+        self.lock = threading.Lock()
+        self.pool = futures.ThreadPoolExecutor(max_workers=workers)
+        self.futs = []
+        self.skipped = 0
+
+    def _wanted(self, it):
+        url = it.get("url") or ""
+        if not url or "news.google.com" in url:
+            return False
+        key = url_key(url)
+        if key in self.queued:
+            return False
+        if key in self.caches["prev" if it.get("paywalled") else "open"]:
+            return False
+        return reaches_a_section(it)
+
+    def submit(self, it):
+        try:
+            if not self._wanted(it):
+                self.skipped += 1
+                return
+        except Exception:  # noqa: BLE001 - a classification hiccup must not stop the sweep
+            return
+        key = url_key(it["url"])
+        self.queued.add(key)
+        self.futs.append(self.pool.submit(self._one, key, it["url"], bool(it.get("paywalled"))))
+
+    def _one(self, key, url, paywalled):
+        text = fetch_article_preview(url) if paywalled else fetch_article_opening(url)
+        if text:
+            with self.lock:
+                self.new["prev" if paywalled else "open"][key] = text
+
+    def finish(self, grace=PREFETCH_GRACE):
+        """Wait up to `grace` seconds, drop the rest, merge into the on-disk caches."""
+        done, pending = futures.wait(self.futs, timeout=grace)
+        for f in pending:
+            f.cancel()
+        self.pool.shutdown(wait=False, cancel_futures=True)
+        sl = self.sl
+        for name, path in (("open", sl.OPENINGS_CACHE), ("prev", sl.PREVIEWS_CACHE)):
+            with self.lock:
+                fresh = dict(self.new[name])
+            if not fresh:
+                continue
+            # Re-read before writing: the file on disk is the authority, and merging onto it
+            # rather than overwriting it means nothing another process wrote is lost.
+            try:
+                disk = json.load(open(path))
+            except (OSError, ValueError):
+                disk = {}
+            if name == "open" and disk.get("__schema__") != sl.OPENINGS_SCHEMA:
+                disk = {"__schema__": sl.OPENINGS_SCHEMA}
+            disk.update(fresh)
+            tmp = path + ".tmp"
+            with open(tmp, "w") as fh:
+                json.dump(disk, fh)
+            os.replace(tmp, path)
+        return (len(self.new["open"]), len(self.new["prev"]), len(pending),
+                len(self.queued))
+
+
+# ---------------------------------------------------------------------------
 # Seen store
 # ---------------------------------------------------------------------------
 def load_seen():
@@ -1107,6 +1369,51 @@ def save_seen(seen):
     with open(tmp, "w") as fh:
         json.dump(pruned, fh)
     os.replace(tmp, SEEN_DB)
+
+
+# --- first-seen store ------------------------------------------------------
+# Genuinely undated scrapesrc cards used to be stamped published=now, which put a source's
+# whole index permanently inside the window: the only brake was seen.json, and that records
+# PUBLISHED items, so anything offered and passed over came back every single day. The
+# Spectator's surrogacy piece was in every sweep from 18.08 to 08.09.2026 that way.
+# Keyed on url_key so it survives tracking-parameter churn, and pruned on the same retention
+# as seen.json - a link that has aged out of both is genuinely new again, which is the
+# behaviour a re-run months later should have.
+def load_firstseen():
+    try:
+        with open(FIRSTSEEN_DB) as fh:
+            return json.load(fh)
+    except (ValueError, OSError):
+        return {}
+
+
+def save_firstseen(firstseen):
+    cutoff = (dt.datetime.now(dt.timezone.utc)
+              - dt.timedelta(days=SEEN_RETENTION_DAYS)).isoformat()
+    pruned = {k: v for k, v in firstseen.items() if v >= cutoff}
+    tmp = FIRSTSEEN_DB + ".tmp"
+    with open(tmp, "w") as fh:
+        json.dump(pruned, fh)
+    os.replace(tmp, FIRSTSEEN_DB)
+
+
+def dateless_is_new(link, firstseen, cutoff):
+    """Is an undated item still new? False once we first saw it before the cutoff.
+
+    An unknown link is new by definition - that is the "new link = new story" rule the
+    scrapesrc path always intended. What changes is that being offered now COUNTS as having
+    seen it, so tomorrow the same link is no longer new.
+    """
+    stamp = firstseen.get(url_key(link))
+    if not stamp:
+        return True
+    try:
+        first = dt.datetime.fromisoformat(stamp)
+    except (TypeError, ValueError):
+        return True
+    if first.tzinfo is None:
+        first = first.replace(tzinfo=dt.timezone.utc)
+    return first >= cutoff
 
 
 # --- cut store -------------------------------------------------------------
@@ -1160,6 +1467,9 @@ def main():
                          "sends ~40%% of leads to the ranker with no article text")
     ap.add_argument("--decode-workers", type=int, default=8,
                     help="concurrency for redirect decoding (default 8)")
+    ap.add_argument("--no-prefetch", action="store_true",
+                    help="do not fetch article text during the sweep; the sheet then fetches "
+                         "it all afterwards, as before 27.09.2026 (~15 min slower)")
     args = ap.parse_args()
 
     # 36h by default so nothing slips through the gap between runs; the overlap is
@@ -1171,6 +1481,8 @@ def main():
 
     feeds, scrapes, blocked = load_feeds()
     seen = {} if args.include_seen else load_seen()
+    firstseen = {} if args.include_seen else load_firstseen()
+    firstseen_add = {}
 
     link_index = {} if args.no_resolve else build_link_index(scrapes)
     items, errors = [], []
@@ -1202,6 +1514,8 @@ def main():
                     # A WordPress REST collection. Dated like a feed, so it takes the
                     # normal window path below - nothing here is dateless.
                     entries = parse_wpjson(job.result(), ftitle)
+                elif mode == "feedly":
+                    entries = parse_feedly(job.result(), ftitle)
                 else:
                     entries = parse_feed(job.result())
             except Exception as exc:  # noqa: BLE001
@@ -1249,8 +1563,15 @@ def main():
                 if mode in FILTERED_MODES and not KEYWORD_RE.search(headline):
                     continue
                 link = clean_url(unwrap_link(e["link"]))
+                # An undated card is new only until we have seen it once. Recording the
+                # sighting here - not at publish time - is the whole fix: seen.json only
+                # ever knew about items that made an edition.
+                if dateless and e["date"] is None:
+                    if not dateless_is_new(link, firstseen, fcutoff):
+                        continue
+                    firstseen_add.setdefault(url_key(link), now.isoformat())
                 outlet = (e["source"] or (suffix if is_g else "")
-                          or ftitle or outlet_from_url(link))
+                          or feed_outlet_label(ftitle) or outlet_from_url(link))
                 outlet = re.sub(r"\s+", " ", outlet).strip()[:44]
                 if is_junk_title(headline, outlet):
                     continue
@@ -1264,8 +1585,12 @@ def main():
                     "url": link, "outlet": outlet,
                     "author": re.sub(r"\s+", " ", e["author"] or "").strip()[:40],
                     "paywalled": is_paywalled(link, fdom),
+                    # age_h stays None for undated items - we still do not know when the
+                    # publisher ran it - but "published" now carries the first sighting so
+                    # the sort is not "every dateless item is this instant".
                     "published": (e["date"].astimezone(dt.timezone.utc).isoformat()
-                                  if e["date"] else now.isoformat()),
+                                  if e["date"]
+                                  else firstseen.get(url_key(link)) or now.isoformat()),
                     "age_h": (None if dateless else
                               round((now - e["date"]).total_seconds() / 3600, 1)),
                     # Publisher topic labels, carried through for the classifier.
@@ -1289,7 +1614,25 @@ def main():
             direct = link_index.get(title_key(it["headline"]))
             if direct and "news.google.com" not in direct:
                 it["url"] = direct
+                recheck_paywall(it)
                 resolved += 1
+
+    def on_decoded(it):
+        recheck_paywall(it)
+        if prefetch:
+            prefetch.submit(it)
+
+    # Start fetching article text now, alongside the decode below (see TextPrefetcher).
+    prefetch = None
+    if not args.no_prefetch:
+        try:
+            prefetch = TextPrefetcher()
+            for it in items:
+                if "news.google.com" not in it["url"]:
+                    prefetch.submit(it)
+        except Exception as exc:  # noqa: BLE001 - prefetch is an optimisation, never a gate
+            sys.stderr.write("prefetch disabled: %s\n" % exc)
+            prefetch = None
 
     # Then ask Google itself for whatever title-matching could not reach.
     #
@@ -1306,20 +1649,49 @@ def main():
     # below that can now match a redirect against the direct link to the same story.
     # resolve_items caches successes only - never failures (see its comment).
     decoded = 0
+    skipped_filler = 0
     if not args.no_decode:
         import resolve as _resolve   # local: resolve imports this module
         still = [it for it in items if "news.google.com" in it["url"]]
+        # Decode only what can reach the sheet (27.09.2026). On 25.09.2026, 214 of the 806
+        # decoded redirects (27%) were chaff, blocked or matched no section, and each cost
+        # two Google requests behind the 0.7s gap. They stay as redirects, reported apart
+        # from the real "still redirects" count so the decoder-health signal is unchanged.
+        try:
+            keep = [it for it in still if reaches_a_section(it)]
+        except Exception as exc:  # noqa: BLE001 - never let the filter stop the decode
+            sys.stderr.write("decode filter disabled: %s\n" % exc)
+            keep = still
+        skipped_filler = len(still) - len(keep)
+        still = keep
         if still:
             decoded, _ = _resolve.resolve_items(
-                still, workers=args.decode_workers)
+                still, workers=args.decode_workers,
+                on_resolved=on_decoded)
 
     # Dedup: direct links beat Google redirects; then newest wins.
     items.sort(key=lambda i: ("news.google.com" in i["url"], i["published"]))
     cut = load_cut()
     by_url, by_title, kept, already, cut_out = set(), set(), [], 0, 0
+    # The copy dedup drops may carry text the kept copy lacks (27.09.2026). The Telegraph
+    # arrives both via Google News (headline only - its feed summary is the headline again)
+    # and via Bing (the publisher's own standfirst); once the Google redirect is decoded both
+    # are direct links, and whichever sorts first was kept - so the standfirst was thrown
+    # away and the lead reached the ranker as "NO TEXT". Keep the longer summary instead.
+    kept_by = {}
+
+    def _borrow_summary(dup):
+        k = kept_by.get(url_key(dup["url"])) or kept_by.get(title_key(dup["headline"]))
+        if k is None:
+            return
+        mine, theirs = (k.get("summary") or ""), (dup.get("summary") or "")
+        if len(theirs) > len(mine) + 40 and not theirs.startswith(k["headline"][:40]):
+            k["summary"] = theirs
+
     for it in items:
         uk, tk = url_key(it["url"]), title_key(it["headline"])
         if uk in by_url or (tk and tk in by_title):
+            _borrow_summary(it)
             continue
         # Lost to a section cap in an earlier edition: drop, do not flag. See load_cut().
         if uk in cut:
@@ -1334,9 +1706,26 @@ def main():
         by_url.add(uk)
         if tk:
             by_title.add(tk)
+        kept_by[uk] = it
+        if tk:
+            kept_by[tk] = it
         kept.append(it)
 
-    unresolved = sum(1 for i in kept if "news.google.com" in i["url"])
+    filler_left = 0
+    if skipped_filler:
+        # Of the redirects left in `kept`, the ones the filter chose not to decode are filler
+        # by construction; the rest are genuine decode failures - the health signal.
+        filler_left = sum(1 for i in kept if "news.google.com" in i["url"]
+                          and not _safe_reaches(i))
+    unresolved = sum(1 for i in kept if "news.google.com" in i["url"]) - filler_left
+
+    if prefetch:
+        t0 = time.monotonic()
+        n_open, n_prev, n_dropped, n_queued = prefetch.finish()
+        sys.stderr.write(
+            "prefetch: %d opening(s) + %d paywall preview(s) fetched during the sweep, of %d "
+            "queued (%d unfinished left for the sheet; waited %.0fs after decoding)\n"
+            % (n_open, n_prev, n_queued, n_dropped, time.monotonic() - t0))
     kept.sort(key=lambda i: (i["category"], i["published"]))
 
     out = sys.stdout
@@ -1348,9 +1737,9 @@ def main():
               "| %d already published in an earlier edition (kept, flagged) "
               "| %d dropped as cut by an earlier cap "
               "| gnews: %d matched to a direct link, %d decoded via Google, "
-              "%d still redirects\n"
+              "%d still redirects (+%d filler not decoded)\n"
               % (len(feeds) - len(errors), len(errors), len(items), len(kept),
-                 already, cut_out, resolved, decoded, unresolved))
+                 already, cut_out, resolved, decoded, unresolved, filler_left))
     out.write("paywalled items (marked £, use \"(£)\" after the outlet name): %d\n"
               % sum(1 for i in kept if i["paywalled"]))
     out.write("cols: N | headline | url | outlet | author | age  "
@@ -1377,6 +1766,14 @@ def main():
         with open(args.json, "w") as fh:
             json.dump({"generated": now.isoformat(), "window_hours": hours,
                        "items": kept, "errors": errors}, fh, indent=1)
+
+    # Unconditional, and deliberately NOT under --mark. Marking records what was PUBLISHED
+    # and happens later in the pipeline (mark_published.py); a first sighting has to be
+    # recorded even for the items no edition ever uses, which is exactly the population that
+    # used to come back for ever. --include-seen stays a true dry run and persists nothing.
+    if firstseen_add and not args.include_seen:
+        firstseen.update(firstseen_add)
+        save_firstseen(firstseen)
 
     if args.mark:
         stamp = now.isoformat()

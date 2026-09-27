@@ -1,0 +1,129 @@
+{
+ "date": "20260910",
+ "channel": "#campaigns-en-gb",
+ "doc_url": "https://docs.google.com/document/d/1yXqkDR051M6EO3K3g37K_gW9vYeT2C3_iiWcUnhd3Zs/edit",
+ "doc_items": 304,
+ "text": ":coffee: *Breakfast Briefing — Thursday 10 September* is out (automated): <https://docs.google.com/document/d/1yXqkDR051M6EO3K3g37K_gW9vYeT2C3_iiWcUnhd3Zs/edit|docs.google.com/document/d/1yXqkDR051M6EO3K3g3…/edit>\n\nTop five for the UK:\n\n1. *<https://www.dailymail.com/news/article-16117951/Badenoch-vote-against-assisted-dying-law-returns-Commons-week-Tory-leader-warns-MPs-clear-eyed-Bills-fatal-flaws.html|Badenoch to vote against assisted dying law when it returns to Commons this week as Tory leader warns MPs to be 'clear-eyed' about Bill's 'fatal flaws'>* — Mail. Second Reading is *tomorrow, Friday 11 September*.\n    ◦ <https://spectator.com/article/the-assisted-dying-vote-is-a-test-of-labours-core-values|The assisted dying vote is a test of Labour’s core values> — The Spectator. Lois McLatchie Miller on whether Labour MPs still hold to protecting the vulnerable\n    ◦ <https://www.christian.org.uk/features/assisted-suicide-is-just-like-abortion-lauren-edwards-advocacy-for-death-by-choice|‘Assisted suicide is just like abortion’: Lauren Edwards’ advocacy for death by ‘choice’> — The Christian Institute, on the Bill sponsor's own comparison in her latest opinion piece\n    ◦ <https://thecatholicherald.com/article/assisted-suicide-vote-to-follow-world-suicide-prevention-day|Assisted suicide vote to follow World Suicide Prevention Day> — The Catholic Herald. A government suicide-prevention adviser questions the contrast. Today is the day itself\n2. *<https://www.bbc.co.uk/news/articles/c9w41v2r742o|Drug gangs exploited and raped us as teens, then police failed us, women tell BBC>* — BBC. Four women waive anonymity for the documentary *Britain's Forgotten Girls*: groomed as children, then not taken seriously by the authorities.\n3. *<https://www.dailymail.com/news/article-16118541/M-iri-McAllan-comes-fire-having-no-ambition-unable-guarantee-standards-schools-improve-2029.html|Màiri McAllan comes under fire for having no ambition after she was unable to guarantee standards in schools will improve by 2029>* — Mail. The 2025 PISA data has England in the top ten while Scotland and Wales slump.\n    ◦ <https://theconversation.com/pisa-results-what-they-tell-us-about-reading-standards-in-welsh-schools-and-what-they-dont-291381|Pisa results: what they tell us about reading standards in Welsh schools – and what they don’t> — The Conversation – Articles (UK). Nearly one in three Welsh pupils missed the baseline\n4. *<https://www.standard.co.uk/news/politics/nigel-farage-face-coverings-migrant-protests-b1296098.html|Farage calls for ban on face coverings in public after anti-migration protests>* — London Evening Standard. Prompted by the masked protesters at Dover and Portsmouth, but drawn much wider.\n    ◦ <https://www.spiked-online.com/2026/09/09/why-ban-balaclavas-but-not-burqas|Why ban balaclavas, but not burqas?> — spiked, on Nottingham's new face-covering powers, which take effect next week\n    ◦ <https://www.gbnews.com/news/london-no-go-zones-sharia-law-third-of-britons|More than a third of Britons fear 'no-go zones' in London where sharia law dominates> — GB News.\n5. *<https://www.dailymail.com/news/article-16116949/Residents-tiny-Oxfordshire-village-centre-migrant-crisis-fear-asylum-seeker-camp-DOUBLE-size-house-3-510-men.html|Residents in tiny Oxfordshire village at centre of migrant crisis fear asylum seeker camp could DOUBLE in size to house 3,510 men>* — Mail. The village has 350 residents, 46 of them children.\n    ◦ <https://www.bbc.co.uk/news/articles/cly47p5vk63o|RNLI volunteer targeted online and branded 'traitor' after Portsmouth protests> — BBC.\n\n304 stories across nine sections in the Doc — worth a scroll for the rest.",
+ "items": [
+  {
+   "n": 1059,
+   "depth": 0,
+   "note": "Second Reading is *tomorrow, Friday 11 September*.",
+   "headline": "Badenoch to vote against assisted dying law when it returns to Commons this week as Tory leader warns MPs to be 'clear-eyed' about Bill's 'fatal flaws'",
+   "outlet": "Mail",
+   "url": "https://www.dailymail.com/news/article-16117951/Badenoch-vote-against-assisted-dying-law-returns-Commons-week-Tory-leader-warns-MPs-clear-eyed-Bills-fatal-flaws.html",
+   "section": "Life",
+   "paywalled": false
+  },
+  {
+   "n": 290,
+   "depth": 1,
+   "note": "Lois McLatchie Miller on whether Labour MPs still hold to protecting the vulnerable",
+   "headline": "The assisted dying vote is a test of Labour’s core values",
+   "outlet": "The Spectator",
+   "url": "https://spectator.com/article/the-assisted-dying-vote-is-a-test-of-labours-core-values",
+   "section": "Life",
+   "paywalled": false
+  },
+  {
+   "n": 215,
+   "depth": 1,
+   "note": "on the Bill sponsor's own comparison in her latest opinion piece",
+   "headline": "‘Assisted suicide is just like abortion’: Lauren Edwards’ advocacy for death by ‘choice’",
+   "outlet": "The Christian Institute",
+   "url": "https://www.christian.org.uk/features/assisted-suicide-is-just-like-abortion-lauren-edwards-advocacy-for-death-by-choice",
+   "section": "Life",
+   "paywalled": false
+  },
+  {
+   "n": 791,
+   "depth": 1,
+   "note": "A government suicide-prevention adviser questions the contrast. Today is the day itself",
+   "headline": "Assisted suicide vote to follow World Suicide Prevention Day",
+   "outlet": "The Catholic Herald",
+   "url": "https://thecatholicherald.com/article/assisted-suicide-vote-to-follow-world-suicide-prevention-day",
+   "section": "Life",
+   "paywalled": true
+  },
+  {
+   "n": 987,
+   "depth": 0,
+   "note": "Four women waive anonymity for the documentary *Britain's Forgotten Girls*: groomed as children, then not taken seriously by the authorities.",
+   "headline": "Drug gangs exploited and raped us as teens, then police failed us, women tell BBC",
+   "outlet": "BBC",
+   "url": "https://www.bbc.co.uk/news/articles/c9w41v2r742o",
+   "section": "Marriage, Family & Education",
+   "paywalled": false
+  },
+  {
+   "n": 1091,
+   "depth": 0,
+   "note": "The 2025 PISA data has England in the top ten while Scotland and Wales slump.",
+   "headline": "Màiri McAllan comes under fire for having no ambition after she was unable to guarantee standards in schools will improve by 2029",
+   "outlet": "Mail",
+   "url": "https://www.dailymail.com/news/article-16118541/M-iri-McAllan-comes-fire-having-no-ambition-unable-guarantee-standards-schools-improve-2029.html",
+   "section": "Marriage, Family & Education",
+   "paywalled": false
+  },
+  {
+   "n": 659,
+   "depth": 1,
+   "note": "Nearly one in three Welsh pupils missed the baseline",
+   "headline": "Pisa results: what they tell us about reading standards in Welsh schools – and what they don’t",
+   "outlet": "The Conversation – Articles (UK)",
+   "url": "https://theconversation.com/pisa-results-what-they-tell-us-about-reading-standards-in-welsh-schools-and-what-they-dont-291381",
+   "section": "Marriage, Family & Education",
+   "paywalled": false
+  },
+  {
+   "n": 982,
+   "depth": 0,
+   "note": "Prompted by the masked protesters at Dover and Portsmouth, but drawn much wider.",
+   "headline": "Farage calls for ban on face coverings in public after anti-migration protests",
+   "outlet": "London Evening Standard",
+   "url": "https://www.standard.co.uk/news/politics/nigel-farage-face-coverings-migrant-protests-b1296098.html",
+   "section": "Immigration & Asylum",
+   "paywalled": false
+  },
+  {
+   "n": 653,
+   "depth": 1,
+   "note": "on Nottingham's new face-covering powers, which take effect next week",
+   "headline": "Why ban balaclavas, but not burqas?",
+   "outlet": "spiked",
+   "url": "https://www.spiked-online.com/2026/09/09/why-ban-balaclavas-but-not-burqas",
+   "section": "Free Speech & Civil Liberties",
+   "paywalled": true
+  },
+  {
+   "n": 1155,
+   "depth": 1,
+   "note": "",
+   "headline": "More than a third of Britons fear 'no-go zones' in London where sharia law dominates",
+   "outlet": "GB News",
+   "url": "https://www.gbnews.com/news/london-no-go-zones-sharia-law-third-of-britons",
+   "section": "Immigration & Asylum",
+   "paywalled": false
+  },
+  {
+   "n": 1444,
+   "depth": 0,
+   "note": "The village has 350 residents, 46 of them children.",
+   "headline": "Residents in tiny Oxfordshire village at centre of migrant crisis fear asylum seeker camp could DOUBLE in size to house 3,510 men",
+   "outlet": "Mail",
+   "url": "https://www.dailymail.com/news/article-16116949/Residents-tiny-Oxfordshire-village-centre-migrant-crisis-fear-asylum-seeker-camp-DOUBLE-size-house-3-510-men.html",
+   "section": "Immigration & Asylum",
+   "paywalled": false
+  },
+  {
+   "n": 1081,
+   "depth": 1,
+   "note": "",
+   "headline": "RNLI volunteer targeted online and branded 'traitor' after Portsmouth protests",
+   "outlet": "BBC",
+   "url": "https://www.bbc.co.uk/news/articles/cly47p5vk63o",
+   "section": "Immigration & Asylum",
+   "paywalled": false
+  }
+ ]
+}

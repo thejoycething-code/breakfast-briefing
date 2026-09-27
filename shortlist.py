@@ -20,6 +20,8 @@ Usage:
 
 import argparse
 import collections
+import functools
+import html
 import json
 import math
 import os
@@ -32,6 +34,7 @@ import regions
 import fetch_feeds   # url_key + fetch_lede, for the sheet's bounded lede fetch
 import textsignals   # report-vs-comment and friends, read off the article opening
 import history      # what actually appeared in recent editions, for the cross-day repeat check
+import boilerplate  # site furniture scrubbed from article text before the judge reads it
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -58,6 +61,17 @@ SECTIONS = [
             # definition; the phrase has no other use.
             r"|freedom of religion|\bFoRB\b|conscientious objection"),
         (4, r"church (attack|burn|bomb|raid|demolish|clos)|attack on (a )?church"
+            # Any faith's place of worship, 27.09.2026: two reports of the Ontario synagogue
+            # shooting had no section, because only the church form existed. Anchored to a
+            # violent verb, so a synagogue's fundraiser or a mosque planning row stays in
+            # Church & Religion.
+            r"|(attack|shooting|shot|gunm[ae]n|opened fire|bomb|arson|firebomb|stabb|torch)"
+            r"\w*\b.{0,40}(synagogue|mosque|temple|gurdwara)"
+            r"|(synagogue|mosque|temple|gurdwara)s?\b.{0,20}(attack|shooting|arson|bomb)"
+            r"|antisemitic (attack|threat|assault|abuse)"
+            # The Easter Sunday bombings (Sri Lanka, 2019) targeted churches; neither report
+            # of the 25.09.2026 sentencing said "church" or "Christian".
+            r"|easter (sunday )?(bomb|attack|massacre)|(bomb|attack)\w*\b.{0,30}\beaster\b"
             r"|christians? (killed|kidnapp|abduct|jailed|imprison|arrest|detain|shot)"
             r"|(kill|murder|massacr|abduct|kidnap|behead|slaughter)\w*\b.{0,30}"
             r"(christian|catholic|worshipper|churchgoer|believer)s?"
@@ -140,6 +154,25 @@ SECTIONS = [
             r"|house church|bible (ban|smuggl)|missionar"
             r"|religious exemption|(fired|sacked|dismissed|disciplin)\w*.{0,40}"
             r"(refus\w+|conscience|belief|religio|faith)"),
+        # Chris, 08.09.2026: two stories he listed under "You should have included", both
+        # placed by him in this section.
+        #
+        # 1. Conversion AWAY from Islam. Everything above covers a convert who is arrested,
+        #    jailed or awaiting a verdict, and "apostas" covers the charge - but nothing
+        #    covered the act, which in much of the world is what puts a person in danger in
+        #    the first place. CBN's "Many Muslims Turning to Christ Amid Middle East
+        #    Conflict" scored nothing here and fell to the Church & Religion catch-all.
+        (4, r"(muslim|hindu|buddhist|sikh)s?\b.{0,30}"
+            r"(turning|turn|converting|convert|coming|came) to (christ|christianity|jesus)"
+            r"|(leaving|left|renounc\w+) islam|ex-muslims?\b|former muslims?\b"),
+        # 2. Legislating a religious rite. Circumcision is a Jewish and Muslim obligation
+        #    before it is a medical procedure, so an MP moving to regulate it is a religious
+        #    liberty question - and it reached NO section at all. Guarded against "female
+        #    circumcision", which is FGM under a euphemism and belongs with the safeguarding
+        #    and family beats rather than here. Deliberately NOT widened to ritual slaughter
+        #    or shechita: nothing in this sweep declared them, and this file's own rule is to
+        #    add vocabulary when a real miss asks for it, not in anticipation.
+        (4, r"(?<!female )(?<!women's )circumcision"),
         (2, r"^(?=.*(christ|church|catholic|priest|pastor|bishop|missionar|convert|believer"
             r"|muslim|islam|hindu|sikh|jewish|faith|religio|worship|blasphem|persecut"
             r"|martyr|chapel|mosque|temple|monk|nun\b|preacher|gospel|bible))"
@@ -160,6 +193,23 @@ SECTIONS = [
             # fell to Other. Chris, 17.08.2026: the ruling "should have stood as a free speech
             # issue" - so the subject matter has to carry it, not the wording of one headline.
             r"|social media ban|age verification|online safety|digital id"
+            # Chris, 24.09.2026: the US warning Australia over its social-media rules was
+            # missed. WORLD's "U.S. criticizes Australia's proposed digital safety legislation"
+            # matched nothing and sat in NO SECTION MATCHED - "digital safety" is the same
+            # speech-regulation beat as "online safety", worded the Australian way.
+            r"|digital (safety|services) (law|legislation|bill|act|rules|code)"
+            # 27.09.2026, four shapes that had no vocabulary (see testcases.txt): security
+            # and cyber laws, which are how most states now regulate speech; jailing over
+            # private communications; detaining journalists; and platform bosses facing
+            # criminal liability for content.
+            r"|(cyber ?security|cybercrime|anti-?terror\w*|foreign agents?|sedition"
+            r"|national security) (law|bill|act|legislation|ordinance)"
+            r"|(jail|imprison|sentenc|detain|arrest)\w*\b.{0,40}\b(over|for) (their |his |her )?"
+            r"(private )?(phone calls?|messages?|reporting|articles?|lyrics|cartoons?)"
+            r"|journalists?\b.{0,30}\b(detained|arrested|jailed|held)\b(?!.{0,40}\bspy)"
+            r"|(detain|arrest|jail)\w*\b.{0,20}\bjournalists?\b"
+            r"|social media\b.{0,50}\b(criminally liable|criminal liability)"
+            r"|social media (law|legislation|rules|regulation|code)s?\b"
             r"|(block|strike|struck|overturn)\w*\b.{0,24}(ban on|ban for|speech|expression)"),
         # Verbs and objects both widened 20.08.2026. Chris moved The Federalist's UK
         # speech-ban story to Free Speech; the Daily Wire's version of the same story
@@ -238,7 +288,12 @@ SECTIONS = [
             r"|strip.search|gender.critical|self-?id\b|biological (sex|male|female|m[ae]n|women)"
             r"|women'?s (sport|football|rugby|swimming|boxing|cricket|league|spa)"
             r"|female categor|male athlete"),
-        (3, r"\bLGBT|\bpride\b|\bqueer\b|lesbian|\bgay\b|bisexual|non-?binary|stonewall"
+        # Stonewall only in its LGBT senses (27.09.2026): the bare word also scored a town's
+        # baseball game, a high school named for Stonewall Jackson and the verb "stonewall",
+        # ~2.5 a day into Gender. The charity and the inn are named as such in headlines.
+        (3, r"\bLGBT|\bpride\b|\bqueer\b|lesbian|\bgay\b|bisexual|non-?binary"
+            r"|stonewall (inn|uprising|riots?|national monument|charity|uk|chief|boss|ceo"
+            r"|guidance|champions?|diversity|accused|says|warns|has|was|is)\b|stonewall'?s\b"
             r"|drag queen|conversion therapy|chestfeed|intersex|same-sex attract"
             r"|sexual orientation|\bWNBA\b|women'?s (basketball|team|categor)"),
         (4, r"\bDEI\b|\bEDI\b|diversity, equity|equity and inclusion|identity politics"
@@ -254,9 +309,21 @@ SECTIONS = [
             # "born alive" matched nothing at all, so the Daily Telegraph's "10,000 booties on
             # lawn in 'born alive' bill push" fell into NO SECTION MATCHED (Chris, 17.08.2026).
             r"|born.?alive|infanticide|viability (limit|threshold)|late-?term"
-            r"|conscientious objection|foeticide|feticide"),
+            r"|conscientious objection|foeticide|feticide"
+            # "aborted" and the pregnancy-loss vocabulary, 27.09.2026: Live Action's
+            # "Aborted baby's estate is awarded monetary damages" and CARE's "bereavement
+            # leave for pregnancy loss" both scored nothing. A court ordering a child to
+            # "carry (a) pregnancy" is an abortion ruling that never says the word.
+            r"|\baborted\b|abortionist|pregnancy loss|baby loss|miscarriage(?!s? of justice)"
+            r"|stillbirth"
+            r"|carry (a |the |her )?pregnancy|terminat\w* (a |the |her )?pregnanc"),
         (6, r"assisted (dying|suicide|death)|euthanas|\bMAiD\b|\bMAID\b|right to die"
-            r"|dignity in dying|end of life|palliative|hospice|lethal (drug|prescription)"),
+            r"|dignity in dying|end of life|palliative|hospice|lethal (drug|prescription)"
+            # Word forms, 27.09.2026 (see testcases.txt, 25.09.2026 edition). The space-only
+            # "assisted (dying|...)" dropped AP's "Assisted-dying law goes into effect in
+            # Illinois"; "euthanas" never matched euthanized/euthanised; and "medical aid in
+            # dying" is the US statutory name, used alone in two headlines that day.
+            r"|assisted-(dying|suicide|death)|euthani[sz]|aid in dying"),
         (6, r"surrogac|surrogate|\bIVF\b|embryo|egg freezing|fertility (treatment|clinic|doctor)"
             r"|designer bab|gene edit|three.parent|artificial womb|sperm donor"),
         # Three gaps found 19.08.2026, all in NO SECTION MATCHED:
@@ -276,7 +343,9 @@ SECTIONS = [
             r"|cathedral|parish|vicar|curate|lambeth|canterbury|york minster"),
         (4, r"\bpope\b|vatican|papal|leo xiv|cardinal|conclave|holy see|encyclical"
             r"|canon law|catholic (church|bishops|conference)|magisterium"),
-        (3, r"\bchurch(es|goer|going)?\b|christian|catholic|evangelical|protestant"
+        # churchgoers? - the plural was missing, so "Half of younger churchgoers say..."
+        # had no section (27.09.2026).
+        (3, r"\bchurch(es|goers?|going)?\b|christian|catholic|evangelical|protestant"
             r"|orthodox|baptist"
             r"|methodist|presbyterian|congregation|pastor|priest|clergy|chaplain"
             # "Mass" but NOT "Mass." — the abbreviation for Massachusetts. Found 28.08.2026
@@ -423,7 +492,12 @@ OTHER_SPLIT = [
      re.compile(r"migrant|migration|asylum|immigration|immigrant|border|deport|refugee"
                 r"|\bICE\b|smuggl|people.smugg|channel crossing|small boat|dinghy"
                 r"|visa\b|citizenship|naturalis|resettle|hotel(s)? (for|housing)"
-                r"|illegal alien|undocumented|sanctuary (city|state)", re.I)),
+                r"|illegal alien|undocumented|sanctuary (city|state)"
+                # 27.09.2026: trafficking gangs, the UK-France returns deal and birth
+                # tourism each passed OTHER_ALLOW and then found no theme here.
+                r"|human trafficking|(?<!drug )(?<!drugs )(?<!arms )(?<!wildlife )"
+                r"trafficking (gang|ring|network)"
+                r"|channel (deal|treaty|agreement)|one.in,? one.out|birth tourism", re.I)),
     ("Politics, Government & Society",
      # \bvotes?\b/\bvoting\b: "voter" was here but not "vote", so TVP World's "Fedorov calls
      # for wartime vote" reached no section while the same story from The European Conservative
@@ -453,13 +527,69 @@ OTHER_SPLIT = [
                 r"|judicial (review|independence|nominee|confirmation|appointment|reform)"
                 r"|court.packing|\bSCOTUS\b|redistrict|gerrymander|filibuster|impeach"
                 r"|executive order|legislature|statehouse"
+                # Public inquiries, added 16.09.2026. The Thirlwall Inquiry into Lucy Letby
+                # reported on 15.09 and the ENTIRE cluster reached no section at all - both
+                # GOV.UK primary documents, the Times, BBC and Telegraph reports, the doctor's
+                # reaction - and ran only because it was rescued by hand from the suppressed
+                # block. OTHER_ALLOW was never the gate: every one of them already matched it
+                # on "inquiry"/"NHS"/"hospital". They passed it, found no OTHER_SPLIT theme,
+                # fell to plain "Other", and were refused there because Other demands a
+                # positive subject of its own (16.08.2026). An inquiry reporting is not an
+                # "Other" subject; it is public accountability, which is this split's job.
+                #
+                # A bare "inquiry" IS the right width, and that is measured, not assumed:
+                # across the 19 archived editions it moves 59 items out of NO SECTION AT ALL,
+                # ~3 a day, and they are overwhelmingly real stories the briefing dropped
+                # silently - the Nottingham attack death ruled "potentially preventable", the
+                # chief coroner calling for an inquiry into the Manchester synagogue attack,
+                # RUC obstruction of the Robert Hamill murder inquiry, Bondi, the Australian
+                # antisemitism hearings, GPs' advice service causing missed cancer diagnoses.
+                # Narrower variants were built and measured too: anchoring "inquiry" to a
+                # reporting verb caught 9 of today's 14 and dropped the Times' "Lucy Letby
+                # inquiry: staff could have stopped three murders" - a lead item - on nothing
+                # but its punctuation.
+                #
+                # The single false sense is the police one, and it is excluded by the word in
+                # front rather than by narrowing the term: 2 of those 59 are "homicide
+                # inquiry". "murder, inquiry finds" keeps the comma and so still matches,
+                # which is correct - that is an inquiry into a murder investigation.
+                r"|(?<!homicide )(?<!murder )(?<!police )\binquir(y|ies)\b"
+                # The other half of the same story: a government ANSWERING an inquiry, which
+                # can be written without the word. "Government to act on Thirlwall patient
+                # safety recommendations" - a GOV.UK primary document, and the one Letby item
+                # the pattern above still missed. Both tokens measured on the archive and both
+                # tiny: the first moves 3 (this, plus New Zealand rejecting advice on
+                # retirement village payouts and the Scottish Government rejecting a men's
+                # health plan), the second 2 (this, plus the BMA chief warning the NHS puts
+                # reputation before patient safety). Every one a real story that was dropped.
+                # A bare "recommendations" was tried and rejected: same 2, but it also drags
+                # in EU programme boilerplate.
+                r"|government (to act on|accepts|rejects|responds)|patient safety"
                 # "politic" itself was missing, so a headline whose only political word was
                 # "political" reached no section at all - which is how the Belfast News
                 # Letter's "...short-lived political marriage" ended up relying on its
                 # publisher tag alone (20.08.2026). This can only pull items OUT of the
                 # residual bucket; it cannot take one from a real section, because
                 # other_section runs only when nothing else scored.
-                r"|politic", re.I)),
+                r"|politic"
+                # The state's money and its devolved governments, 27.09.2026: "Conservatives
+                # pledge to cut benefits for the long-term unemployed", "20 million adults
+                # don't pay income tax" and GOV.UK's £1.5bn offer to the Northern Ireland
+                # Executive all passed OTHER_ALLOW on benefits/tax/government and then had
+                # no theme. "conservatives" is here because the pattern above only knew the
+                # party by "conservative party" and "tory". Care homes and social care are
+                # public provision, the same beat as the NHS inquiries above.
+                r"|conservatives\b|\bbenefits? (cut|crackdown|claimants?|bill|system|cap)"
+                r"|long-term unemployed|universal credit"
+                r"|welfare (reform|cuts?|state|bill|spending|system|claimants?|budget)"
+                r"|\b(income|council|inheritance|wealth|mansion|payroll) tax\b"
+                r"|taxpayer-funded|taxpayers'? (money|cash|bill)|cost (to )?taxpayers"
+                r"|stormont|northern ireland executive|holyrood|senedd|devolved"
+                r"|care homes?\b|social care"
+                # Community flashpoints: flag burning and religious slogans at a protest or
+                # attack. The 25.09.2026 Union flags trial led the Slack five and reached no
+                # section at all.
+                r"|union (jack|flag)s?|flag[- ]burn|burn\w* .{0,25}flags?\b|allahu akbar", re.I)),
 ]
 
 SECTION_NAMES = ([name for name, _ in SECTIONS]
@@ -504,6 +634,15 @@ SOURCE_HINTS = {
         "charlotte gill",
     ],
 }
+
+# Outlets whose unscored items belong in Church & Religion - but only as a LAST resort, after
+# the Immigration/Politics splits have had their turn. 27.09.2026: the Church Times had no
+# hint, so "Survivor Support Fund to be launched", a church safeguarding story with no church
+# word in its headline, reached no section. Put in SOURCE_HINTS it was consulted FIRST and
+# took "James Orr stands down as head of policy for Reform UK" out of Politics, measured on
+# the 29 archived sweeps; here it only catches what would otherwise have had no section.
+# Its job adverts and standing columns are chaffed by CHAFF_HARD before they get this far.
+CHURCH_FALLBACK_OUTLETS = re.compile(r"(?<![a-z])church ?times(?![a-z])", re.I)
 SOURCE_BOOST = 4
 
 # Celebrity, entertainment and sport chaff. PinkNews' unfiltered feed is the main source
@@ -573,7 +712,23 @@ CHAFF_HARD = re.compile(
     r"|radio show|daily broadcast|\| \d{1,2}-\d{1,2}-\d{2}|– \d{1,2}[-/]\d{1,2}[-/]\d{2}"
     r"|reflection for|daily devotion|verse of the day|prayer of the day"
     r"|quiz:|\brecipe|horoscope|lottery|deals? of the day|\d+ things|top \d+|best \d+"
-    r"|fringe (comedy )?review|album review|restaurant review|theatre review|gig review",
+    r"|fringe (comedy )?review|album review|restaurant review|theatre review|gig review"
+    # Newspaper notices pages (24.09.2026), brought in by the Times topic searches: they
+    # match "marriage", "death" and "church" and are never news. Anchored at the start,
+    # so a story that merely mentions the Court Circular is untouched.
+    r"|^births, marriages and deaths\b|^court circular\b"
+    # The Church Times job board (27.09.2026): "Vicar vacancy in South East" ran as a
+    # Church & Religion candidate three times on 25.09.2026. Anchored to the advert's own
+    # shape - "<role> vacancy in <place>" - so "vacancy rates" and a bishopric left vacant
+    # are untouched.
+    r"|\bvacanc(y|ies) in (the )?[A-Z]\w+"
+    # ...and its standing columns, which the Church Times source hint would otherwise send
+    # to Church & Religion every week: reviews, the Sunday readings, the caption contest,
+    # photo round-ups and the money column. Anchored at the start, as the paper titles them.
+    r"|^(book|film|tv|radio|art|theatre|music|dance|exhibition) review:"
+    r"|^sunday.?s readings\b|caption competition|^photo stories of the week"
+    r"|^good money:|^resignations and retirements$|^\d+ years ago:|^notice board:"
+    r"|^books? photo:",
     re.I)
 
 
@@ -862,6 +1017,10 @@ BLOCKED_OUTLETS = re.compile(
     # display name rather than the URL.
     r"|truth[- ]?nigeria|24-7[- ]?press[- ]?release|this[- ]?day|\bzenit\b"
     r"|evangelical[- ]?times"
+    # The Times' job board (24.09.2026): teacher and care-worker adverts that the Times
+    # topic searches bring in under site:thetimes.com. Also blocked at fetch time in
+    # extra_feeds.txt; this is the backstop if an advert arrives under the bare domain.
+    r"|times[- ]?appointments"
     # Chris's markup on the TEST 20260824 draft: "Drop this source completely" (Voice of
     # Emirates, which arrives under its Arabic masthead), "Drop as a source" (Rediff, AOL.com)
     # and "This is a repeat from previous days. Also drop as a source." (China Daily). All
@@ -912,7 +1071,15 @@ PERSON_CONTEXT = re.compile(
     r"|season|game|games|match|innings|touchdown|homer|home run|slugger|cornerback"
     r"|quarterback|striker|midfielder|coach|lineup|injury|injured|scored|playoff"
     r"|blast|rally|win over|defeat|astros|patriots|seahawks|yankees|dodgers|wnba|nba"
-    r"|hairstyle|girlfriend|boyfriend|red carpet)\b", re.I)
+    r"|hairstyle|girlfriend|boyfriend|red carpet"
+    # 27.09.2026: showbiz, business and death-notice shapes are just as much proof of a
+    # person as sport is - a memoir tour, a film remake, a share tip and an obituary all read
+    # as church news on the bare "Christian" until these were added.
+    r"|memoir|book tour|remake|trailer|film|movie|actor|actress|singer|album|designer"
+    r"|fashion|couture|obituary|buy|sell|stock|dies at|f1|red bull|formula one)\b", re.I)
+# Fashion houses named after a Christian (27.09.2026): LVMH's "holding Christian Dior" is a
+# stock story in French and had no English context word to prove it was not the faith.
+CHRISTIAN_BRAND = re.compile(r"\bchristian (dior|louboutin|lacroix|siriano)\b", re.I)
 
 
 
@@ -935,13 +1102,20 @@ GOSSIP = re.compile(
     r"bombshell|make-?or-?break|explodes amid|breaks? (her |his |their )?silence"
     r"|prenup|hidden detail|secret (wedding|romance|deal talks)|controversial marriage"
     r"|recalls? family opposition|opens? up about (her|his|their) (marriage|divorce|split)"
-    r"|spotted (with|together)|steps out with|cosy|cozy up|sparks .{0,20}rumou?rs"
+    r"|spotted (with|together)|steps out with|sparks .{0,20}rumou?rs"
+    # "cosy" is the celebrity-romance framing; "cosying up to" is a political idiom, and
+    # the bare word binned the Telegraph's "Labour is playing a dangerous game by cosying
+    # up to the Muslim Council for Britain" as gossip (25.09.2026).
+    r"|\bcos(y|ier|ied|ying)\b(?! up to)|\bcoz(y|ying) up with"
     r"|fuels .{0,20}rumou?rs|inside .{0,30}(marriage|divorce|split)|marriage hell"
     r"|\| bollywood|year-younger|age-shaming|wedding certificate|marriage decision"
     r"|i married the wrong|love life|dating history|ex-?wife|ex-?husband", re.I)
 # Entertainment desks whose marriage coverage is never our subject.
 ENTERTAINMENT_DESKS = re.compile(
-    r"telangana today|news18|pinkvilla|koimoi|bollywood hungama|filmfare|etimes"
+    # "etimes" is the Times of India's entertainment vertical and MUST stay anchored:
+    # unanchored it is a substring of "thetimes.com", which silently chaffed every Times
+    # item that did not trip CIVIC_MARRIAGE (found 14.09.2026 - see testcases.txt).
+    r"telangana today|news18|pinkvilla|koimoi|bollywood hungama|filmfare|\betimes\b"
     r"|hindustan times.*bollywood|zoom tv|india forums", re.I)
 
 
@@ -956,6 +1130,10 @@ def is_name_collision(headline):
     required, and in practice that means sport and contract vocabulary.
     """
     if FAITH_ORGS.search(headline):
+        return False
+    if CHRISTIAN_BRAND.search(headline):
+        return True
+    if SHAPE_RESCUE.search(headline):
         return False
     if not NAME_COLLISION.search(headline):
         return False
@@ -997,6 +1175,65 @@ def is_blocked_outlet(outlet=""):
     return bool(outlet and BLOCKED_OUTLETS.search(outlet))
 
 
+# School and college sport (27.09.2026). ~5 a day reached Church & Religion because the
+# school is called "... Christian" or "... Catholic", and ~5 more reached Marriage, Family &
+# Education on "high school". A match report is never the beat, whatever the school's name -
+# but the PLURAL is the faith, so every school-name arm requires "Christian" not followed by
+# "s": "Pakistani Christians Rally for Equal Rights" must survive the word "rally".
+SCHOOL_SPORT = re.compile(
+    r"high school (sports|football|soccer|volleyball|basketball|baseball|softball|tennis|golf"
+    r"|wrestling|cross country|lacrosse|hockey|swimming|girls|boys)\b"
+    r"|highlights/scores|\b(sports|football|soccer|volleyball) results\b|football extra"
+    r"|team preview"
+    r"|\b(christian|catholic|lutheran|baptist|adventist)\b(?!s)[^|]{0,60}\b(football|soccer"
+    r"|volleyball|basketball|baseball|softball|tennis|netters|golf|hockey|wrestling"
+    r"|cross country|lacrosse|bulldogs|eagles|knights|lions|warriors|champions)\b"
+    r"|\b(football|soccer|volleyball|basketball|baseball|softball|tennis|golf)\b[^|]{0,60}"
+    r"\b(christian|catholic|lutheran|baptist)\b(?!s)"
+    # Result verbs in their unambiguous headline forms only: "down" matched "shutting down
+    # Christian village" and "beat" would match "police beat Christian man" (27.09.2026).
+    r"|\b(defeats|defeated|downs|tops|edges|routs|rolls past|falls to|win over|notches win"
+    r"|loss to|sweeps)\b[^|]{0,50}\b(christian|catholic|lutheran|baptist|adventist)\b(?!s)"
+    r"|\b(christian|catholic|lutheran|baptist)\b(?!s)[^|]{0,50}\b(defeats|defeated|downs"
+    r"|tops|edges|routs|rolls past|falls to|win over|first loss|sweeps)\b", re.I)
+# Issue words that outrank a sport or name-collision shape: a ban on transgender athletes in
+# high school sports is the Gender beat whatever else the headline says, and "Actor Christian
+# Bale opens foster village" is a fostering story. Replaying 29 archived sweeps found both.
+SHAPE_RESCUE = re.compile(
+    r"transgender|\btrans\b|gender|women'?s (sport|sports|category)|girls'? (sport|sports)"
+    r"|sexual assault|abuse|shoot|shot|killed|persecut|\bpray|faith journey|coach (fired|sacked)"
+    r"|lawsuit|\bsues?\b|\bban\b|banning|referendum|foster|adopt|abortion|surrogac|euthanas"
+    r"|bishop|\bchurch|pastor|baptis|worship|ministry|mission", re.I)
+
+# Indian entertainment and crime desks (27.09.2026): ~10 a day reached Marriage, Family &
+# Education on "marriage" alone - a film star's proposal, a lover's murder, a dating survey.
+# Kept only when the marriage is public policy, law or a court case, which is what those
+# desks also carry (child-marriage drives, High Court rulings, registration rules).
+INDIA_DESKS = re.compile(
+    r"times of india|timesofindia|\bndtv\b|india today|hindustan times|news18|the statesman"
+    r"|dt next|mensxp|bhaskar|gujarat ?samachar|news minute|deccan herald|india tv|\babp\b"
+    r"|zee news|indulgexpress|magzter|punjab newsline|mangalore today|court book|lawchakra"
+    r"|free press journal|oneindia|republic world", re.I)
+_MARRIAGE_WORD = re.compile(r"marri|marry|wedding|divorc|shaadi|spouse|husband|wife|\blove"
+                            r"|lover|couple|dating|alimony", re.I)
+_INDIA_CIVIC = re.compile(
+    r"child marriage|forced|minor|high court|supreme court|\bcourt\b|\blaw\b|\bbill\b"
+    r"|\bact\b|\brules?\b|registration|cabinet|government|ministry|dowry|conversion"
+    r"|inter-?(faith|caste|religious)|love jihad|polygamy|uniform civil code"
+    # ...and anything that is one of the OTHER beats, or in scope as marriage fraud (Chris,
+    # 13.08.2026: sham marriage stays in Marriage). Found replaying 29 sweeps: a sham-wedding
+    # gang, a forced-abortion killing and a UK Home Office detention payout were all binned.
+    r"|sham|fraud|traffick|abort|surroga|euthan|pregnan|transgender|convert|christian|church"
+    r"|muslim|hindu|temple|visa|immigra|deport|\bsue|suing|lawsuit|payout|home office"
+    r"|same-sex|\bgay\b|lesbian|lgbt|\bparty\b|election|\bpoll\b"
+    r"|(?-i:\b[A-Z]*HC\b)|\bUCC\b", re.I)
+
+
+def is_offbeat_india_marriage(headline, outlet=""):
+    return bool(outlet and INDIA_DESKS.search(outlet) and _MARRIAGE_WORD.search(headline)
+                and not _INDIA_CIVIC.search(headline))
+
+
 def is_chaff(headline, outlet="", categories=None):
     """True if the headline is celebrity/sport/schedule filler and nothing more."""
     if is_excluded(headline):
@@ -1015,6 +1252,10 @@ def is_chaff(headline, outlet="", categories=None):
     if outlet and ENTERTAINMENT_DESKS.search(outlet) and not CIVIC_MARRIAGE.search(headline):
         return True
     if is_name_collision(headline):
+        return True
+    if SCHOOL_SPORT.search(headline or "") and not SHAPE_RESCUE.search(headline or ""):
+        return True
+    if is_offbeat_india_marriage(headline or "", outlet):
         return True
     # Publisher tags it as arts/culture filler - Chris marked these "Not interesting".
     if category_is_filler(categories):
@@ -1116,6 +1357,11 @@ OTHER_INTEREST = re.compile(
     # same morning, which is precisely the landfill this gate exists to prevent - so the
     # radicalisation sense is anchored to an online/ideological referent.
     r"|radicalis|radicaliz|violent extremis|counter-?extremis"
+    # Terrorism and atrocity crimes, 27.09.2026: a Briton killed in a terrorist attack and a
+    # UK doctor charged over the Rwandan genocide both passed OTHER_ALLOW and were refused
+    # here for lacking a subject.
+    r"|terror(ist|ism)? (attack|plot|cell)|killed by (terrorists|jihadists|isis)"
+    r"|genocide|war crimes?|crimes against humanity"
     r"|extremis\w*\b.{0,25}(online|content|propaganda|material|network)"
     r"|(online|social media|internet)\b.{0,30}extremis", re.I)
 
@@ -1153,7 +1399,10 @@ OTHER_ALLOW = re.compile(_ML_OTHER.lstrip("|") + "|" +
     r"|defend|missile|ukraine|russia|nato|zelensky|putin|gaza|israel|iran|hamas"
     # and religious-practice words the Church section does not itself carry
     # ("Adult baptisms increase in Germany as overall numbers continue to decline").
-    r"|baptis|congregation|parish|seminar(y|ians)|ordination|vocations",
+    r"|baptis|congregation|parish|seminar(y|ians)|ordination|vocations"
+    # 27.09.2026: "Tim Scott Seeks to Shut Down Birth Tourism Pipeline" failed this gate
+    # before the Immigration split could see it.
+    r"|birth tourism|trafficking",
     re.I)
 
 
@@ -1297,9 +1546,19 @@ def _deaccent(s):
     return unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode("ascii")
 
 
-def sig_words(headline):
+# sig_words, entities and ent_tokens are pure functions of one headline, and the cross-day
+# repeat check calls them for every archived headline once per LEAD: 5.1 million entities()
+# calls and 56s of CPU on one sheet, measured 27.09.2026, for ~1,500 distinct strings. They
+# are memoised; each call still returns a fresh set, so a caller that mutates what it gets
+# back cannot corrupt the cache.
+@functools.lru_cache(maxsize=200000)
+def _sig_words_frozen(headline):
     t = re.sub(r"[^a-z0-9 ]", " ", _deaccent(headline).lower())
-    return {_stem(w) for w in t.split() if len(w) > 3 and w not in STOPW}
+    return frozenset(_stem(w) for w in t.split() if len(w) > 3 and w not in STOPW)
+
+
+def sig_words(headline):
+    return set(_sig_words_frozen(headline or ""))
 
 
 # A primary source that is RELAYING a newsroom is not the primary source of that story.
@@ -1458,7 +1717,12 @@ ENTITY_COOCCUR_MIN = 3
 
 
 def entities(headline):
-    """Multi-word proper nouns, minus sentence-initial noise."""
+    """Multi-word proper nouns, minus sentence-initial noise. Memoised - see sig_words."""
+    return set(_entities_frozen(headline or ""))
+
+
+@functools.lru_cache(maxsize=200000)
+def _entities_frozen(headline):
     out = set()
     # Deaccented first: ENTITY_RE is [A-Z][a-z]{2,}, which cannot match "Päivi" or "Orbán",
     # so accented names were not entities at all. See _deaccent().
@@ -1471,7 +1735,7 @@ def entities(headline):
             out.add(" ".join(words).lower())
         elif len(words[0]) >= 5:
             out.add(words[0].lower())
-    return out
+    return frozenset(out)
 
 
 def ent_tokens(headline):
@@ -1658,6 +1922,26 @@ _DEV_CLASSES = [
     {"uphold", "upholds", "upheld", "win", "wins", "back", "backs", "backed"},
     # "Texas drag show ban struck down" / "judge ... in overturning Texas drag show ban".
     {"struck down", "strike down", "overturn", "quash", "revers"},
+    # "... Are Sentenced to Life in Prison" / "Two women get life in prison for ...", and
+    # "Unification Church leader gets two years" / "... sentenced to 2 years". One sentencing,
+    # worded twice. Found 10.09.2026 by eval_week.sh's first run: DEV COLLISIONS had gone from
+    # 1 after the 27.08 stem/class fix to 24, and get/gets vs sentenc was 13 of the 24 - so
+    # word overlap wanted to merge these and this guard was blocking it, which is precisely
+    # how a repeat reaches an edition.
+    #
+    # get/gets are grouped with sentenc and NOT given a class of their own, because the whole
+    # collision is that they are the colloquial form of the same verb. This does not collapse
+    # the arc that LEADS to a sentencing: arrest, charged and jailed keep their own keys, so
+    # "Man charged" -> "Man sentenced" is still a development, and the arrest/charge pair the
+    # 27.08 fix deliberately left blocked stays blocked. Both directions are asserted in
+    # testcases.txt under the 10.09.2026 heading.
+    {"sentenc", "sentenced", "sentence", "get", "gets"},
+    # "Gloria Steinem ... dies at 92" / "... has died at 92". One death, reported twice.
+    # Enumerated rather than stemmed for the same reason win/wins are: _dev_stem protects
+    # stems shorter than four characters, so it cannot reach die/dies without turning them
+    # into "di", and died/dying are irregular anyway. Found 10.09.2026 - the last real
+    # synonym miss in the DEV COLLISIONS list once get/sentenc was grouped.
+    {"die", "dies", "died", "dying"},
 ]
 _DEV_CLASS_OF = {}
 for _n, _cls in enumerate(_DEV_CLASSES):
@@ -1680,6 +1964,27 @@ def _dev_matches(headline):
             continue        # "full return of...", "a win for...", "the lost generation"
         out.add(_dev_key(token))
     return out
+
+
+# A court HEARING is its own event (Chris, 24.09.2026). The White House media ban ran on
+# 21-22.09; the hearing on 23.09 was flagged as a repeat of the ban's announcement, three
+# lines out of ~15, and never ran. Used by ran_before ONLY, not by the within-day clusterer:
+# across days "the judge heard it" versus "the ban was announced" is two moments, while
+# within one day a hearing report and a DOJ-brief report are the same news.
+#
+# Deliberately narrow - the judge acting in the courtroom, not any mention of a court.
+# "court" alone would split "Court blocks Illinois assisted suicide mandate" from "Illinois
+# agrees to pause enforcement", which testcases.txt holds as one story. Two headlines that
+# BOTH report the hearing are on the same side and still match.
+COURT_HEARD = re.compile(
+    r"\bjudges?\b[^.]{0,40}\b(hears?|heard|questions?|questioned|skeptical|sceptical"
+    r"|weighs?|rebukes?|rebuked|grills?|grilled|presses|pressed|appears)\b"
+    r"|\b(will not|won'?t|did not|does not) (yet )?rule\b|\bwithout (immediately )?ruling\b"
+    r"|\bhears? arguments?\b|\boral arguments?\b|\bat (a |the )?hearing\b", re.I)
+
+
+def _court_heard(headline):
+    return bool(COURT_HEARD.search(headline or ""))
 
 
 def is_development_of(a, b):
@@ -1707,6 +2012,58 @@ def is_development_of(a, b):
     return bool(da ^ db) and not (da & db)
 
 
+# --- Common words are not evidence of a shared story (Chris, 23.09.2026) -------------------
+# Word overlap measured "these headlines use the same words", and on a day when thirty
+# headlines say "religious freedom" that is not the same thing as "these are one story".
+# First Liberty's "Reflecting on Religious Freedom" has three significant words; every
+# headline containing the phrase shared two of them, cleared the 0.55 ratio, and corroborate()
+# built an x19 cluster of eighteen unrelated stories printed as one line. Christianity
+# Today's piece on Cissie Graham Lynch and the IRF office was one of them and never reached
+# the sheet. See test_common_words_do_not_cluster.
+#
+# So a word-overlap merge needs at least COMMON_MIN_DISTINCT shared word that is NOT used by
+# a large slice of the day's headlines.
+# Measured on 23.09.2026: "religiou" 31, "freedom" 26, "care" 28, "about" 43, "court" 95 of
+# 1,752 headlines. The same asymmetry as ENTITY_COOCCUR_MIN applies: a missed merge costs
+# one extra line to read, a wrong merge hides stories, so this errs towards keeping apart.
+# Measured both settings on 23.09.2026's 1,318 placed candidates. At 2 it broke 20 clusters,
+# half of them genuine (the SCOTUS surrogacy reports, the White House pool boycott, B.C.'s
+# snap election). At 1 it breaks exactly two: the x19 religious-freedom cluster, and three
+# "White House launches Trump TV" reports whose only shared words are all common - one
+# extra line on the sheet, which is the cheap side of the trade.
+#
+# The table is set per corpus by set_common_words(), which corroborate() calls on the whole
+# day. A two-headline fixture never reaches the floor, so every SAMESTORY/NOCLUSTER case in
+# testcases.txt is judged exactly as before.
+COMMON_DF_MIN = 15
+COMMON_DF_FRAC = 0.012
+COMMON_MIN_DISTINCT = 1
+_COMMON_WORDS = None
+
+
+def set_common_words(rows):
+    """Record which significant words are common across this corpus. Returns the set."""
+    global _COMMON_WORDS
+    df = collections.Counter()
+    for it in rows:
+        df.update(sig_words(it.get("headline") or ""))
+    floor = max(COMMON_DF_MIN, COMMON_DF_FRAC * len(rows))
+    _COMMON_WORDS = {w for w, n in df.items() if n >= floor}
+    return _COMMON_WORDS
+
+
+def words_overlap_enough(wa, wb):
+    """The word-overlap arm shared by same_story() and corroborate(). One rule, two callers."""
+    if not wa or not wb:
+        return False
+    shared = wa & wb
+    if not (len(shared) / max(1, min(len(wa), len(wb))) >= 0.55 or len(shared) >= 5):
+        return False
+    if _COMMON_WORDS:
+        return len(shared - _COMMON_WORDS) >= COMMON_MIN_DISTINCT
+    return True
+
+
 def same_story(a, b, wa, wb, shared_entities):
     """Word overlap as before, OR a distinctive shared entity plus a little topical overlap."""
     # Never cluster across sections. The French Constitutional Council ruled on assisted dying
@@ -1719,10 +2076,8 @@ def same_story(a, b, wa, wb, shared_entities):
         return False
     if is_development_of(a, b):
         return False
-    if wa and wb:
-        overlap = len(wa & wb) / max(1, min(len(wa), len(wb)))
-        if overlap >= 0.55 or len(wa & wb) >= 5:
-            return True
+    if words_overlap_enough(wa, wb):
+        return True
     if shared_entities:
         # A name alone is not enough - Farage on Clacton and Farage on welfare are two
         # stories. Require the name plus THREE other significant words in common.
@@ -1815,6 +2170,70 @@ def union_entity_index(rows, past):
     return entity_index(corpus)
 
 
+_FEED_WINDOWS_LOADED = False
+
+
+def source_window_h(item):
+    """The window this item's SOURCE was allowed, or 0 if it just used the sweep's.
+
+    Chris, 10.09.2026. Why the sheet needs this. A handful of sources declare
+    `window=168h` in extra_feeds.txt because they publish two or three times a week and at
+    the default 36h the sweep would miss them entirely - FoRB in Full, Charlotte Gill, ADF
+    International. Their items therefore arrive legitimately old: 63h, 106h, 157h on
+    10.09.2026. The sheet printed those ages with nothing to say they were normal, and the
+    curator read straight past a 63.2h piece and published it as that morning's news.
+
+    The fix is NOT a staleness flag keyed on the sweep window. That would fire on every one
+    of these lines, every day, and the sources it would cry wolf on are exactly the ★
+    primary and low-frequency ones the brief says get missed most - so it would teach the
+    reader to distrust the lines that most need reading. What the age needs is context, not
+    an alarm.
+
+    Read off extra_feeds.txt rather than stamped onto each item by fetch_feeds, deliberately:
+    that keeps the 15-minute 6am sweep path and today.json's shape untouched, so a --new-only
+    re-run against an older today.json still works.
+    """
+    global _FEED_WINDOWS_LOADED
+    if not _FEED_WINDOWS_LOADED:
+        try:
+            fetch_feeds.load_extra()
+        except Exception:
+            pass                      # never a crash in the morning path over a display flag
+        _FEED_WINDOWS_LOADED = True
+    return fetch_feeds.FEED_WINDOWS.get((item.get("feed") or "").strip().lower(), 0)
+
+
+def age_flag(item):
+    """'  [wk src, 168h window]' for a declared-long-window source, else ''.
+
+    Only ever attached to an item whose age has actually run past the sweep window, because
+    that is the only time the printed age misleads. A 4h item from a weekly needs no gloss.
+    """
+    win = source_window_h(item)
+    age = item.get("age_h")
+    if not win or age is None or age <= SWEEP_WINDOW_H:
+        return ""
+    return "  [low-frequency source, %dh window]" % win
+
+
+def outside_own_window(items):
+    """Items older than the window their own source was allowed. Should always be empty.
+
+    This is the leak guard the staleness flag was mistaken for. Nothing here is an editorial
+    judgement: an item outside its own window means fetch_feeds' cutoff or a date parse is
+    wrong, and the sweep has silently reached further back than anything asked it to.
+    """
+    bad = []
+    for it in items:
+        age = it.get("age_h")
+        if age is None:
+            continue
+        allowed = max(source_window_h(it), SWEEP_WINDOW_H)
+        if age > allowed + 1.0:            # 1h of slack for clock skew between fetch and read
+            bad.append((it.get("_i"), it.get("feed"), age, allowed))
+    return bad
+
+
 def ran_before(item, history, ents=None):
     """The most recent recent-edition appearance of the same story, or None.
 
@@ -1822,7 +2241,9 @@ def ran_before(item, history, ents=None):
     back on 27.08 at the same slug with "-2" on the end and no URL-keyed store could see it.
 
     Three guards, each earning its place:
-      - same section, as in same_story. Two sections means two concerns.
+      - NOT the section. That guard was removed 10.09.2026 after it cost a real repeat;
+        see the note in the loop for why a same-section test is right within a day and
+        wrong across days.
       - is_development_of, so a running story that has MOVED is not called a repeat. "MPs
         vote down the Bill" after "MPs to vote on the Bill" is the news, not an echo.
       - the word-overlap arm only. The entity arm of same_story leans on ENTITY_MIN_DF, a
@@ -1836,11 +2257,26 @@ def ran_before(item, history, ents=None):
     if not wa:
         return None
     ta = ent_tokens(headline) if ents else set()
-    section = item.get("_section")
     best = None
     for past in history:
-        if section and past.get("section") and past["section"] != section:
-            continue
+        # NO SECTION GUARD. Removed 10.09.2026, and it is the reason this function existed in
+        # a broken state for two editions.
+        #
+        # It used to `continue` when the past item sat in a different section, justified as
+        # "same section, as in same_story - two sections means two concerns". That reasoning
+        # is sound WITHIN a day, where the section is a fixed property of the sweep. Across
+        # days it is not: the classifier can file the same story differently on two mornings,
+        # and the curator moves items by hand precisely because some routing cannot be read
+        # off a headline. So the guard was asking "did this run before, in the same section",
+        # when the question is "did this run before". On 08.09.2026 it cost a real repeat -
+        # a story filed under Marriage, Family & Education one day and Life the next came
+        # back unflagged - and the 09.09 and 10.09 editions both shipped with it open.
+        #
+        # What still supplies the precision: the word-overlap floors (CROSSDAY_MIN_WORDS,
+        # CROSSDAY_OVERLAP, CROSSDAY_WORDS) and is_development_of. The section was never
+        # doing that work; it was a cheap proxy that happened to be wrong in the one
+        # direction that matters, because a false NEGATIVE here publishes a repeat while a
+        # false positive only asks the curator to look.
         wb = sig_words(past.get("headline") or "")
         if not wb:
             continue
@@ -1894,6 +2330,8 @@ def ran_before(item, history, ents=None):
             continue
         if is_development_of(item, past):
             continue
+        if _court_heard(headline) != _court_heard(past.get("headline") or ""):
+            continue
         if best is None or past["date"] > best["date"]:
             best = past
     return best
@@ -1923,6 +2361,8 @@ def unify_clusters(rows):
     stories aren't grouped". A story is one thing and belongs in one place, so clustering now
     happens across the whole day and the lead decides where the cluster lives.
     """
+    if _COMMON_WORDS is None:          # main() has already set it from the whole day
+        set_common_words(rows)
     sets = [(it, sig_words(it["headline"]), ent_tokens(it["headline"])) for it in rows]
     ents = entity_index(rows)
     seen, moved = set(), 0
@@ -2108,6 +2548,7 @@ def corroborate(rows):
     stating precisely, because the whole US-cap exemption turned on this contract and it was
     documented only at a call site.
     """
+    set_common_words(rows)
     sets = [(it, sig_words(it["headline"])) for it in rows]
     seen, out = set(), {}
     for i, (a, wa) in enumerate(sets):
@@ -2118,7 +2559,7 @@ def corroborate(rows):
         for b, wb in sets[i + 1:]:
             if id(b) in seen or len(wb) < 3:
                 continue
-            if len(wa & wb) / max(1, min(len(wa), len(wb))) >= 0.55 or len(wa & wb) >= 5:
+            if words_overlap_enough(wa, wb):
                 group.append(b)
                 seen.add(id(b))
         # Relaying items sort LAST, whatever they score. This is the selection that decides
@@ -2141,6 +2582,131 @@ def corroborate(rows):
         tier = 1 if any(t in (it.get("outlet") or "").lower() for t in SOURCE_TIER) else 0
         out.setdefault(id(it), (1, it, tier))
     return out
+
+
+# --- Event size: how many items are about one NAMED event (27.09.2026) -------------------
+# Why. corroborate() groups on headline word overlap alone, so a big story reported in many
+# wordings shows as many small lines: on 25.09.2026 the White House media-ban ruling was 16
+# lines, Fulton Sheen's beatification 23, the FDA nominee's hearing 9 - each looking like an
+# x1 or x2 story. Names were no help there: entity links (same_story) are barred for any name
+# in more than ENTITY_MAX_DF=12 headlines, which is exactly the biggest stories' names -
+# "Sheen" was in 57 headlines, "Politico" 25, "Overton" 16.
+#
+# Tested as a MERGE first and rejected: star-merging on a shared name + event word took 1,302
+# lines to 1,290 and hid real pieces - most of the 40 Sheen items were distinct features, not
+# duplicates, and ~15% of merges were wrong (measured over 25.09, 24.09 and 18.09). A wrong
+# merge hides a story; this codebase's rule is that that is the expensive error.
+#
+# So it is a COUNT, printed beside xN as eN, and nothing is merged. Two items belong to one
+# event when they share a proper NAME and an EVENT word ("Sheen" + "beatification", "Overton"
+# + "hearing"); events are the connected components of those links. A wrong link costs an
+# inflated number, never a missing line. What counts as a name was the whole difficulty:
+#   - title-case headlines make "Judge", "Election" and "Speech" look like names. A token is a
+#     name only if it is rarely written lowercase that day (judge 78% lowercase, Sheen 0%);
+#   - institutions and roles (Senate, White House, Supreme Court, senator) pass that test but
+#     are topics, as are places (regions.py's own signals) and a few generic capitalised words
+#     ("Amendment" chained a Transgender Persons Amendment to the Hyde Amendment on 22.09).
+# Top events after those filters, all correct on 25.09: media ban 16, Sheen 14, Overton 12,
+# Danny Tommo 6, Holborn by-election 4, the Polish priest 3.
+EVENT_WORD = re.compile(
+    r"^(stab|attack|shoot|shot|kill|murder|dead|die|death|bomb(s|ing|ed|er|ers)?$|beatif|canoni"
+    r"|ban$|bans$|banne|lift|hear|ruling|rule|judg|court|charg|arrest|sentenc|verdict|convict"
+    r"|jail|vote|elect|resign|confirm|nomin|protest|march|rally|visit|trip|summit|speech|cross"
+    r"|boat|dinghy|landing|arriv|tribunal|strike|flood|quake|fire|lawsuit|sue|appeal|deport"
+    r"|raid|slash|hack|breach|poll|deal|sanction|war|ceasefire|amend|bill|law|inquir|report"
+    r"|launch|close|clos|block|restor|access|reinstat|order)", re.I)
+EVENT_NAME_STOP = {
+    "senate", "house", "white", "congress", "parliament", "supreme", "commons", "lords",
+    "government", "ministry", "department", "federal", "state", "states", "united", "national",
+    "court", "police", "trump", "biden", "america", "american", "britain", "british", "europe",
+    "european", "union", "nations", "church", "catholic", "christian", "muslim", "islamic",
+    "jewish", "labour", "tory", "tories", "conservative", "conservatives", "democrat",
+    "democrats", "republican", "republicans", "reform", "news", "times", "post", "daily",
+    "world", "global", "international", "north", "south", "east", "west", "new", "york",
+    "september", "october", "november", "december",
+    "senator", "senators", "minister", "president", "prime", "bishop", "archbishop", "cardinal",
+    "judge", "mayor", "governor", "secretary", "chief", "leader", "nominee", "commissioner",
+    "attorney", "general",
+    "israeli", "palestinian", "iranian", "russian", "ukrainian", "chinese", "indian", "french",
+    "irish", "scottish", "welsh", "english", "german", "italian", "spanish", "polish",
+    "channel", "county", "amendment", "amendments", "midterm", "midterms", "act", "persons",
+    "people", "family", "families", "woman", "women", "man", "men", "child", "children",
+    "school", "schools", "university", "college", "city", "council", "party", "group", "day",
+    "week", "year", "today", "live", "update", "updates", "video", "photos", "analysis",
+    "review", "decision", "report", "exclusive", "watch", "breaking", "opinion"}
+EVENT_NAME_MAX_DF = 150
+_EVENT_PLACE_RX = None
+_event_place_cache = {}
+
+
+def _is_place(tok):
+    global _EVENT_PLACE_RX
+    if _EVENT_PLACE_RX is None:
+        _EVENT_PLACE_RX = ([rx for _t, rx in regions.HEADLINE_SIGNALS]
+                           + [rx for pairs in regions.COUNTRY_SIGNALS.values()
+                              for _c, rx in pairs])
+    if tok not in _event_place_cache:
+        probe = " %s " % tok.capitalize()
+        _event_place_cache[tok] = any(rx.search(probe) for rx in _EVENT_PLACE_RX)
+    return _event_place_cache[tok]
+
+
+def _proper_tokens(rows):
+    """Tokens written capitalised (not headline-initial) and rarely lowercase, today."""
+    cap, low = collections.Counter(), collections.Counter()
+    for r in rows:
+        toks = re.findall(r"[A-Za-z][A-Za-z'’-]+", _deaccent(r.get("headline") or ""))
+        for i, t in enumerate(toks):
+            k = t.lower().strip("'’")
+            if t[0].isupper():
+                if i > 0:
+                    cap[k] += 1
+            else:
+                low[k] += 1
+    return {k for k in cap if cap[k] >= 2 and low[k] / (cap[k] + low[k]) < 0.3}
+
+
+def event_names(headline, proper):
+    out = set()
+    for e in ent_tokens(headline):
+        n = re.sub(r"['’]s$", "", e)
+        if n.endswith("s") and n[:-1] in EVENT_NAME_STOP:
+            n = n[:-1]
+        if (n in EVENT_NAME_STOP or e in EVENT_NAME_STOP or EVENT_WORD.match(n)
+                or _is_place(n)):
+            continue
+        if n in proper or e in proper:
+            out.add(n)
+    return out
+
+
+def event_sizes(rows):
+    """{id(item): size of its named event}. Stamps nothing; see stamp_event_sizes."""
+    proper = _proper_tokens(rows)
+    sets = [(sig_words(r.get("headline") or ""), event_names(r.get("headline") or "", proper))
+            for r in rows]
+    parent = list(range(len(rows)))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    by_name = collections.defaultdict(list)
+    for i, (_w, names) in enumerate(sets):
+        for n in names:
+            by_name[n].append(i)
+    for idx in by_name.values():
+        if not 2 <= len(idx) <= EVENT_NAME_MAX_DF:
+            continue
+        for x in range(len(idx)):
+            for y in range(x + 1, len(idx)):
+                i, j = idx[x], idx[y]
+                if any(EVENT_WORD.match(w) for w in sets[i][0] & sets[j][0]):
+                    parent[find(i)] = find(j)
+    size = collections.Counter(find(i) for i in range(len(rows)))
+    return {id(r): size[find(i)] for i, r in enumerate(rows)}
 
 
 def real_summary(item, max_len=200):
@@ -2239,8 +2805,17 @@ def attach_openings(leads, cap=0, workers=8):
             os.replace(tmp, OPENINGS_CACHE)
         except OSError:
             pass
+    # Site furniture is scrubbed HERE, at read time, and the cache keeps the raw page text:
+    # see boilerplate.py for why (the learner needs the furniture present, and a scrub change
+    # then applies to every cached entry at once). Day-level grams catch furniture that
+    # changes daily - Fox's in-body sidebar headlines - from today's leads per host.
+    raw_of = lambda i: cache.get(fetch_feeds.url_key(i["url"]))
+    day = boilerplate.day_grams(leads, raw_of)
     for it in leads:
-        opening = cache.get(fetch_feeds.url_key(it["url"]))
+        opening = raw_of(it)
+        if opening:
+            opening = boilerplate.scrub(it["url"], opening,
+                                        day.get(boilerplate.host_of(it["url"])))
         if opening:
             it["_opening"] = opening
         it["_sig"] = textsignals.signals(
@@ -2292,7 +2867,115 @@ def attach_previews(leads, workers=6):
         if it.get("paywalled"):
             got = cache.get(fetch_feeds.url_key(it["url"]))
             if got:
+                got = boilerplate.scrub(it["url"], got)
+            if got:
                 it["_preview"] = got
+    return live
+
+
+SYNDICATED_CACHE = os.path.join(HERE, "syndicated.json")
+# Publisher host -> syndication partners that publish its articles free, under licence, with
+# the publisher credited in their own structured data. 27.09.2026: the Telegraph's site answers
+# 402 (Tollbit) and its Bluesky account has been silent since June, but Yahoo News carries a
+# share of its journalism with JSON-LD "provider": "The Telegraph" and the Telegraph's own
+# standfirst as the description. Reading that is reading what the Telegraph chose to publish
+# free; it is not a route past its pay gate, and only the standfirst plus a capped opening is
+# taken. MSN also syndicates it but serves an app shell with no credit to check - not used.
+SYNDICATION = {"telegraph.co.uk": ("yahoo.com", "Telegraph")}
+_LDJSON_RE = re.compile(r'<script[^>]+application/ld\+json[^>]*>(.*?)</script>', re.S)
+
+
+def _syndicated_copy(item, partner, credit):
+    """(text, url) of a partner's credited copy of `item`, or None."""
+    import urllib.parse as _up
+    words = re.sub(r"[‘’'“”\"]", "", item.get("headline") or "").split()[:7]
+    if len(words) < 4:
+        return None
+    try:
+        raw = fetch_feeds.fetch("https://www.bing.com/news/search?q=%s&format=RSS&count=10"
+                                % _up.quote("site:%s %s" % (partner, " ".join(words))))
+        entries = fetch_feeds.parse_feed(raw)
+    except Exception:  # noqa: BLE001
+        return None
+    hw = sig_words(item.get("headline") or "")
+    for e in entries:
+        url = fetch_feeds.unwrap_link(e.get("link") or "")
+        if partner not in _up.urlsplit(url).netloc:
+            continue
+        ew = sig_words(e.get("title") or "")
+        if not hw or len(hw & ew) / max(1, min(len(hw), len(ew))) < 0.6:
+            continue
+        try:
+            body = fetch_feeds.fetch(url, retry_uas=1)
+            body = body.decode("utf-8", "replace") if isinstance(body, bytes) else body
+        except Exception:  # noqa: BLE001
+            continue
+        desc = credited_description(body, credit)
+        if desc:
+            return desc, url
+    return None
+
+
+def credited_description(body, credit):
+    """The article description from a page's JSON-LD, ONLY if its provider is `credit`.
+
+    The credit check is the whole safeguard: a similar headline from another outlet must
+    never be shown on the sheet as the Telegraph's own words.
+    """
+    for blk in _LDJSON_RE.findall(body or ""):
+        try:
+            data = json.loads(blk)
+        except ValueError:
+            continue
+        for d in (data if isinstance(data, list) else [data]):
+            if not isinstance(d, dict) or "Article" not in str(d.get("@type")):
+                continue
+            prov = (d.get("provider") or {})
+            prov = prov.get("name", "") if isinstance(prov, dict) else str(prov)
+            if credit.lower() not in prov.lower():
+                continue
+            desc = re.sub(r"\s+", " ", html.unescape(d.get("description") or "")).strip()
+            if len(desc) >= 60:
+                return desc[:600]
+    return None
+
+
+def attach_syndicated_text(leads, workers=4):
+    """The publisher's own text from a licensed syndication partner, for blind leads."""
+    import concurrent.futures as _futures
+    import urllib.parse as _up
+    try:
+        cache = json.load(open(SYNDICATED_CACHE))
+    except (ValueError, OSError):
+        cache = {}
+    todo = []
+    for it in leads:
+        if (it.get("_opening") or it.get("_preview") or real_summary(it) or it.get("_lede")):
+            continue
+        host = _up.urlsplit(it.get("url") or "").netloc.lower().replace("www.", "")
+        for pub, (partner, credit) in SYNDICATION.items():
+            if host == pub or host.endswith("." + pub):
+                k = fetch_feeds.url_key(it["url"])
+                if k in cache:
+                    it["_syntext"], it["_synfrom"] = cache[k]["text"], cache[k]["from"]
+                else:
+                    todo.append((it, partner, credit, k))
+    live = 0
+    if todo:
+        with _futures.ThreadPoolExecutor(max_workers=workers) as pool:
+            for (it, partner, credit, k), got in zip(todo, pool.map(
+                    lambda t: _syndicated_copy(t[0], t[1], t[2]), todo)):
+                if got:
+                    frm = "%s, syndicating the %s's own copy" % (partner.split(".")[0].title(),
+                                                               credit)
+                    it["_syntext"], it["_synfrom"] = got[0], frm
+                    cache[k] = {"text": got[0], "from": frm, "url": got[1]}
+                    live += 1
+        if live:
+            tmp = SYNDICATED_CACHE + ".tmp"
+            with open(tmp, "w") as fh:
+                json.dump(cache, fh)
+            os.replace(tmp, SYNDICATED_CACHE)
     return live
 
 
@@ -2312,7 +2995,7 @@ def attach_sibling_text(leads, workers=6):
     import concurrent.futures as _futures
     blind = [it for it in leads
              if not it.get("_opening") and not it.get("_preview")
-             and not real_summary(it) and not it.get("_lede")
+             and not real_summary(it) and not it.get("_lede") and not it.get("_syntext")
              and it.get("_siblings")]
 
     def best_sibling(it):
@@ -2328,6 +3011,7 @@ def attach_sibling_text(leads, workers=6):
         with _futures.ThreadPoolExecutor(max_workers=workers) as pool:
             for (it, sib), text in zip(pairs, pool.map(
                     lambda p: fetch_feeds.fetch_article_opening(p[1]["url"]), pairs)):
+                text = boilerplate.scrub(sib["url"], text) if text else text
                 if text:
                     it["_sibtext"] = text
                     it["_sibfrom"] = sib.get("outlet") or "another outlet"
@@ -2349,10 +3033,19 @@ def attach_ledes(leads, cap=150, workers=8):
         cache = json.load(open(LEDES_CACHE))
     except (ValueError, OSError):
         cache = {}
+    # A lede is only ever the fallback for a lead with no opening (the sheet's "page" route),
+    # so a lead whose opening is already cached does not need one fetched. Before 27.09.2026
+    # this ran first and spent its whole cap of 150 fetches (27s) on leads that then printed
+    # their cached article text instead - the more so now fetch_feeds prefetches openings.
+    try:
+        _opened = json.load(open(OPENINGS_CACHE))
+    except (ValueError, OSError):
+        _opened = {}
     todo = [it for it in leads
             if real_summary(it) is None
             and not it.get("paywalled")
-            and "news.google.com" not in (it.get("url") or "")]
+            and "news.google.com" not in (it.get("url") or "")
+            and fetch_feeds.url_key(it["url"]) not in _opened]
     todo.sort(key=lambda i: -importance(i))
     hits = misses = 0
     fetchable = []
@@ -2786,6 +3479,12 @@ POLITICIAN_LEGAL = re.compile(
     r"\b(MPs?|MLA|MSP|senator|congressman|councillor|mayor|minister|governor)\b", re.I)
 
 
+# A political party as the grammatical subject, acting. Used only on a WEAK Church score.
+PARTY_ACTS = re.compile(
+    r"^(labour|the tories|tories|conservatives|reform( uk)?|lib dems|the snp|snp|plaid"
+    r"|the dup|dup|sinn f[eé]in|greens|the greens|republicans|democrats)\b", re.I)
+
+
 # Religious-liberty litigators. Deliberately NOT in SOURCE_HINTS: that list is consulted
 # when nothing scored at all, and on 20.08.2026 putting them there swept a First Liberty piece
 # on Supreme Court term limits and its dated newsletter index into Religious Freedom. Used only
@@ -2945,10 +3644,12 @@ LEAD_TIEBREAK_SKIP = {frozenset(("Religious Freedom & Persecution", "Church & Re
 # Both halves are required, and the animal noun is looked for in the TEXT as well as the
 # headline: "Appeal of euthanasia order for 'Bubba,' 'Stewie,'" names two dogs without using
 # the word, which is exactly the case a headline-only rule would miss.
-_EOL_WORDS = r"euthanas|put (?:down|to sleep)|\bcull(?:ed|ing)?\b"
+_EOL_WORDS = r"euthanas|euthani[sz]|put (?:down|to sleep)|\bcull(?:ed|ing)?\b"
 _ANIMAL_WORDS = (r"\b(?:dogs?|cats?|puppy|puppies|kitten|pets?|animals?|horses?|eagle|"
                  r"terrier|shepherd|livestock|cattle|sheep|kennel|zoo|wildlife|raptor|"
-                 r"veterinar|shelter (?:animal|pet|dog|cat)|bald eagle)\b")
+                 r"veterinar|shelter (?:animal|pet|dog|cat)|bald eagle|bears?|wolf|wolves"
+                 r"|mole rats?|deer|rodents?|mice|rats|\bvets?\b|pup|foal|calf"
+                 r"|dolphins?|whales?|orcas?|seals?)\b")
 
 
 _APOS = {0x2019: "'", 0x2018: "'", 0x02BC: "'", 0xFF07: "'",
@@ -3065,7 +3766,11 @@ def classify(headline, outlet, categories=None, text=""):
                 return routed, 0
         if outlet and ESSAY_SOURCES.search(outlet):
             return "Other", 0
-        return (("Other", 0) if OTHER_INTEREST.search(headline) else (None, 0))
+        if OTHER_INTEREST.search(headline):
+            return "Other", 0
+        if outlet and CHURCH_FALLBACK_OUTLETS.search(outlet):
+            return CHURCH, 1
+        return None, 0
     specific = [(s, n) for s, n in ranked if n != CHURCH]
     if specific and specific[0][0] >= SPECIFIC_MIN:
         return specific[0][1], specific[0][0]
@@ -3089,6 +3794,14 @@ def classify(headline, outlet, categories=None, text=""):
         # overridden, so anything that genuinely scored elsewhere is untouched.
         if church[0][0] <= 3 and outlet and LIBERTY_LITIGATORS.search(outlet):
             return "Religious Freedom & Persecution", church[0][0]
+        # A party ACTING on a faith body is party politics, not church news (27.09.2026):
+        # the Telegraph's "Labour is playing a dangerous game by cosying up to the Muslim
+        # Council for Britain" scored only the bare "Muslim". Same WEAK-score guard as the
+        # two overrides around it, so a party story that genuinely scores for Church stays.
+        if church[0][0] <= 3 and PARTY_ACTS.search(headline):
+            routed = other_section(headline)
+            if routed != "Other":
+                return routed, church[0][0]
         if church[0][0] <= 3 and POLITICIAN_LEGAL.search(headline):
             routed = other_section(headline)
             if routed != "Other":
@@ -3119,6 +3832,13 @@ def main():
     ap.add_argument("--text-chars", type=int, default=900,
                     help="how much article text to print per story in --sheet (default 900; "
                          "was 260 before 25.08.2026)")
+    ap.add_argument("--text-short", type=int, default=320,
+                    help="tiered depth: print only this many characters of text for a lead "
+                         "that is x1, not UK/Irish, not a primary source and not part of a "
+                         "named event (see text_depth). Default 320 since 27.09.2026 - it cut "
+                         "the 25.09 sheet by 32%%, and all 8 of that day's tier-1 picks that "
+                         "fell in the short tier were decidable from their first 320 chars. "
+                         "0 = off, every lead gets --text-chars")
     ap.add_argument("--leads-json", metavar="PATH",
                     help="sheet only: also write a machine-readable manifest of the leads "
                          "shown, for record_tiers.py. Emitted from the same list the sheet "
@@ -3217,6 +3937,7 @@ def main():
         # preview for paywalled leads, and - last - another outlet's account of the same
         # story for the ones that refuse machine access entirely.
         previewed = 0 if args.no_ledes else attach_previews(leads)
+        syndicated = 0 if args.no_ledes else attach_syndicated_text(leads)
         borrowed = 0 if args.no_ledes else attach_sibling_text(leads)
         # ...and re-sorted now the text exists, because importance() reads the text signals
         # that attach_openings has just written. Until 25.08.2026 only the first sort ran, so
@@ -3244,6 +3965,7 @@ def main():
             if it.get("_preview"):  return "preview"
             if real_summary(it):    return "feed"
             if it.get("_lede"):     return "page"
+            if it.get("_syntext"):  return "syndicated"
             if it.get("_sibtext"):  return "sibling"
             return None
 
@@ -3252,29 +3974,62 @@ def main():
         total = len(leads) or 1
         sys.stderr.write(
             "text coverage: %d/%d leads readable (%.0f%%) - %d article text, %d paywalled "
-            "preview, %d feed summary, %d shallow page, %d via another outlet, %d NO TEXT\n"
+            "preview, %d feed summary, %d shallow page, %d syndicated copy, %d via another "
+            "outlet, %d NO TEXT\n"
             % (have, len(leads), 100.0 * have / total, routes["text"], routes["preview"],
-               routes["feed"], routes["page"], routes["sibling"], routes[None]))
+               routes["feed"], routes["page"], routes["syndicated"], routes["sibling"],
+               routes[None]))
+        late = outside_own_window(items)
+        if late:
+            # An item outside its OWN source's window means fetch_feeds' cutoff or a date
+            # parse is wrong and the sweep reached further back than anything asked it to.
+            # Empty on 10.09.2026, which is the point: the four suspiciously old items that
+            # day were all inside a declared 168h window, so there was no leak to find.
+            sys.stderr.write("WINDOW LEAK: %d item(s) older than their own source's window - the "
+                      "sweep reached further back than anything asked it to, so a cutoff or "
+                      "a date parse is wrong: %s\n"
+                      % (len(late), "; ".join("%s %s %.0fh>%dh" % (n, f, a, w)
+                                              for n, f, a, w in late[:6])))
         sys.stderr.write(
             "  fetched this run (rest came from cache): %d opening(s), %d lede(s), "
-            "%d preview(s), %d sibling(s)\n" % (opened, fetched, previewed, borrowed))
+            "%d preview(s), %d syndicated, %d sibling(s)\n"
+            % (opened, fetched, previewed, syndicated, borrowed))
         if 100.0 * have / total < 70:
             sys.stderr.write(
                 "  TEXT COVERAGE DEGRADED - under 70%. The day is being ranked on headlines; "
                 "say so prominently in the final message.\n")
 
         def lead_text(it):
-            return it.get("_opening") or it.get("_preview") or it.get("_sibtext")
+            return (it.get("_opening") or it.get("_preview") or it.get("_syntext")
+                    or it.get("_sibtext"))
 
         # The manifest is written from `leads` BEFORE --new-only filters it: recording only
         # the leads that were re-read would leave every unchanged story permanently absent
         # from the store, and so permanently "new" - the exact loop this is meant to break.
         if args.leads_json:
             import tiers as _tiers
+            # "text"/"text_from" added 27.09.2026 for slack_five.py: the five's notes are
+            # written by hand, and for a lead whose own page is unreadable (the Telegraph's
+            # RCN "eunuch" story on 25.09) the writer had nothing to write from, though the
+            # sheet had shown another outlet's account. slack_five prints this beside any slot
+            # left without a note. It is source material for a note, never pasted into one.
+            def _from(it):
+                if it.get("_opening"):
+                    return "article text"
+                if it.get("_preview"):
+                    return "paywall preview"
+                if it.get("_syntext"):
+                    return it.get("_synfrom") or "syndicated copy"
+                if it.get("_sibtext"):
+                    return "via " + (it.get("_sibfrom") or "another outlet")
+                return None
             manifest = [{"i": it["_i"], "key": fetch_feeds.url_key(it["url"]),
                          "section": it.get("_section"), "headline": it.get("headline"),
                          "outlet": it.get("outlet"),
-                         "text_id": _tiers.text_id(lead_text(it))} for it in leads]
+                         "text_id": _tiers.text_id(lead_text(it)),
+                         "text": (lead_text(it) or real_summary(it, 600) or "")[:600],
+                         "text_from": _from(it) or ("feed summary" if real_summary(it)
+                                                    else None)} for it in leads]
             with open(args.leads_json, "w") as fh:
                 json.dump(manifest, fh)
             sys.stderr.write("wrote %d lead(s) to %s\n"
@@ -3318,8 +4073,10 @@ def main():
         out.write("RANKING SHEET - %d stories from %d candidates, %s sources\n"
                   % (len(leads), len(all_rows), data.get("sources", "?")))
         out.write("one line per story; xN = N outlets carrying it (the only free measure of "
-                  "how big it is)\ncols: N | section | region | iN xN | headline | outlet | "
-                  "age\n'> text:' is the article's own opening, fetched and scrubbed of page "
+                  "how big it is). eN, where shown, = N items on the same NAMED event (a shared "
+                  "name plus an event word), reported in wordings too different to collapse - "
+                  "it merges nothing, so read the other lines too\ncols: N | section | region | "
+                  "iN xN [eN] | headline | outlet | age\n'> text:' is the article's own opening, fetched and scrubbed of page "
                   "furniture - rank on this, not the headline. '> feed:' is the outlet's own "
                   "summary, used when the page could not be fetched; '> page:' an older "
                   "shallow standfirst.\n'> preview (£...)' is a PAYWALLED story's public "
@@ -3342,7 +4099,13 @@ def main():
                   "a DIFFERENT url, which is how Right To Life's 25.08 piece came back on "
                   "27.08 unflagged. Neither is a veto - a running story can legitimately "
                   "run again - but the second one means read the past headline before you "
-                  "pick it.\n\n")
+                  "pick it.\n"
+                  "'[low-frequency source, NNNh window]' explains an age that has run past "
+                  "the sweep window: that source declares its own longer window in "
+                  "extra_feeds.txt because it publishes two or three times a week, so the age "
+                  "is normal and the piece is not a leftover. It is context for the age, not "
+                  "a warning - on 10.09.2026 a 63.2h FoRB in Full piece was published as that "
+                  "morning's news because the bare age read like breaking news.\n\n")
         # ★ marks a PRIMARY_SOURCE item. The sheet is ordered by corroboration, which is the
         # right order for judging how big a story is and the WRONG one for finding the stories
         # Chris cares most about: an advocacy body's own release is x1 by definition - nobody
@@ -3351,18 +4114,39 @@ def main():
         # stories that should have run and 17 of them were in the sweep, unpicked, most of them
         # exactly that shape. The marker does not reorder anything - reordering by source would
         # bury the day's real news instead - it just makes them findable wherever they sit.
+        ev = event_sizes(all_rows)
+
+        # Tiered text depth (27.09.2026). The full-text sheet reached ~280k tokens on
+        # 25.09.2026, past what can be read in one pass without truncating by hand. Chris's
+        # instruction (25.08.2026) is to rank on the article, not the headline, and the reason
+        # it holds is the lead that turns on a fact in paragraph two - so depth is cut only
+        # where the ranking is least likely to turn on it: a single-outlet, non-UK story that
+        # is not a primary source and not part of a named event. Those still get the opening
+        # (--text-short chars), which carries report-vs-comment and the basic facts. UK and
+        # Irish stories, anything corroborated, every primary source and every named event
+        # keep the full --text-chars.
+        def text_depth(it, region, e):
+            if not args.text_short:
+                return args.text_chars
+            full = (region in ("UK", "Ireland") or it["_corr"] >= 2 or e >= 3
+                    or any(t in (it["outlet"] or "").lower() for t in PRIMARY_SOURCE))
+            return args.text_chars if full else args.text_short
+
         for it in leads:
             n = it["_corr"]
             star = " ★" if any(t in (it["outlet"] or "").lower()
                                for t in PRIMARY_SOURCE) else ""
-            out.write("%d%s | %s | %s | i%-2d x%d | %s | %s%s | %s%s\n" % (
-                it["_i"], star, it["_section"][:4],
-                regions.region(it["headline"], it["outlet"], "", region_text(it)),
-                importance(it), n, it["headline"], it["outlet"],
+            e = ev.get(id(it), 1)
+            reg = regions.region(it["headline"], it["outlet"], "", region_text(it))
+            depth = text_depth(it, reg, e)
+            out.write("%d%s | %s | %s | i%-2d x%d%s | %s | %s%s | %s%s\n" % (
+                it["_i"], star, it["_section"][:4], reg,
+                importance(it), n, (" e%d" % e) if e > n else "", it["headline"], it["outlet"],
                 (" £" if it["paywalled"] else "") +
                 (" ↗" if "news.google.com" in it["url"] else ""),
                 "new" if it["age_h"] is None else "%sh" % it["age_h"],
                 ("  [ran %s]" % it["seen_on"][5:] if it.get("seen_on") else "")
+                + age_flag(it)
                 + ('  [SAME STORY ran %s: "%s" - %s]'
                    % (it["_ran_story"]["date"][4:6] + "-" + it["_ran_story"]["date"][6:],
                       it["_ran_story"]["headline"][:70],
@@ -3373,7 +4157,7 @@ def main():
                 out.write("    > is: %s\n" % flags)
             text = real_summary(it)
             if it.get("_opening"):
-                out.write("    > text: %s\n" % it["_opening"][:args.text_chars])
+                out.write("    > text: %s\n" % it["_opening"][:depth])
             elif it.get("_preview"):
                 out.write("    > preview (£, publisher's own summary): %s\n"
                           % it["_preview"])
@@ -3381,9 +4165,11 @@ def main():
                 out.write("    > feed: %s\n" % text)
             elif it.get("_lede"):
                 out.write("    > page: %s\n" % it["_lede"][:200])
+            elif it.get("_syntext"):
+                out.write("    > syndicated (%s): %s\n" % (it["_synfrom"], it["_syntext"]))
             elif it.get("_sibtext"):
                 out.write("    > via %s on the same story: %s\n"
-                          % (it["_sibfrom"], it["_sibtext"][:args.text_chars]))
+                          % (it["_sibfrom"], it["_sibtext"][:depth]))
             else:
                 # Say WHY there is no text. An absent line reads as an absent story, and
                 # the outlet it happens to most is the Telegraph - 8 of its 12 leads on
@@ -3456,6 +4242,7 @@ def main():
                 it["headline"], it["outlet"], flags, it["author"] or "-",
                 "new" if it["age_h"] is None else "%sh" % it["age_h"],
                 ("  [ran %s]" % it["seen_on"][5:] if it.get("seen_on") else "")
+                + age_flag(it)
                 + marks.get(id(it), "")))
         if tail:
             out.write("--- lower-ranked, same section (%d) ---\n" % len(tail))
