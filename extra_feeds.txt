@@ -1011,10 +1011,12 @@ filter | Media: UK Mainstream    | The Herald (Scotland)       | https://www.her
 filter | Media: Alternative      | Troy Media                  | https://troymedia.com/feed/
 
 # --- Free Speech source gaps from Chris's 29.09.2026 markup --------------------------------
-# Al-Monitor: never configured. Its /rss feed answers (20 items) and it is the outlet that
-# follows Turkey's speech and press prosecutions beyond the Goktas-type headline cases -
-# Chris cited its $18B fund-probe fallout piece. FILTERED: most of it is Gulf diplomacy.
-filter | Media: US and World      | Al-Monitor                  | https://www.al-monitor.com/rss
+# Al-Monitor: never configured. It follows Turkey's speech and press prosecutions beyond
+# the Goktas-type headline cases - Chris cited its $18B fund-probe fallout piece. Its /rss
+# answers but carries 20 items and did NOT carry that piece (replayed 29.09); Google News
+# indexes the site properly (86 items in 3 days, the piece among them). FILTERED: most of
+# it is Gulf diplomacy.
+gnewsf | Media: US and World      | Al-Monitor                  | al-monitor.com
 # politics.co.uk: never configured, and its own /feed/ is 403 to us, so Google News.
 # Chris cited Labour MP Jonathan Hinder's "the Left must reclaim free speech" there.
 gnewsf | Media: UK Politics       | Politics.co.uk              | politics.co.uk

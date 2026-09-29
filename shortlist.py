@@ -210,7 +210,17 @@ SECTIONS = [
             r"|(detain|arrest|jail)\w*\b.{0,20}\bjournalists?\b"
             r"|social media\b.{0,50}\b(criminally liable|criminal liability)"
             r"|social media (law|legislation|rules|regulation|code)s?\b"
-            r"|(block|strike|struck|overturn)\w*\b.{0,24}(ban on|ban for|speech|expression)"),
+            r"|(block|strike|struck|overturn)\w*\b.{0,24}(ban on|ban for|speech|expression)"
+            # Chris, 29.09.2026: the ACT of curbing or compelling speech, with no "free
+            # speech" in the headline. Guido's "Stella Creasy Says Speech Must Be Controlled
+            # to Be Free" filed under Politics; Cato's "Private Property Shouldn't Be
+            # Commandeered for Others' Speech" reached no section. Same shapes as the fetch
+            # gate in fetch_feeds.KEYWORDS - keep the two in step.
+            r"|speech (must|should|has to|needs to|will) be (controlled|curbed|restricted"
+            r"|regulated|limited|policed|compelled)"
+            r"|\b(compelled|unwelcome|controlled|restricted|curbs? on|limits? on"
+            r"|restrictions? on|controls? on) speech\b"
+            r"|\b(compel\w*|commandeer\w*)\b.{0,40}\bspeech\b"),
         # Verbs and objects both widened 20.08.2026. Chris moved The Federalist's UK
         # speech-ban story to Free Speech; the Daily Wire's version of the same story
         # ("Politician Punished For Christian Beliefs Targeted Again") scored nothing here

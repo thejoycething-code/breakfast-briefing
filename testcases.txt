@@ -1546,13 +1546,19 @@ KEEP | bhaskarenglish.in | Germany’s far-right party wins poll for 1st time: L
 # fetch-time gate, both on the ACT of curbing speech phrased without any word the gate knew:
 #   Guido Fawkes "Labour MP Stella Creasy Says Speech Must Be Controlled to Be Free" - in the
 #     feed at 11:26 on 28.09, inside the window; the 7 Guido items either side of it were kept.
-#   Cato "Private property shouldn't be commandeered for unwelcome speech" - Cato's blog is
-#     403 to us; this headline is reconstructed from the URL slug, so match on its shape.
+#   Cato "Private Property Shouldn't Be Commandeered for Others' Speech" (the real headline,
+#     read off Google News; a first version of this case guessed "unwelcome speech" from the
+#     URL slug, passed, and would still have dropped the real story - replayed 29.09).
 # The other three were never fetched at all: politics.co.uk (Hinder) and Al-Monitor were not
 # sources, and the Independent's Liberty-poll piece is past the 100-item depth of its main
 # feed (and is the same poll the Guardian's version ran on 28.09).
 KEYWORD keep | Labour MP Stella Creasy Says Speech Must Be Controlled to Be Free
-KEYWORD keep | Private property shouldn't be commandeered for unwelcome speech
+KEYWORD keep | Private Property Shouldn’t Be Commandeered for Others’ Speech
 # Guards: the widening must stay on the curbing sense. No other keyword in these headlines.
 KEYWORD drop | Speech therapist shortage leaves toddlers waiting a year
 KEYWORD drop | Best man's speech must be under five minutes, says etiquette guide
+# Passing the gate is not enough: replayed through classify(), Creasy filed under Politics
+# and Cato reached no section at all (NO SECTION MATCHED). Both are the curbing-speech beat.
+SECTION Free Speech & Civil Liberties | Guido Fawkes | Labour MP Stella Creasy Says Speech Must Be Controlled to Be Free
+SECTION Free Speech & Civil Liberties | Cato Institute | Private Property Shouldn’t Be Commandeered for Others’ Speech
+SECTION Free Speech & Civil Liberties | Politics.co.uk | Left must ‘reclaim free speech’, says Labour MP Jonathan Hinder

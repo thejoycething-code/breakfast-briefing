@@ -130,6 +130,9 @@ KEYWORDS = [
     r"limited|policed|compelled)",
     r"\b(compelled|commandeered|unwelcome|controlled|restricted|curbing|curbs? on|limits? on|"
     r"restrictions? on|controls? on) speech\b",
+    # Cato's real headline puts words between the verb and the noun: "Commandeered for
+    # Others' Speech". compel/commandeer are never the ordinary sense, so allow a short gap.
+    r"\b(compel\w*|commandeer\w*)\b[^.!?]{0,40}?\bspeech\b",
     r"l[eè]se.?majest\w*", r"insulting the (president|king|head of state)",
     r"(comedian|comic|satirist|cartoonist|journalist|blogger|columnist|broadcaster|"
     r"newsroom|publisher)s?\b[^.!?]{0,70}?\b(arrest|re-?arrest|jail|imprison|detain|charg|"
