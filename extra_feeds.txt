@@ -973,6 +973,11 @@ gnewsf | Media: US and World     | The Washington Post         | washingtonpost.
 # a configured desk.
 filter | Media: UK Mainstream     | The Independent (Asia)      | https://www.independent.co.uk/asia/rss
 
+# Chris, 29.09.2026, the Liberty free-speech poll: missed for the same reason - the politics
+# desk is its own feed (/news/uk/politics/rss, ~14 items a day, gzipped), and the main feed's
+# 100 items had moved past it. Probed that morning: the piece was on it.
+filter | Media: UK Mainstream     | The Independent (Politics)  | https://www.independent.co.uk/news/uk/politics/rss
+
 # --- UK independent reporting -----------------------------------------------
 # Chris, 03.09.2026, after "£1.86 million: The taxpayer-funded research of 'Pregnant Men'
 # Professor Sally Hines" (01.09) was missed. Gill does FOI-driven reporting on what public
@@ -1004,3 +1009,12 @@ filter | Media: UK Mainstream    | The Herald (Scotland)       | https://www.her
 filter | Media: UK Mainstream    | The Herald (Scotland)       | https://www.heraldscotland.com/politics/rss/
 # Troy Media was not covered at all.
 filter | Media: Alternative      | Troy Media                  | https://troymedia.com/feed/
+
+# --- Free Speech source gaps from Chris's 29.09.2026 markup --------------------------------
+# Al-Monitor: never configured. Its /rss feed answers (20 items) and it is the outlet that
+# follows Turkey's speech and press prosecutions beyond the Goktas-type headline cases -
+# Chris cited its $18B fund-probe fallout piece. FILTERED: most of it is Gulf diplomacy.
+filter | Media: US and World      | Al-Monitor                  | https://www.al-monitor.com/rss
+# politics.co.uk: never configured, and its own /feed/ is 403 to us, so Google News.
+# Chris cited Labour MP Jonathan Hinder's "the Left must reclaim free speech" there.
+gnewsf | Media: UK Politics       | Politics.co.uk              | politics.co.uk

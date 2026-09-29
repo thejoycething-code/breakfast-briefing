@@ -1538,3 +1538,21 @@ KEEP | India Today | 'Robber Bride' gang busted in Bihar after luring Rajasthan 
 KEEP | The Times of India | Indian couple win payout after suing UK home office for 'unlawful' immigration detention
 KEEP | The Times of India | Pregnant Woman Killed For Refusing Abortion, Lover Arrested
 KEEP | bhaskarenglish.in | Germany’s far-right party wins poll for 1st time: Lesbian leader Weidel opposes same-sex marriage
+
+# ---------------------------------------------------------------------------
+# Chris, 29.09.2026: "You missed quite a lot of free speech stories" - six URLs. Only one
+# (Brussels Signal on Goktas's 19-month sentence, idx 1514) reached the sweep, and that
+# story DID run, via Stockholm Center for Freedom (469). Of the other five, TWO died at this
+# fetch-time gate, both on the ACT of curbing speech phrased without any word the gate knew:
+#   Guido Fawkes "Labour MP Stella Creasy Says Speech Must Be Controlled to Be Free" - in the
+#     feed at 11:26 on 28.09, inside the window; the 7 Guido items either side of it were kept.
+#   Cato "Private property shouldn't be commandeered for unwelcome speech" - Cato's blog is
+#     403 to us; this headline is reconstructed from the URL slug, so match on its shape.
+# The other three were never fetched at all: politics.co.uk (Hinder) and Al-Monitor were not
+# sources, and the Independent's Liberty-poll piece is past the 100-item depth of its main
+# feed (and is the same poll the Guardian's version ran on 28.09).
+KEYWORD keep | Labour MP Stella Creasy Says Speech Must Be Controlled to Be Free
+KEYWORD keep | Private property shouldn't be commandeered for unwelcome speech
+# Guards: the widening must stay on the curbing sense. No other keyword in these headlines.
+KEYWORD drop | Speech therapist shortage leaves toddlers waiting a year
+KEYWORD drop | Best man's speech must be under five minutes, says etiquette guide

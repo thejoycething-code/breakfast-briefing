@@ -122,6 +122,14 @@ KEYWORDS = [
     # act of curbing speech, and a speech-trade worker facing the law.
     r"press freedom", r"freedom of the press", r"crack ?down on speech",
     r"speech crack ?down", r"policing speech", r"speech police",
+    # The act of curbing or compelling speech, phrased with no gate word at all (Chris,
+    # 29.09.2026): Guido's "Stella Creasy Says Speech Must Be Controlled to Be Free" and Cato's
+    # "private property shouldn't be commandeered for unwelcome speech" were both dropped
+    # here. Still no bare \bspeech\b - each shape pins speech to a curbing verb or adjective.
+    r"speech (must|should|has to|needs to|will) be (controlled|curbed|restricted|regulated|"
+    r"limited|policed|compelled)",
+    r"\b(compelled|commandeered|unwelcome|controlled|restricted|curbing|curbs? on|limits? on|"
+    r"restrictions? on|controls? on) speech\b",
     r"l[eè]se.?majest\w*", r"insulting the (president|king|head of state)",
     r"(comedian|comic|satirist|cartoonist|journalist|blogger|columnist|broadcaster|"
     r"newsroom|publisher)s?\b[^.!?]{0,70}?\b(arrest|re-?arrest|jail|imprison|detain|charg|"
