@@ -856,6 +856,19 @@ IMMIGRATION_DECISION = re.compile(
     r"|removal (order|flight)|deportation (flight|appeal)|immigration tribunal"
     r"|avoid(s|ed)? deportation|spared deportation)\b", re.I)
 
+# A migration SUBJECT outranks the family/school words around it (02.10.2026). On 01.10 three
+# stories were filed under Marriage, Family & Education and moved to Immigration by hand: an
+# asylum seeker filming "British teens", Sweden's "family immigration" law, and Gaza
+# "students" refused visas. Applied only when Marriage would otherwise win, so a migration
+# word inside a Life or Gender story changes nothing. Marriage fraud stays in Marriage - Chris
+# ruled on 13.08.2026 that fraud against the institution is in scope there.
+MIGRATION_SUBJECT = re.compile(
+    r"\b(asylum seekers?|asylum|migrants?|refugees?|deport\w*|visas?|visa refusals?"
+    r"|family (immigration|reunification)|immigration (law|rules|status)|small boats?"
+    r"|channel crossings?|illegal (immigrants?|migrants?)|citizenship)\b", re.I)
+MARRIAGE_FRAUD = re.compile(r"sham marriage|marriage (fraud|scam)|green card (fraud|marriage)"
+                            r"|marriage of convenience", re.I)
+
 # Islamism is a political ideology and the Church & Religion catch-all grabs it on the stem
 # "islam". Chris marked spiked's "Islamism and the silence of the 'progressives'" as "more of
 # a society section article" (24.08.2026). Genuine religion coverage carries its own
@@ -2177,7 +2190,21 @@ def union_entity_index(rows, past):
     """
     corpus = [{"headline": it.get("headline") or ""} for it in rows]
     corpus += [{"headline": h.get("headline") or ""} for h in past]
-    return entity_index(corpus)
+    ents = entity_index(corpus)
+    # A title-cased headline capitalises every word, so ENTITY_RE reads verbs as names -
+    # "More Christians Killed in Previously Attacked Area" yields "killed". Over the union
+    # corpus the CAPITALISED form is rare and passes the DF gate. 28.09.2026: that alone
+    # linked Morning Star News' report of 15 new killings in Plateau to EWTN's 24.09 report
+    # on the rate of killings, the curator accepted the flag, and Chris named it a miss.
+    # A word the corpus also uses in lower case, mid-headline, is vocabulary, not a name.
+    # Only cross-day: the within-day clusterer's precision was measured separately.
+    lower = set()
+    for row in corpus:
+        for w in re.findall(r"(?<=\s)[a-z][a-z'\-]{4,}", _deaccent(row["headline"])):
+            lower.add(w[:-1] if len(w) > 6 and w.endswith("s") else w)
+    for tok in [t for t in ents if t in lower]:
+        del ents[tok]
+    return ents
 
 
 _FEED_WINDOWS_LOADED = False
@@ -2244,6 +2271,55 @@ def outside_own_window(items):
     return bad
 
 
+# Words that say what KIND of thing happened, not which story it is (02.10.2026). On the 01.10
+# edition five of fourteen cross-day flags were unrelated pairs joined by an actor plus these:
+# "Newsom signs bill to ban child marriage" against "Newsom Signs Ten New Gun Control Bills",
+# a CSW call for a Cuban journalist's release against one for a Turkish journalist's, a
+# Milwaukee imam "accused" against a Hamas leader's bodyguard "accused". Stemmed through
+# sig_words at import so they compare like for like. Deliberately NOT here: "court" and
+# "judge" (court steps have their own guard) and "vote" (is_development_of handles it).
+_PROCEDURAL_RAW = ("sign signs signed signing bill bills law laws act call calls called "
+                   "release releases released accused accuses accuse leader leaders get gets "
+                   "got fund funds funded funding say says said urge urges urged new plan "
+                   "plans government governments group groups make makes made "
+                   # "taxpayer-funded" describes how something is paid for, not what happened:
+                   # it alone joined an asylum seeker's chant video to Asylum Aid's pay rise.
+                   "taxpayer taxpayers")
+
+
+def _procedural():
+    global _PROCEDURAL
+    if _PROCEDURAL is None:
+        _PROCEDURAL = set(sig_words(_PROCEDURAL_RAW))
+    return _PROCEDURAL
+
+
+_PROCEDURAL = None
+SUBSTANCE_VETO = True      # off only for before/after measurement (repeat_eval, replays)
+
+
+def _title_cased(headline):
+    words = [w for w in re.findall(r"[A-Za-z][A-Za-z'’\-]{3,}", headline or "")]
+    return len(words) >= 3 and sum(w[0].isupper() for w in words) / len(words) >= 0.7
+
+
+def _substance(shared, headline_a, headline_b):
+    """How many story-specific units two headlines share: procedural words dropped, and a
+    shared name counted ONCE however many tokens it has ("Gavin Newsom" is one actor)."""
+    # In a Title-Cased headline every word is capitalised, so ent_tokens reads the whole
+    # overlap as one long name and the count collapses to 1. repeat_eval caught it the same
+    # night: "SCOTUS Greenlights White House Ballroom Construction" against "Supreme Court
+    # Lets Trump's White House Ballroom Construction Continue" was vetoed. Capitals carry no
+    # signal there, so names are not collapsed when either side is title case.
+    if _title_cased(headline_a) or _title_cased(headline_b):
+        names = set()
+    else:
+        names = ent_tokens(headline_a) & ent_tokens(headline_b)
+    rest = shared - _procedural()
+    named = {w for w in rest if w in names}
+    return len(rest - named) + (1 if named else 0)
+
+
 def ran_before(item, history, ents=None):
     """The most recent recent-edition appearance of the same story, or None.
 
@@ -2267,6 +2343,7 @@ def ran_before(item, history, ents=None):
     if not wa:
         return None
     ta = ent_tokens(headline) if ents else set()
+    comment = is_comment_piece(item)
     best = None
     for past in history:
         # NO SECTION GUARD. Removed 10.09.2026, and it is the reason this function existed in
@@ -2338,23 +2415,73 @@ def ran_before(item, history, ents=None):
                 linked = True
         if not linked:
             continue
+        # Substance veto (02.10.2026). Every arm above can be satisfied by an actor plus
+        # procedural words; require two story-specific units in common. (A second test, the
+        # overlap ratio recomputed without procedural words, was tried and REMOVED the same
+        # night: repeat_eval showed it dropping real repeats with short headlines - "Macron
+        # signs France's euthanasia law" against "Macron signs law legalizing euthanasia",
+        # and two reports of MPs voting down the assisted dying bill.) The intact-distinctive-
+        # name arm is exempt: it is exact by construction and is
+        # how Päivi Räsänen's travel-ban and visa stories were joined (28.08.2026).
+        phrase_link = bool(ents) and any(
+            len(phrase_tokens(p)) >= CROSSDAY_ENTITY_TOKENS
+            and all(t in ents for t in phrase_tokens(p))
+            for p in (entities(headline) & entities(past.get("headline") or "")))
+        # A near-verbatim re-run is a repeat whatever its casing (02.10.2026: a title-cased
+        # First Liberty headline matched itself and was vetoed as "one name in common").
+        verbatim = len(shared) >= 0.8 * max(len(wa), len(wb))
+        if not phrase_link and not verbatim and SUBSTANCE_VETO:
+            ph = past.get("headline") or ""
+            if _substance(shared, headline, ph) < 2:
+                continue
         if is_development_of(item, past):
             continue
         if _court_heard(headline) != _court_heard(past.get("headline") or ""):
+            continue
+        # Chris, 28.09.2026: "comment pieces shouldn't be included in deduped posts". An
+        # argument about an event is not a second report of it, so a comment piece is only a
+        # repeat of an earlier piece from the SAME outlet (the same column back under a new
+        # URL). Within the day the clusterer already keeps comment beside the news lead.
+        if comment and _outlet_key(past.get("outlet")) != _outlet_key(item.get("outlet")):
             continue
         if best is None or past["date"] > best["date"]:
             best = past
     return best
 
 
+def _outlet_key(name):
+    """Outlet name folded for same-outlet comparison: 'The Church Times £' == 'Church Times'."""
+    n = re.sub(r"[£©\d|]", " ", (name or "").lower())
+    n = re.sub(r"^\s*the\s+", "", n)
+    n = re.sub(r"^www\.|\.(com|org|net|co\.uk|org\.uk|ie|com\.au)\b.*$", "", n.strip())
+    return " ".join(n.split()[:2])
+
+
+# Opinion labels a headline or an article's opening carries on its face (28.09.2026). The
+# Christian Post runs op-eds under "CP VOICES do not necessarily reflect...", which appears in
+# the fetched opening and nowhere in the headline.
+OPINION_MARK = re.compile(
+    r"^(letter|voices|viewpoint|leader comment|opinion)\s*[:|]|\bop-ed\b"
+    r"|CP VOICES do not necessarily|Opinions expressed are solely those", re.I)
+
+
 def is_comment_piece(item):
     """Argument rather than report - used to allow comment alongside the news lead."""
     h = item.get("headline") or ""
-    if COMMENT.search(h):
+    if COMMENT.search(h) or OPINION_MARK.search(h):
+        return True
+    if OPINION_MARK.search((item.get("text") or item.get("_opening") or "")[:400]):
+        return True
+    outlet = (item.get("outlet") or "").lower()
+    # Outlets that publish nothing BUT argument (28.09.2026). They were only reached after
+    # the OUTCOME test, so spiked's "The man jailed for two years for throwing a plastic
+    # bottle" read as a report on its verb and was deduped against the Telegraph's news story.
+    if any(t in outlet for t in (
+            "spiked", "the critic", "unherd", "first things", "public discourse",
+            "quillette", "conservative woman", "the article")):
         return True
     if OUTCOME.search(h):
         return False
-    outlet = (item.get("outlet") or "").lower()
     return any(t in outlet for t in (
         "spiked", "the critic", "unherd", "spectator", "first things", "public discourse",
         "national review", "federalist", "conservative woman", "quillette", "compact",
@@ -2717,6 +2844,122 @@ def event_sizes(rows):
                     parent[find(i)] = find(j)
     size = collections.Counter(find(i) for i in range(len(rows)))
     return {id(r): size[find(i)] for i, r in enumerate(rows)}
+
+
+def event_groups(rows):
+    """event_sizes' groups as [[row index, ...]], for fold_groups. Same union-find."""
+    proper = _proper_tokens(rows)
+    sets = [(sig_words(r.get("headline") or ""), event_names(r.get("headline") or "", proper))
+            for r in rows]
+    parent = list(range(len(rows)))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    by_name = collections.defaultdict(list)
+    for i, (_w, names) in enumerate(sets):
+        for n in names:
+            by_name[n].append(i)
+    for idx in by_name.values():
+        if not 2 <= len(idx) <= EVENT_NAME_MAX_DF:
+            continue
+        for x in range(len(idx)):
+            for y in range(x + 1, len(idx)):
+                i, j = idx[x], idx[y]
+                if any(EVENT_WORD.match(w) for w in sets[i][0] & sets[j][0]):
+                    parent[find(i)] = find(j)
+    g = collections.defaultdict(list)
+    for i in range(len(rows)):
+        g[find(i)].append(i)
+    return [v for v in g.values() if len(v) >= 2]
+
+
+# Sheet folding (Chris, 02.10.2026: "show each big event once"). Display only - nothing is
+# merged, every line keeps its index and can still be picked. On 01.10 the abortion shield-law
+# lawsuit arrived as ~17 lines, the Flydubai hijack ~15, Christa Pike's execution ~12, and
+# event_sizes caught none of the shield-law lines: they share no person's name, only the
+# phrase "shield law". So a fold is the union of event_sizes' groups and a second test:
+# two lines share a distinctive two-word phrase (in FOLD_BIGRAM_MIN..FOLD_BIGRAM_MAX lines)
+# AND at least FOLD_EXTRA_WORDS further significant words. The extra words are what stop
+# "supreme court" or "prime minister" folding unrelated stories. event_sizes' own groups are
+# NOT chained in: at EVENT_NAME_MAX_DF they joined a bishop's fasting call to a story about
+# digital distractions. A wrong fold hides a story's text, so precision wins over recall.
+FOLD_BIGRAM_MIN = 3
+FOLD_BIGRAM_MAX = 25
+FOLD_EXTRA_WORDS = 2      # measured 02.10 on the 01.10 sheet: 1 chained the Nigerian
+                          # blasphemy appeal into the shield-law fold; 2 folds 26 lines, all right
+# Phrases that name an institution or office, not an event.
+# Phrases that name an institution, office-holder or topic, not an event. Written as plain
+# words and stemmed through _ordered_sig on first use, so they compare like for like
+# ("assisted dying" is stored as the stems the matcher actually sees).
+FOLD_STOP_RAW = ("supreme court|high court|white house|prime minister|labour party|home office"
+                 "|united states|new york|assisted suicide|assisted dying|free speech"
+                 "|religious freedom|social media|pope leo|leo xiv"
+                 # each folded two different stories on the 01.10 sheet
+                 "|andy burnham|gender-affirming care|gender affirming|affirming care"
+                 "|voluntary assisted|donald trump|gavin newsom")
+_FOLD_STOP = None
+
+
+def _fold_stop():
+    global _FOLD_STOP
+    if _FOLD_STOP is None:
+        _FOLD_STOP = set()
+        for ph in FOLD_STOP_RAW.split("|"):
+            t = _ordered_sig(ph)
+            _FOLD_STOP.update(zip(t, t[1:]))
+    return _FOLD_STOP
+
+
+_FOLD_TOK = re.compile(r"[a-z][a-z'’\-]+")
+
+
+def _ordered_sig(headline):
+    out = []
+    for w in _FOLD_TOK.findall((headline or "").lower()):
+        st = sig_words(w)
+        if st:
+            out.append(next(iter(st)))
+    return out
+
+
+def fold_groups(rows, ev_groups=None):
+    """[[row index, ...], ...] for every group of 2+ lines on one event, in row order."""
+    parent = list(range(len(rows)))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    sigs = [sig_words(r.get("headline") or "") for r in rows]
+    postings = collections.defaultdict(set)
+    for i, r in enumerate(rows):
+        toks = _ordered_sig(r.get("headline") or "")
+        for a, b in zip(toks, toks[1:]):
+            if a != b and (a, b) not in _fold_stop():
+                postings[(a, b)].add(i)
+    for bg, idx in postings.items():
+        if not FOLD_BIGRAM_MIN <= len(idx) <= FOLD_BIGRAM_MAX:
+            continue
+        idx = sorted(idx)
+        for x in range(len(idx)):
+            for y in range(x + 1, len(idx)):
+                i, j = idx[x], idx[y]
+                if len((sigs[i] & sigs[j]) - set(bg)) >= FOLD_EXTRA_WORDS:
+                    parent[find(i)] = find(j)
+    if ev_groups:
+        for members in ev_groups:
+            for a, b in zip(members, members[1:]):
+                parent[find(a)] = find(b)
+    groups = collections.defaultdict(list)
+    for i in range(len(rows)):
+        groups[find(i)].append(i)
+    return [g for g in sorted(groups.values(), key=lambda g: g[0]) if len(g) >= 2]
 
 
 def real_summary(item, max_len=200):
@@ -3314,8 +3557,10 @@ SCALE = re.compile(
 # Commentary framings - fine to run, but they are not the day's lead.
 COMMENT = re.compile(
     r"^(why|how|what|when|who|the case (for|against)|in defence|in defense|on\b)"
-    r"|\?\s*$|opinion:|comment:|analysis:|explainer|explained\b|my \w+\b"
-    r"|we (need|must|should)|let'?s\b|isn'?t it|the trouble with|the problem with", re.I)
+    r"|\?\s*$|opinion:|comment:|analysis:|explainer|explained\b|\bmy \w+\b"
+    r"|\bwe (need|must|should)|\blet'?s\b|isn'?t it|the trouble with|the problem with", re.I)
+# \b added 28.09.2026: "my \w+" matched inside "hysterectomy ended" and "let's" inside
+# "outlets", so a Mail showbiz report and a WBUR news report both read as commentary.
 
 
 # Spanish and Italian equivalents, appended so the said-versus-happened axis works in those
@@ -3810,6 +4055,9 @@ def classify(headline, outlet, categories=None, text=""):
 
     tagged = category_section(categories)
     ranked = score_sections(headline, outlet)
+    if (ranked and ranked[0][1] == "Marriage, Family & Education"
+            and MIGRATION_SUBJECT.search(headline) and not MARRIAGE_FRAUD.search(headline)):
+        return "Immigration & Asylum", ranked[0][0]
     if tagged:
         top_score, top_section = (ranked[0] if ranked else (0, None))
         tagged_score = next((n for n, sec in ranked if sec == tagged), 0)
@@ -3898,6 +4146,9 @@ def main():
     ap.add_argument("--outlet-exempt", type=int, default=14,
                     help="importance at or above which an item ignores the per-outlet cap; "
                          "an outlet may hold as many slots as it earns")
+    ap.add_argument("--no-fold", action="store_true",
+                    help="in --sheet, print every line in full instead of folding lines on the "
+                         "same event under their top line (fold_groups, 02.10.2026)")
     ap.add_argument("--sheet", action="store_true",
                     help="one compact line per STORY across all sections, ordered by how "
                          "many outlets carry it. Read this in a single pass to rank by "
@@ -4165,6 +4416,9 @@ def main():
                   "briefing still links the lead.\n'> NO TEXT:' says why nothing could be "
                   "read. Judge those on the headline and do not mistake silence for "
                   "insignificance - the outlet it happens to most is the Telegraph.\n"
+                  "'> SAME EVENT, N more line(s) folded here' lists other lines on the event "
+                  "above it, with a short excerpt each. They are not merged: any of them can "
+                  "be picked, and the lead you cite should still be the primary source.\n"
                   "read the whole sheet, then tier: "
                   "1 must run, 2 if room, 3 filler. Compare across sections, not within.\n"
                   "★ = a primary source (advocacy body's own release, court filing, etc). "
@@ -4209,7 +4463,47 @@ def main():
                     or any(t in (it["outlet"] or "").lower() for t in PRIMARY_SOURCE))
             return args.text_chars if full else args.text_short
 
+        # Folding (02.10.2026). A group's first line (the highest in sheet order) prints as
+        # normal; the rest print right under it, compactly, and are skipped where they would
+        # otherwise appear. Nothing is merged and every index stays pickable.
+        folded_under, fold_members = {}, {}
+        if not getattr(args, "no_fold", False):
+            for grp in fold_groups(leads):
+                head = leads[grp[0]]
+                fold_members[id(head)] = [leads[k] for k in grp[1:]]
+                for k in grp[1:]:
+                    folded_under[id(leads[k])] = head
+            if fold_members:
+                sys.stderr.write("sheet: %d line(s) folded under %d event(s)\n"
+                                 % (len(folded_under), len(fold_members)))
+
+        def write_folded(head):
+            members = fold_members.get(id(head))
+            if not members:
+                return
+            out.write("    > SAME EVENT, %d more line(s) folded here - each is still pickable "
+                      "by its number; check provenance before choosing the lead:\n"
+                      % len(members))
+            for m in members:
+                mstar = " ★" if any(t in (m["outlet"] or "").lower()
+                                    for t in PRIMARY_SOURCE) else ""
+                mreg = regions.region(m["headline"], m["outlet"], "", region_text(m))
+                snippet = (m.get("_opening") or m.get("_preview") or real_summary(m)
+                           or m.get("_syntext") or m.get("_sibtext") or "")
+                out.write("      %d%s | %s | %s | x%d | %s | %s%s | %s%s\n" % (
+                    m["_i"], mstar, m["_section"][:4], mreg, m["_corr"], m["headline"],
+                    m["outlet"], " £" if m["paywalled"] else "",
+                    "new" if m["age_h"] is None else "%sh" % m["age_h"],
+                    ("  [ran %s]" % m["seen_on"][5:] if m.get("seen_on") else "")
+                    + ("  [SAME STORY ran %s]" % (m["_ran_story"]["date"][4:6] + "-"
+                                                 + m["_ran_story"]["date"][6:])
+                       if m.get("_ran_story") else "")))
+                if snippet:
+                    out.write("        > %s\n" % " ".join(snippet.split())[:220])
+
         for it in leads:
+            if id(it) in folded_under:
+                continue
             n = it["_corr"]
             star = " ★" if any(t in (it["outlet"] or "").lower()
                                for t in PRIMARY_SOURCE) else ""
@@ -4260,6 +4554,7 @@ def main():
                 else:
                     why = "page could not be fetched (blocked or unavailable)"
                 out.write("    > NO TEXT: %s\n" % why)
+            write_folded(it)
         for label, rows in (("BLOCKED SOURCES - ruled out by Chris. Do NOT pick from "
                              "here; this is not an over-matching filter", blocked),
                             ("CHAFF - celebrity/sport/schedule filler", chaff),

@@ -587,7 +587,11 @@ def run(verbose=False, known_red=None):
                      (test_feedly_parse, "Feedly-route problem"),
                      (test_batched_decode_mapping, "batched-decode problem"),
                      (test_syndicated_credit, "syndicated-copy problem"),
-                     (test_decoded_link_tidy, "decoded-link tidy problem")):
+                     (test_decoded_link_tidy, "decoded-link tidy problem"),
+                     (test_action_desk, "Action Desk problem"),
+                     (test_five_uses_published_url, "Slack-five URL problem"),
+                     (test_sheet_fold, "sheet-fold problem"),
+                     (test_refresh_petitions, "petition-refresh problem")):
         got = fn()
         if not got:
             passed += 1
@@ -2179,6 +2183,198 @@ def test_syndicated_credit():
         bad.append("a copy credited to another provider was accepted")
     if sl.credited_description("<html>no structured data</html>", "Telegraph") is not None:
         bad.append("a page with no JSON-LD was accepted")
+    return bad
+
+
+def test_refresh_petitions():
+    """Looker rows -> petition_totals.json (02.10.2026). Invented ids, field names and counts:
+    this repo is public, and the real source settings live in petition_source.json.
+
+    signatures = new + existing + duplicated; concatenated objects parse as the tool returns
+    them; a count that falls more than MAX_DROP is refused as a copying mistake; a row missing
+    a field is refused, not read as zero.
+    """
+    import refresh_petitions as rp
+    bad = []
+    fields = {"id": "t.pid", "new": "t.new", "existing": "t.old", "duplicated": "t.dup"}
+    raw = ('{"t.pid":"90001","t.dup":1000,"t.old":5000,"t.new":400}'
+           '{"t.pid":"90002","t.dup":20,"t.old":300,"t.new":10}')
+    rows = rp.parse_rows(raw)
+    if len(rows) != 2:
+        bad.append("concatenated rows parsed as %d, expected 2" % len(rows))
+    held, rep, probs = rp.apply(rows, {}, fields, today="2026-10-02")
+    if held.get("90001", {}).get("signatures") != 6400 or probs:
+        bad.append("90001 summed to %r (expected 6,400): %r" % (held.get("90001"), probs))
+    _, _, probs = rp.apply(rows, {"90001": {"signatures": 10000, "as_of": "2026-09-01"}}, fields)
+    if not any("90001" in p for p in probs):
+        bad.append("a count 36% below the held figure was not refused")
+    _, _, probs = rp.apply([{"t.pid": "1", "t.new": 5}], {}, fields)
+    if not probs:
+        bad.append("a row missing the existing/duplicated fields was accepted")
+    return bad
+
+
+def test_sheet_fold():
+    """fold_groups folds one event's lines and nothing else (02.10.2026, from the 01.10 sheet).
+
+    Positives: the shield-law lawsuit, worded four ways. Negatives that the first two
+    versions of the rule folded: the Nigerian blasphemy appeal (shares "supreme court ...
+    hear" with the shield-law lead), and two different Burnham stories (an office-holder's
+    name is not an event).
+    """
+    import shortlist as sl
+    rows = [{"headline": h} for h in (
+        "Multistate lawsuit asks Supreme Court to hear challenge to abortion 'shield laws'",
+        "Red states ask U.S. Supreme Court to overturn California's abortion shield laws",
+        "3 States Ask High Court To Block Abortion Shield Laws",
+        "3 GOP states go to US Supreme Court to challenge 3 Democratic-led states' abortion 'shield' laws",
+        "Lawyers urge Nigerian Supreme Court to hear case of young musician who nears seventh year in prison on blasphemy charge",
+        "Andy Burnham determined to prove John Swinney wrong for claiming he'd be the last Prime Minister",
+        "Andy Burnham admits concern Man City owners will be forced to SELL after being found guilty")]
+    groups = sl.fold_groups(rows)
+    bad = []
+    shield = next((g for g in groups if 0 in g), [])
+    if sorted(shield) != [0, 1, 2, 3]:
+        bad.append("shield-law fold was %r, expected the four shield-law lines" % shield)
+    if any(4 in g for g in groups):
+        bad.append("the Nigerian blasphemy appeal was folded into another event")
+    if any(5 in g and 6 in g for g in groups):
+        bad.append("two different Burnham stories were folded together")
+    return bad
+
+
+def test_five_uses_published_url():
+    """slack_five must check the link a story was PUBLISHED with, not the feed's original.
+
+    01.10.2026: Esther Rantzen's BBC lead arrived as a Google News redirect, compose.py
+    resolved it to bbc.co.uk in memory and published that, today.json kept the redirect, and
+    slack_five refused the lead as invented. composed.json now carries the published URLs.
+    """
+    import slack_five as sf
+    bad = []
+    gnews = "https://news.google.com/rss/articles/CBMiXEFVX3lx"
+    bbc = "https://www.bbc.co.uk/news/articles/c4g4z255y30o"
+    items = [{"headline": "Esther Rantzen dies aged 86", "outlet": "BBC", "url": gnews}]
+    flat = [{"n": 0, "depth": 0, "note": ""}]
+    picks, probs = sf.resolve(flat, items, {0: "Life"}, {bbc}, {0: bbc})
+    if probs or not picks or picks[0]["url"] != bbc:
+        bad.append("a resolved lead was refused or linked to the redirect: %r" % (probs,))
+    _, probs = sf.resolve(flat, items, {0: "Life"}, {bbc}, {})
+    if not probs:
+        bad.append("with no published URL on record, the unpublished redirect was accepted")
+    return bad
+
+
+def test_action_desk():
+    """The Slack five's Action Desk lines post with no human review (Chris, 02.10.2026), so
+    the matching must refuse rather than guess. Built against stubbed parl-monitor data so it
+    runs on any machine; the live desk is exercised by slack_five.py itself.
+
+    - a vote card attaches only when the story NAMES its bill or Act on a 2+ word core. On
+      the first live run "Abortion (Northern Ireland) Regulations" collapsed to "abortion" and
+      tied a US shield-law story to the NI regulations.
+    - petitions are candidates only: big enough (>= MIN_SIGNERS), recent (<= MAX_AGE_DAYS)
+      and in the story's area. A 3-signer 2021 petition was the first live "match".
+    - slack_five refuses a slot whose candidates have no decision, and an id that is not
+      one of them; null attaches nothing; a valid id attaches the rendered line.
+    - no desk line may carry a URL.
+    """
+    import datetime as _dt
+    import action_desk as ad
+    import slack_five as sf
+    bad = []
+    real = ad.Desk
+
+    def stub():
+        d = real.__new__(real)
+        d.ok, d.reason, d.root = True, "", "stub"
+        d.petitions_as_of = _dt.date.today()
+        d.areas = lambda h, t: set()          # section mapping alone tags the story
+        d.bills = [{"title": "Immigration and Asylum Bill", "house": "Commons",
+                    "stage": "Committee stage", "next": "2026-10-13", "areas": [11]}]
+        d.cards = [{"name": "Abortion decriminalisation", "area": 1,
+                    "bill": "Crime and Policing Bill - New Clause 1",
+                    "debate_match": ["Crime and Policing Bill"],
+                    "status": "Agreed by the Commons 379-137 on 17 June 2025 and added to the Bill."},
+                   {"name": "Abortion services in Northern Ireland", "area": 1,
+                    "bill": "Abortion (Northern Ireland) Regulations",
+                    "debate_match": ["Abortion (Northern Ireland)"], "status": "All agreed."}]
+        recent = (_dt.date.today() - _dt.timedelta(days=100)).isoformat()
+        old = (_dt.date.today() - _dt.timedelta(days=2000)).isoformat()
+        d.petitions = [dict(p, words=ad._words(p["name"])) for p in (
+            {"id": 1, "name": "Keep the Abortion Decriminalisation Clause Out of Law",
+             "signatures": 25000, "areas": [1], "logged": recent, "launch": recent},
+            {"id": 2, "name": "Abortion reversal - allow women real choice!",
+             "signatures": 3, "areas": [1], "logged": recent, "launch": recent},
+            {"id": 3, "name": "Stop abortion up to birth", "signatures": 50000,
+             "areas": [1], "logged": recent, "launch": old},
+            {"id": 4, "name": "Secure Our Borders", "signatures": 8000,
+             "areas": [11], "logged": recent, "launch": recent})]
+        return d
+
+    d = stub()
+    r = d.lookup("Government admits abortion up to birth is no longer a crime",
+                 "An impact assessment on the Crime and Policing Act 2026 concedes ...", "Life")
+    if not any(l.startswith("Vote: Abortion decriminalisation") for l in r["lines"]):
+        bad.append("a story naming the Crime and Policing Act did not get its vote card")
+    r2 = d.lookup("States sue to overturn abortion shield laws", "abortion pills by mail", "Life")
+    if r2["lines"]:
+        bad.append("a story naming no bill got %r (one-word core matched)" % r2["lines"])
+    ids = [c["id"] for c in r["candidates"]]
+    if ids != [1]:
+        bad.append("petition candidates were %r, expected only the big recent area-1 one" % ids)
+    r3 = d.lookup("One in, one out scheme scrapped", "small boat returns to France",
+                  "Immigration & Asylum")
+    if r3["lines"]:
+        bad.append("a migration story that names no bill got a bill line: %r" % r3["lines"])
+    r4 = d.lookup("MPs to amend the Immigration and Asylum Bill", "", "Immigration & Asylum")
+    if not any("next sitting 13 October" in l for l in r4["lines"]):
+        bad.append("a story naming the Immigration and Asylum Bill got no bill line")
+
+    # Islam stories stay in their sections but reach areas 7 and 8 (Chris, 02.10.2026).
+    d.petitions.append(dict({"id": 5, "name": "Defend the freedom to critique Islam",
+                             "signatures": 40000, "areas": [8, 7],
+                             "logged": d.petitions[0]["logged"],
+                             "launch": d.petitions[0]["launch"]},
+                            words=ad._words("Defend the freedom to critique Islam")))
+    r5 = d.lookup("Preacher at London mosque urges men to beat their wives",
+                  "Islamic community centre investigated by the Charity Commission",
+                  "Politics, Government & Society")
+    if 5 not in [c["id"] for c in r5["candidates"]]:
+        bad.append("a mosque story outside the religion sections did not reach areas 7/8")
+    if "islam" not in [w for c in r5["candidates"] if c["id"] == 5 for w in c["shared"]]:
+        bad.append("'Islamic' in the story did not meet 'Islam' in the petition")
+
+    ad.Desk = lambda *a, **k: stub()
+    try:
+        def picks(choice):
+            p = {"n": 7, "depth": 0, "headline": "Government admits abortion up to birth",
+                 "section": "Life", "desk": []}
+            if choice != "unset":
+                p["petition"] = choice
+            else:
+                p["petition"] = sf._UNSET
+            return [p]
+        text = {7: "the Crime and Policing Act 2026"}
+        if not sf.attach_desk(picks("unset"), text):
+            bad.append("a slot with candidates and no petition decision was not refused")
+        if not sf.attach_desk(picks(999), text):
+            bad.append("a petition id outside the candidates was not refused")
+        pk = picks(None)
+        if sf.attach_desk(pk, text) or any("petition" in l for l in pk[0]["desk"]):
+            bad.append("petition null still attached a petition, or was refused")
+        pk = picks(1)
+        if sf.attach_desk(pk, text) or not any(l.startswith("Our petition: Keep the Abortion Decriminalisation")
+                                               for l in pk[0]["desk"]):
+            bad.append("a valid petition id did not attach its line")
+        if any("http" in l or "www." in l for l in pk[0]["desk"]):
+            bad.append("a desk line carried a URL")
+        out = sf.render([dict(pk[0], url="https://example.org/a", outlet="X", note="")],
+                        "https://docs.google.com/document/d/x/edit", "Friday 2 October", 1)
+        if "    ↳ Our petition: Keep the Abortion Decriminalisation" not in out:
+            bad.append("render did not nest the desk lines under the slot")
+    finally:
+        ad.Desk = real
     return bad
 
 

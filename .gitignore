@@ -57,3 +57,7 @@ __pycache__/
 # this repo exists to prevent:
 #   testcases.txt exclusions.txt bylines.txt link_fixes.txt extra_feeds.txt
 #   sources.opml briefing-sources.opml tiers.json rank_eval_log.txt
+logs/
+# Private: where live petition counts come from (refresh_petitions.py). Backed up to Drive, never to the public repo.
+petition_source.json
+petition_totals.json

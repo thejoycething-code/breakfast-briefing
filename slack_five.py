@@ -44,6 +44,19 @@ The spec is JSON, a list of up to ~6 slots, each a lead index plus optional nest
 
 `note` is your own words and is the only free text in the whole file - it can say anything
 except a URL, which is refused, because a URL in a note is a URL nobody checked.
+
+ACTION DESK (02.10.2026, action_desk.py). Under each lead slot the post also carries what
+parl-monitor knows: the live bill and the recorded vote when the story names them (attached
+automatically), and our own petition on the subject. The petition is chosen in the spec,
+by id only, from the candidates the desk lists for that slot:
+
+    {"n": 222, "note": "...", "petition": 12345}      # attach petition 12345
+    {"n": 52,  "note": "...", "petition": null}       # none of the candidates fits
+
+A slot with candidates and no "petition" key is refused, and the refusal prints the
+candidates. An id that is not among them is refused too. Its text is rendered from
+parl-monitor's data, never typed. Chris asked for no approval step, so none of this asks;
+`--no-desk` turns it off if parl-monitor is broken on the day.
 """
 import argparse
 import glob
@@ -89,6 +102,17 @@ def published_index(composed_path=COMPOSED):
         for n in idxs:
             out[int(n)] = section
     return out
+
+
+def published_urls(composed_path=COMPOSED):
+    """{index: url as published} from composed.json, {} for a composed.json written before
+    02.10.2026. Preferred over today.json, whose url is the feed's original (often a Google
+    News redirect) because compose.py resolves links in memory, not on disk."""
+    try:
+        d = json.load(open(composed_path, encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return {int(k): v for k, v in (d.get("urls") or {}).items() if v}
 
 
 def expected_urls(path=EXPECTED):
@@ -148,13 +172,17 @@ def outlet_name(item):
         return (item.get("outlet") or "").strip()
 
 
+_UNSET = object()
+
+
 def flatten(spec):
     """Spec -> flat [{n, depth, note}], preserving order."""
     flat = []
     for slot in spec:
         if not isinstance(slot, dict) or "n" not in slot:
             die("each slot needs an \"n\": got %r" % (slot,))
-        flat.append({"n": int(slot["n"]), "depth": 0, "note": slot.get("note", "")})
+        flat.append({"n": int(slot["n"]), "depth": 0, "note": slot.get("note", ""),
+                     "petition": slot.get("petition", _UNSET)})
         for sub in slot.get("under", []) or []:
             if not isinstance(sub, dict) or "n" not in sub:
                 die("each nested item needs an \"n\": got %r" % (sub,))
@@ -162,7 +190,7 @@ def flatten(spec):
     return flat
 
 
-def resolve(flat, items, pub, exp):
+def resolve(flat, items, pub, exp, urls=None):
     """Attach verbatim headline/outlet/url, refusing anything unpublished or invented."""
     problems, picks = [], []
     for f in flat:
@@ -181,7 +209,7 @@ def resolve(flat, items, pub, exp):
                             "edition data, never from a note." % n)
             continue
         it = items[n]
-        url = (it.get("url") or "").strip()
+        url = ((urls or {}).get(n) or it.get("url") or "").strip()
         if not url:
             problems.append("%s: no url in the edition data" % n)
             continue
@@ -191,11 +219,57 @@ def resolve(flat, items, pub, exp):
                             % (n, url[:100]))
             continue
         picks.append({"n": n, "depth": f["depth"], "note": f["note"],
+                      "petition": f.get("petition", _UNSET), "desk": [],
                       "headline": (it.get("headline") or "").strip(),
                       "outlet": outlet_name(it), "url": url,
                       "section": pub[n], "paywalled": bool(it.get("paywalled")),
                       "age_h": it.get("age_h")})
     return picks, problems
+
+
+def attach_desk(picks, by_text):
+    """Fill p["desk"] for every lead slot. Returns problems; [] means go ahead.
+
+    Bill and vote lines attach automatically. A petition attaches only when the spec names one
+    of this slot's candidates by id, and a slot with candidates must say which (or null).
+    """
+    import action_desk
+    desk = action_desk.Desk()
+    sys.stderr.write("slack_five: %s\n" % desk.status())
+    if not desk.ok:
+        return []
+    problems = []
+    for p in picks:
+        if p["depth"] != 0:
+            continue
+        r = desk.lookup(p["headline"], by_text.get(p["n"], ""), p["section"])
+        p["desk"] = list(r["lines"])
+        cands = {c["id"]: c for c in r["candidates"]}
+        choice = p.get("petition", _UNSET)
+        if choice is _UNSET:
+            if cands:
+                problems.append(
+                    "%s: set \"petition\" to one of these ids, or null if none is about this "
+                    "story:\n%s" % (p["n"], "\n".join(
+                        "      %-6s %s (%s signers; shares: %s)"
+                        % (c["id"], c["name"][:80], "{:,}".format(c["signatures"]),
+                           ", ".join(c["shared"]) or "-") for c in r["candidates"])))
+            continue
+        if choice is None:
+            continue
+        try:
+            choice = int(choice)
+        except (TypeError, ValueError):
+            problems.append("%s: petition must be an id or null, got %r" % (p["n"], choice))
+            continue
+        if choice not in cands:
+            problems.append("%s: petition %s is not one of this slot's candidates (%s)"
+                            % (p["n"], choice, ", ".join(str(i) for i in cands) or "none"))
+            continue
+        p["desk"].append(desk.petition_line(cands[choice]))
+    for p in picks:
+        p.pop("petition", None)
+    return problems
 
 
 def render(picks, doc_url, date_label, total):
@@ -218,12 +292,71 @@ def render(picks, doc_url, date_label, total):
         if p["depth"] == 0:
             slot += 1
             out.append("%d. *%s* — %s%s" % (slot, link, p["outlet"], tail))
+            for line in p.get("desk") or []:
+                out.append("    ↳ %s" % line)
         else:
             out.append("    ◦ %s — %s%s" % (link, p["outlet"], tail))
     out.append("")
     out.append("%d stories across nine sections in the Doc — worth a scroll for the rest."
                % total)
     return "\n".join(out)
+
+
+def pre_check(args):
+    """--pre: validate the five BEFORE compose, so the Doc can open with it (02.10.2026).
+
+    Every pick must be tier 1 in picks.json. Tier 1 is the one tier no section cap cuts, so a
+    five checked here cannot later point at a story the Doc dropped. The URL check waits for
+    the real run after publish, when expected_urls.txt exists for this edition.
+    """
+    if not args.spec:
+        die("--pre needs --spec")
+    picks_spec = json.load(open(args.picks, encoding="utf-8"))
+    pub, tier1 = {}, set()
+    for section, tiers in picks_spec.items():
+        if isinstance(tiers, list):
+            tiers = {"2": tiers}
+        for tier, ns in tiers.items():
+            for n in ns:
+                pub[int(n)] = section
+                if str(tier) == "1":
+                    tier1.add(int(n))
+    items = load_items(args.today)
+    flat = flatten(json.load(open(args.spec, encoding="utf-8")))
+    picks, problems = resolve(flat, items, pub, None, {})
+    for p in picks:
+        if p["n"] not in tier1:
+            problems.append("%s: not tier 1 in %s. Make every five pick tier 1 so no cap can "
+                            "cut it from the Doc: %r" % (p["n"], args.picks, p["headline"][:60]))
+    if not problems and not args.no_desk:
+        try:
+            texts = {m["i"]: m.get("text") or "" for m in
+                     json.load(open(args.leads, encoding="utf-8"))}
+        except (OSError, ValueError):
+            texts = {}
+        problems = attach_desk(picks, texts)
+    if problems:
+        sys.stderr.write("slack_five --pre: %d problem(s):\n" % len(problems))
+        for p in problems:
+            sys.stderr.write("  %s\n" % p)
+        return 1
+    repeats = check_repeats(picks, load_fives())
+    if repeats:
+        sys.stderr.write("slack_five --pre: %d pick(s) already ran in a past five:\n"
+                         % len(repeats))
+        for p, past in repeats:
+            sys.stderr.write("  %s  %r\n      ran %s as %r (%s)\n"
+                             % (p["n"], p["headline"][:64], past["date"],
+                                past["headline"][:64], past["outlet"]))
+        if not args.allow_repeat:
+            sys.stderr.write("slack_five --pre: refusing; --allow-repeat if deliberate.\n")
+            return 1
+    print(render(picks, "https://docs.google.com/document/d/(published-doc)/edit",
+                 "(preview)", len(pub)))
+    sys.stderr.write("slack_five --pre: OK. compose.py --five %s will open the Doc with these. "
+                     "After publish, run slack_five.py with the same --spec and --doc-url.\n"
+                     % args.spec)
+    return 0
 
 
 def main(argv=None):
@@ -243,6 +376,14 @@ def main(argv=None):
     ap.add_argument("--leads", default="/tmp/leads.json",
                     help="the sheet's leads manifest; its text is shown beside any slot "
                          "that has no note, as material to write one from")
+    ap.add_argument("--pre", action="store_true",
+                    help="BEFORE compose: check the spec against /tmp/picks.json (every pick "
+                         "must be tier 1, so no cap can cut it), settle the Action Desk "
+                         "decisions and the repeat check. Writes nothing. compose.py --five "
+                         "then prints the same five at the top of the Doc")
+    ap.add_argument("--picks", default="/tmp/picks.json")
+    ap.add_argument("--no-desk", action="store_true",
+                    help="leave out the Action Desk lines (parl-monitor broken on the day)")
     args = ap.parse_args(argv)
 
     if args.history:
@@ -254,6 +395,8 @@ def main(argv=None):
             print("%s  %-26s %s" % (h["date"], h["outlet"][:26], h["headline"][:78]))
         return 0
 
+    if args.pre:
+        return pre_check(args)
     if not args.spec or not args.doc_url:
         die("--spec and --doc-url are both required (or use --history)")
 
@@ -274,12 +417,26 @@ def main(argv=None):
                          "invented-URL check is UNAVAILABLE. Report that.\n")
 
     picks, problems = resolve(flatten(json.load(open(args.spec, encoding="utf-8"))),
-                              items, pub, exp)
+                              items, pub, exp, published_urls(args.composed))
     if problems:
         sys.stderr.write("slack_five: %d problem(s), nothing written:\n" % len(problems))
         for p in problems:
             sys.stderr.write("  %s\n" % p)
         return 1
+
+    try:
+        by_text = {m["i"]: m.get("text") or "" for m in
+                   json.load(open(args.leads, encoding="utf-8"))}
+    except (OSError, ValueError):
+        by_text = {}
+    if not args.no_desk:
+        problems = attach_desk(picks, by_text)
+        if problems:
+            sys.stderr.write("slack_five: %d Action Desk problem(s), nothing written:\n"
+                             % len(problems))
+            for p in problems:
+                sys.stderr.write("  %s\n" % p)
+            return 1
 
     # Material for empty notes (27.09.2026). Printed, never inserted: a note is the writer's
     # own words, and text copied from the manifest could carry a URL or a paywalled passage.
@@ -338,7 +495,7 @@ def main(argv=None):
                "doc_items": len(pub), "text": text,
                "items": [{k: p[k] for k in
                           ("n", "depth", "note", "headline", "outlet", "url", "section",
-                           "paywalled")}
+                           "paywalled", "desk")}
                          for p in picks]},
               open(path, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
     sys.stderr.write("slack_five: %d link(s), all published and in expected_urls.txt\n"

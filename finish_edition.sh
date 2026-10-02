@@ -47,6 +47,7 @@
 # stories permanently and pushing an unmarked seen.json throws the day away.
 set -euo pipefail
 cd "$(dirname "$0")"
+ARGS="$*"
 
 DRY=0
 FROM=""
@@ -73,6 +74,15 @@ runs() { [[ $(step_no "$1") -ge $START ]]; }
 DATE="$(python3 -c "import json,datetime as dt;d=json.load(open('/tmp/today.json'));print(dt.datetime.fromisoformat(d['generated']).strftime('%Y%m%d'))")"
 echo "== edition $DATE"
 
+# Everything below is also written to logs/<date>-finish.log (02.10.2026). On 01.10 the
+# compose/publish/mark output scrolled away and the only way to prove the doc was clean was
+# to re-run verify_doc.sh. Appends, so a --from resume lands in the same file as the run it
+# resumes. Process substitution is fine on this Mac's bash 3.2.
+mkdir -p logs
+LOG="logs/$DATE-finish.log"
+exec > >(tee -a "$LOG") 2>&1
+echo "== $(date '+%Y-%m-%d %H:%M:%S') finish_edition ${ARGS:-(no options)} (log: $LOG)"
+
 if [[ -n "$FROM" ]]; then
     echo "== resume from '$FROM': re-verifying the published doc first"
     ./verify_doc.sh --date "$DATE"
@@ -82,7 +92,19 @@ echo "== compose"
 # --allow-reclass is unconditional: see the header. compose's mismatch report still prints
 # to stderr, so read it in the output above "composed N items" - it is a report now, not a
 # gate, and a transposed index will publish rather than stop the run.
+# Top five at the head of the Doc (02.10.2026): /tmp/five.json is the Slack-five spec, checked
+# with `slack_five.py --pre` before this runs. Used ONLY when it is newer than today's sweep:
+# indices mean a different story every day, so yesterday's spec would print five wrong
+# stories without any check failing. Absent or stale, the Doc simply has no Top five.
+FIVE_ARGS=()
+if [[ -f /tmp/five.json && /tmp/five.json -nt /tmp/today.json ]]; then
+    FIVE_ARGS=(--five /tmp/five.json)
+    echo "== top five: /tmp/five.json will open the Doc"
+else
+    echo "== top five: no /tmp/five.json newer than today's sweep - the Doc opens without it"
+fi
 python3 compose.py /tmp/today.json /tmp/picks.json --no-mark --allow-reclass \
+    ${FIVE_ARGS[@]+"${FIVE_ARGS[@]}"} \
     --md "out/${DATE}-breakfast-briefing.md" > /tmp/briefing.html
 wc -c /tmp/briefing.html
 

@@ -1539,6 +1539,37 @@ KEEP | The Times of India | Indian couple win payout after suing UK home office 
 KEEP | The Times of India | Pregnant Woman Killed For Refusing Abortion, Lover Arrested
 KEEP | bhaskarenglish.in | Germany’s far-right party wins poll for 1st time: Lesbian leader Weidel opposes same-sex marriage
 
+# --- Chris's markup on the 28.09.2026 edition: two credit names -----------------------------
+# "ADF should be Alliance Defending Freedom". The adfmedia.org wp-json and adflegal.org gnews
+# lines both name the source "ADF", so two of that day's picks were credited with a bare
+# acronym while the adflegal.org fundraising pages printed the full name. ADF International
+# is a separate organisation and must keep its own name - hence the exact-match cases.
+OUTLET Alliance Defending Freedom | ADF
+OUTLET ADF International | ADF International
+# "Crux should simply be 'Crux'". Google News redirects carry the site's own <title> suffix,
+# so a decoded cruxnow.com item arrived as "Crux | Taking the Catholic Pulse".
+OUTLET Crux | Crux | Taking the Catholic Pulse
+OUTLET Crux | Crux
+# Morning Star News, 28.09.2026: Chris "should have included". Dropped on a SAME STORY flag
+# against EWTN's 24.09 report on the rate of killings - a statistic, not this event (15 more
+# Christians killed in Barkin Ladi, Plateau, 21-25 Sept). "Christian", "killed", "Nigeria"
+# are the whole overlap, which is the persecution beat's vocabulary, not a shared story.
+NOTRANBEFORE | More Christians Killed in Previously Attacked Area in Nigeria ::was:: New Report: 1 Christian Is Killed Every 86 Minutes in Nigeria, on Average ::sections:: Religious Freedom & Persecution >> Religious Freedom & Persecution
+# That plain pair PASSES - the word arm alone does not link them. The flag came from the
+# ENTITY arm: both headlines are title-cased, so "Killed" reads as a proper noun, and over the
+# union corpus the capitalised token was rare enough to clear ENTITY_MAX_DF; three shared words
+# plus one "distinctive name" met CROSSDAY_ENTITY_WORDS. Fixed in union_entity_index (a word the
+# corpus also uses in lower case is vocabulary). Not expressible here: a two-headline corpus
+# cannot show Christian/Nigeria are common, so the real check is the 28.09 replay, recorded in
+# repeat_eval_log.txt.
+
+# --- Chris, 28.09.2026: "comment pieces shouldn't be included in deduped posts" -------------
+# The within-day clusterer already keeps comment apart from the news it argues about ("also
+# take: comment on the same story"). The CROSS-DAY check did not: a comment piece matching a
+# past news REPORT was flagged SAME STORY and dropped as a repeat. An argument about an event
+# is not a second report of it. The same piece from the same outlet is still a repeat.
+NOTRANBEFORE | Opinion: FDA commissioner nominee Heidi Overton is ignoring the science on abortion drug ::was:: 50 pro-life leaders call on FDA nominee Dr. Heidi Overton to restore 'minimal safeguards' on mifepristone ::entity::
+
 # ---------------------------------------------------------------------------
 # Chris, 29.09.2026: "You missed quite a lot of free speech stories" - six URLs. Only one
 # (Brussels Signal on Goktas's 19-month sentence, idx 1514) reached the sweep, and that
@@ -1562,3 +1593,31 @@ KEYWORD drop | Best man's speech must be under five minutes, says etiquette guid
 SECTION Free Speech & Civil Liberties | Guido Fawkes | Labour MP Stella Creasy Says Speech Must Be Controlled to Be Free
 SECTION Free Speech & Civil Liberties | Cato Institute | Private Property Shouldn’t Be Commandeered for Others’ Speech
 SECTION Free Speech & Civil Liberties | Politics.co.uk | Left must ‘reclaim free speech’, says Labour MP Jonathan Hinder
+
+# --- 02.10.2026: false cross-day links on the 01.10 edition (14 flags, at least 5 unrelated) --
+# Each pair was linked by an actor's name plus procedural words ("signs", "bill", "calls",
+# "release", "accused", "leader"), which say what kind of thing happened, not which story it
+# is. Found by Chris asking for fewer false "same story ran" flags; written failing first.
+NOTRANBEFORE | Governor Newsom signs bill to ban child marriage ::was:: Gov. Gavin Newsom Signs Ten New Gun Control Bills Into Law
+NOTRANBEFORE | Gavin Newsom signs 4 laws to make California even more pro-abortion ::was:: CA Gov. Gavin Newsom Signs 'No Kings Act,' Making It Easier to Sue ICE
+NOTRANBEFORE | CSW calls for release of journalist detained for two weeks ::was:: 8 press freedom groups call for release of Turkish journalist held in prison
+NOTRANBEFORE | Judge Clears Way For Trump To Deport Islamic Leader Accused Of Aiding Hamas ::was:: UK Gov't Granted Citizenship to Former Hamas Leader's Bodyguard Accused of Terror Plot ::entity::
+NOTRANBEFORE | Moment Hamas-supporting asylum seeker who called for death to Jews gets British teens to chant 'Free Palestine' - as he is moved from taxpayer-funded house ::was:: Asylum Aid gets a pay rise, funded by taxpayers
+# ...and the real repeats from the same edition must stay linked.
+RANBEFORE | Federal appeals court says historic cross, Nativity can remain in Los Angeles public square ::was:: Appeals court lets cross, Nativity stay in Los Angeles historic square ::entity::
+RANBEFORE | Neb. officials reverse policy that rejected homeschooled firefighter's diploma ::was:: Neb. volunteer firefighter's homeschool diploma rejected when applying for paid job
+# A title-cased headline reads as one long name to ent_tokens, so the substance count must not
+# collapse it to one unit: the same release re-run word for word is the plainest repeat there is.
+RANBEFORE | Victory: Amazon Will Deliver Religious Accommodation ::was:: Victory: Amazon Will Deliver Religious Accommodation ::entity::
+
+# --- 02.10.2026: migration stories the classifier filed under Marriage, Family & Education ---
+# On the 01.10 edition three were moved to Immigration by hand. Each names a migration
+# subject (an asylum seeker, a visa refusal, family immigration law) and reaches Marriage only
+# on the family/children/student words around it. The migration subject decides.
+SECTION Immigration & Asylum | Mail Online UK | Moment Hamas-supporting asylum seeker who called for death to Jews gets British teens to chant 'Free Palestine' - as he is moved from taxpayer-funded house
+SECTION Immigration & Asylum | The Local Sweden | Q&A: Who is affected by Sweden's new law on family immigration?
+SECTION Immigration & Asylum | Middle East Eye | Gaza students take Ireland to court over visa refusals
+# ...but fraud against marriage itself stays in Marriage (Chris, 13.08.2026), and a school
+# story with no migration subject is untouched.
+SECTION Marriage, Family & Education | Fox News | Sham marriage ring busted as dozens charged with green card fraud
+SECTION Marriage, Family & Education | The Independent | High school substitute teacher fired after offering extra credit for GoFundMe donations

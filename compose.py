@@ -198,6 +198,11 @@ OUTLET_FIXES = {
     "cbn.com": "CBN News",
     "www.christiandaily.com": "Christian Daily International",
     "standingforfreedom.com": "Standing for Freedom",
+    # Chris's markup on the 28.09.2026 edition. "ADF" is what extra_feeds.txt names the
+    # adfmedia.org and adflegal.org sources; exact-match only, so ADF International keeps its
+    # own name. The Crux suffix is its page <title>, carried in by a decoded Google redirect.
+    "ADF": "Alliance Defending Freedom",
+    "Crux | Taking the Catholic Pulse": "Crux",
     "adfmedia.org": "Alliance Defending Freedom",
     "Alliance Defending Freedom International": "ADF International",
     "Free Speech Union — News & Publications": "Free Speech Union",
@@ -669,12 +674,82 @@ def normalize_picks(picks):
     return flat, tier_of
 
 
+TOP_FIVE_TITLE = "Top five for the UK"
+NOTE_STYLE = ("font-family:%s;font-size:10pt;color:#000000" % FONT)
+DESK_STYLE = ("font-family:%s;font-size:9pt;color:#444444" % FONT)
+
+
+def render_top_five(spec_path, items, composed_out):
+    """(html paragraphs, markdown lines) for the Doc's opening Top five, or ([], []).
+
+    Refuses (exits) on the same grounds slack_five.py would refuse the post: a pick that is
+    not in this Doc, a URL in a note, an unmade petition decision. A five that cannot be
+    posted must not be printed at the top of the Doc either.
+    """
+    import slack_five
+    try:
+        spec = json.load(open(spec_path, encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        sys.exit("--five: cannot read %s: %s" % (spec_path, exc))
+    pub = {n: sec for sec, ns in composed_out.items() for n in ns}
+    urls = {n: items[n].get("url") or "" for n in pub}
+    picks, problems = slack_five.resolve(slack_five.flatten(spec), items, pub, None, urls)
+    if not problems:
+        texts = {}
+        try:
+            texts = {m["i"]: m.get("text") or "" for m in
+                     json.load(open("/tmp/leads.json", encoding="utf-8"))}
+        except (OSError, ValueError):
+            pass
+        problems = slack_five.attach_desk(picks, texts)
+    if problems:
+        sys.stderr.write("--five: %d problem(s):\n" % len(problems))
+        for p in problems:
+            sys.stderr.write("  %s\n" % p)
+        sys.exit("--five: fix the spec (run slack_five.py --pre) or drop --five")
+    html_out = ['<h1 style="%s">%s</h1>' % (SECTION_STYLE, html.escape(TOP_FIVE_TITLE))]
+    md_out = ["", "## %s" % TOP_FIVE_TITLE, ""]
+    for p in picks:
+        it = items[p["n"]]
+        headline = html.unescape(it["headline"])
+        cred = html.unescape(credit(it))
+        indent = "margin-left:18pt;" if p["depth"] else ""
+        note = (p.get("note") or "").strip()
+        desk = p.get("desk") or []
+        gap = "0pt" if (note or desk) else STORY_GAP
+        html_out.append('<p style="%smargin-bottom:%s"><a href="%s"><span style="%s">%s</span>'
+                        '</a><br/><span style="%s">%s</span></p>'
+                        % (indent, gap, html.escape(p["url"], quote=True), HEADLINE_STYLE,
+                           html.escape(headline), CREDIT_STYLE, html.escape(cred)))
+        md_out.append("%s- [%s](%s) — *%s*" % ("  " if p["depth"] else "", headline,
+                                               p["url"], cred))
+        if note:
+            html_out.append('<p style="%smargin-bottom:%s"><span style="%s">%s</span></p>'
+                            % (indent, "0pt" if desk else STORY_GAP, NOTE_STYLE,
+                               html.escape(note)))
+            md_out.append("  %s" % note)
+        for k, line in enumerate(desk):
+            last = k == len(desk) - 1
+            html_out.append('<p style="%smargin-bottom:%s"><span style="%s">↳ %s</span></p>'
+                            % (indent, STORY_GAP if last else "0pt", DESK_STYLE,
+                               html.escape(line)))
+            md_out.append("  ↳ %s" % line)
+    sys.stderr.write("top five: %d slot(s) opening the Doc: %s\n"
+                     % (sum(1 for p in picks if not p["depth"]),
+                        "; ".join(items[p["n"]]["headline"][:40] for p in picks
+                                  if not p["depth"])))
+    return html_out, md_out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("json_path")
     ap.add_argument("picks_path")
     ap.add_argument("--date", help="ISO date for the heading (default: today)")
     ap.add_argument("--md", metavar="PATH", help="also write a markdown copy")
+    ap.add_argument("--five", metavar="PATH",
+                    help="the Slack-five spec; when given, the same five (with their Action "
+                         "Desk lines) open the Doc as 'Top five for the UK' (02.10.2026)")
     ap.add_argument("--no-mark", action="store_true",
                     help="do not record these stories as published (dry run)")
     ap.add_argument("--no-check-links", action="store_true",
@@ -989,6 +1064,16 @@ def main():
                           html.escape(headline), CREDIT_STYLE, html.escape(cred)))
             md.append("- [%s](%s) — *%s*" % (headline, it["url"], cred))
 
+    # Top five (Chris, 02.10.2026). The Slack five and its Action Desk lines open the Doc, so a
+    # reader arriving from the channel lands on the same five. Built from the same spec and
+    # the same helpers as slack_five.py, so the two cannot disagree; its links are the stories'
+    # own published links, so expected_urls.txt and --verify cover them like any other.
+    if args.five:
+        top_html, top_md = render_top_five(args.five, items, composed_out)
+        if top_html:
+            out[2:2] = top_html
+            md[3:3] = top_md
+
     # Verify every link before it can reach the document. On 12.08.2026 seven invented
     # URLs were typed into the Drive call in place of unresolved Google redirects; this
     # gate makes that impossible to repeat.
@@ -1043,7 +1128,14 @@ def main():
         # Indices, not URLs: the resolver rewrites item["url"] in place, so a URL cannot
         # be traced back to the pick it came from, but an index always can.
         with open(os.path.join(HERE_DIR, "composed.json"), "w") as fh:
-            json.dump({"composed": composed_out, "cut_by_cap": cut_by_cap}, fh, indent=1)
+            # "urls" (02.10.2026): the link each index was actually published with. The
+            # resolver rewrites item["url"] in place but today.json on disk keeps the feed's
+            # Google News redirect, so slack_five checked the redirect against
+            # expected_urls.txt and refused Esther Rantzen's BBC lead on 01.10 as "invented".
+            json.dump({"composed": composed_out, "cut_by_cap": cut_by_cap,
+                       "urls": {str(n): items[n].get("url") or ""
+                                for ns in composed_out.values() for n in ns}},
+                      fh, indent=1)
         if cut_by_cap:
             sys.stderr.write("cut by cap: %d item(s) recorded in composed.json - "
                              "mark_published.py will retire them\n"
