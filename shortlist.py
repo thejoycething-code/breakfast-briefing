@@ -2075,11 +2075,23 @@ def set_common_words(rows):
     return _COMMON_WORDS
 
 
+# Format labels (02.10.2026). "Opinion | ..." said what KIND of piece both headlines were and
+# counted as a SHARED word: the WSJ's religious-persecution op-ed was folded under the Boston
+# Globe's refugee op-ed on "opinion" + "religious persecution" (3/5 = 0.6) and never reached
+# the sheet. They are NOT stopwords: dropping them from every headline shortens short ones,
+# which inflates their overlap ratio, and on the 02.10 sweep that grew a ten-story "religious
+# freedom" cluster (the 23.09 failure). So they still count toward a headline's length and
+# simply never count as common ground. Not "letter" or "watch": "open letter" and "Human
+# Rights Watch" carry the story.
+FORMAT_LABELS = frozenset(_stem(w) for w in ("opinion opinions comment commentary analysis "
+                                             "editorial column podcast listen").split())
+
+
 def words_overlap_enough(wa, wb):
     """The word-overlap arm shared by same_story() and corroborate(). One rule, two callers."""
     if not wa or not wb:
         return False
-    shared = wa & wb
+    shared = (wa & wb) - FORMAT_LABELS
     if not (len(shared) / max(1, min(len(wa), len(wb))) >= 0.55 or len(shared) >= 5):
         return False
     if _COMMON_WORDS:

@@ -1621,3 +1621,10 @@ SECTION Immigration & Asylum | Middle East Eye | Gaza students take Ireland to c
 # story with no migration subject is untouched.
 SECTION Marriage, Family & Education | Fox News | Sham marriage ring busted as dozens charged with green card fraud
 SECTION Marriage, Family & Education | The Independent | High school substitute teacher fired after offering extra credit for GoFundMe donations
+
+# --- Chris, 02.10.2026: the WSJ's "Religious Persecution and Financial 'Crimes'" was a miss ---
+# It never reached the sheet: the cluster folded it under the Boston Globe's refugee-policy
+# op-ed, joined only by "religious persecution" and the format label "Opinion". A label says
+# what kind of piece it is, not what it is about.
+# (Written with "Opinion:" because this file splits fields on the pipe the real headlines carry.)
+NOCLUSTER | Opinion: Religious Persecution and Financial ‘Crimes’ | Opinion: Trump’s refugee policy hurts people fleeing religious persecution

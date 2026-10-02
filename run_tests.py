@@ -591,7 +591,8 @@ def run(verbose=False, known_red=None):
                      (test_action_desk, "Action Desk problem"),
                      (test_five_uses_published_url, "Slack-five URL problem"),
                      (test_sheet_fold, "sheet-fold problem"),
-                     (test_refresh_petitions, "petition-refresh problem")):
+                     (test_refresh_petitions, "petition-refresh problem"),
+                     (test_feed_max, "per-feed limit problem")):
         got = fn()
         if not got:
             passed += 1
@@ -2183,6 +2184,32 @@ def test_syndicated_credit():
         bad.append("a copy credited to another provider was accepted")
     if sl.credited_description("<html>no structured data</html>", "Telegraph") is not None:
         bad.append("a page with no JSON-LD was accepted")
+    return bad
+
+
+def test_feed_max():
+    """`max=NNN` on an extra_feeds line raises that feed's item limit (02.10.2026: The
+    Spectator Australia filed 60+ pieces in the window and "Listen to the Alborithm", at
+    position 78, was cut unreported). Fields after the URL parse in any order."""
+    import fetch_feeds as ff
+    bad = []
+    if ff.feed_max_items("max=150") != 150 or ff.feed_max_items("max = 90") != 90:
+        bad.append("max=NNN did not parse")
+    if ff.feed_max_items("window=168h") or ff.feed_max_items("junk"):
+        bad.append("a non-max field was read as a limit")
+    import tempfile, os as _os
+    with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as fh:
+        fh.write("pass | Cat | Feed A | https://a.example/feed | window=72h | max=120\n"
+                 "pass | Cat | Feed B | https://b.example/feed | max=80 | window=48h\n")
+    try:
+        ff.load_extra(fh.name)
+        if ff.FEED_MAX.get("feed a") != 120 or ff.FEED_MAX.get("feed b") != 80:
+            bad.append("max= was not read from a 5th or 6th field: %r" % ff.FEED_MAX)
+        if ff.FEED_WINDOWS.get("feed a") != 72 or ff.FEED_WINDOWS.get("feed b") != 48:
+            bad.append("window= stopped parsing once max= was added: %r" % ff.FEED_WINDOWS)
+    finally:
+        _os.unlink(fh.name)
+        ff.load_extra()
     return bad
 
 

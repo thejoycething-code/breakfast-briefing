@@ -353,6 +353,21 @@ FILTERED_MODES = {"filter", "gnewsf", "bingf", "scrapesrcf", "wpjsonf"}
 FEED_WINDOWS = {}
 WINDOW_RE = re.compile(r"^window\s*=\s*(\d+)\s*h?$", re.I)
 
+# Per-source item limit, `max=NNN` (02.10.2026). MAX_PER_FEED stops one firehose dominating,
+# but it also cut The Spectator Australia, which filed more than 60 pieces inside the window:
+# "Listen to the Alborithm" sat at position 78 of 100 and never reached the sheet, and Chris
+# named it a miss. Nothing reported the cut. Now a source can declare a higher limit, and every
+# feed that hits its limit is named on the sweep header's CAPPED line.
+FEED_MAX = {}
+MAX_RE = re.compile(r"^max\s*=\s*(\d+)$", re.I)
+CAPPED = []        # [(feed title, kept, dropped in window)], filled by the sweep
+
+
+def feed_max_items(field):
+    """Items declared by a `max=NNN` field, or 0 (the default limit)."""
+    m = MAX_RE.match((field or "").strip())
+    return int(m.group(1)) if m else 0
+
 
 def feed_window_hours(field):
     """Hours declared by a `window=NNNh` field, or 0. Tolerant of junk: an unparseable
@@ -364,6 +379,7 @@ def feed_window_hours(field):
 def load_extra(path=EXTRA):
     feeds, scrapes, disabled, blocked = [], [], [], []
     FEED_WINDOWS.clear()
+    FEED_MAX.clear()
     if not os.path.exists(path):
         return feeds, scrapes, disabled, blocked
     with open(path) as fh:
@@ -381,11 +397,15 @@ def load_extra(path=EXTRA):
                 scrapes.append((parts[2], parts[3]))
             elif head in FEED_MODES and len(parts) >= 4:
                 feeds.append((parts[1], parts[2], parts[3], head))
-                # Optional 5th field. Backwards-compatible: every pre-existing line has four.
-                if len(parts) >= 5:
-                    w = feed_window_hours(parts[4])
+                # Optional 5th+ fields, in any order: window=NNNh, max=NNN. Backwards-
+                # compatible: every pre-existing line has four.
+                for extra in parts[4:]:
+                    w = feed_window_hours(extra)
                     if w:
                         FEED_WINDOWS[parts[2].strip().lower()] = w
+                    m = feed_max_items(extra)
+                    if m:
+                        FEED_MAX[parts[2].strip().lower()] = m
     return feeds, scrapes, disabled, blocked
 
 
@@ -1535,11 +1555,15 @@ def main():
                 errors.append((ftitle, furl, reason[:24]))
                 continue
             dateless = mode.startswith("scrapesrc")
-            limit = MAX_PER_SCRAPE if dateless else MAX_PER_FEED
+            limit = MAX_PER_SCRAPE if dateless else \
+                (FEED_MAX.get((ftitle or "").strip().lower()) or MAX_PER_FEED)
             kept_here = 0
+            over = 0          # in-window items past the limit: counted, never silently lost
             for e in entries:
                 if kept_here >= limit:
-                    break
+                    if not dateless and e.get("date") is not None and fcutoff <= e["date"]:
+                        over += 1
+                    continue
                 if not e["title"] or not e["link"]:
                     continue
                 # A scraped card that prints its own date is treated exactly like a feed
@@ -1610,6 +1634,8 @@ def main():
                     "summary": (e.get("summary") or "")[:300],
                 })
                 kept_here += 1
+            if over:
+                CAPPED.append((ftitle, kept_here, over))
         if timed_out:
             errors.append(("(%d feeds unfinished at deadline)" % timed_out, "-", "deadline"))
 
@@ -1751,6 +1777,13 @@ def main():
               "%d still redirects (+%d filler not decoded)\n"
               % (len(feeds) - len(errors), len(errors), len(items), len(kept),
                  already, cut_out, resolved, decoded, unresolved, filler_left))
+    if CAPPED:
+        # Fourth header line on purpose: Step 2 reads `head -6`, and a cut that is not on the
+        # first screen is a cut nobody sees.
+        out.write("CAPPED: %d feed(s) hit their item limit and DROPPED in-window items - %s "
+                  "(raise with max=NNN on the feed's line in extra_feeds.txt)\n"
+                  % (len(CAPPED), "; ".join("%s kept %d, dropped %d" % c
+                                            for c in sorted(CAPPED, key=lambda c: -c[2]))))
     out.write("paywalled items (marked £, use \"(£)\" after the outlet name): %d\n"
               % sum(1 for i in kept if i["paywalled"]))
     out.write("cols: N | headline | url | outlet | author | age  "
