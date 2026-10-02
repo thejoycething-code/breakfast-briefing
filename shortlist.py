@@ -198,6 +198,10 @@ SECTIONS = [
             # matched nothing and sat in NO SECTION MATCHED - "digital safety" is the same
             # speech-regulation beat as "online safety", worded the Australian way.
             r"|digital (safety|services) (law|legislation|bill|act|rules|code)"
+            # Chris, 02.10.2026: Australia's Digital Duty of Care bill ("a new censorship
+            # bill") was missed, and The Australian's report on it fell to Other at score 0.
+            # The regulator it empowers is the eSafety Commissioner.
+            r"|digital duty( of care)?|\besafety\b"
             # 27.09.2026, four shapes that had no vocabulary (see testcases.txt): security
             # and cyber laws, which are how most states now regulate speech; jailing over
             # private communications; detaining journalists; and platform bosses facing

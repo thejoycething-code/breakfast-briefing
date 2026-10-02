@@ -1628,3 +1628,11 @@ SECTION Marriage, Family & Education | The Independent | High school substitute 
 # what kind of piece it is, not what it is about.
 # (Written with "Opinion:" because this file splits fields on the pipe the real headlines carry.)
 NOCLUSTER | Opinion: Religious Persecution and Financial ‘Crimes’ | Opinion: Trump’s refugee policy hurts people fleeing religious persecution
+
+# --- Chris, 02.10.2026: Australia's Digital Duty of Care bill, "a new censorship bill" ---------
+# Politico's piece was a miss, and The Australian's story on the same bill reached the sweep
+# and fell to Other with a score of 0: "digital duty of care" and eSafety had no vocabulary.
+SECTION Free Speech & Civil Liberties | The Australian | Government ‘sock puppet’ AI bots hidden in digital duty of care bill
+# Politico's real headline (found 02.10 via the new search) says only "Digital duty".
+SECTION Free Speech & Civil Liberties | Politico | Digital duty punishes harmful social media design not content, says architect
+SECTION Free Speech & Civil Liberties | ABC News (Australia) | eSafety Commissioner to get new powers to order removal of posts
