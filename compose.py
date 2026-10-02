@@ -1086,6 +1086,11 @@ def main():
         # distinguishes an invented URL from a corrupted one, on the very day the markup
         # changed. Anchor on the tag, never on the exact attribute list.
         urls = re.findall(r'<p[^>]*>\s*<a href="([^"]+)"', "\n".join(out))
+        # Each link once (02.10.2026). The Top five repeats five stories' links at the head of
+        # the Doc, so the raw list carried them twice: expected_urls.txt held 153 lines for 148
+        # stories and mark_published warned about a mismatch that was only the duplicates.
+        # Order is kept, so the first occurrence (the Top five's) leads.
+        urls = list(dict.fromkeys(urls))
         dead = []
 
         # A gate that verifies nothing must fail, not pass. If the document has items but

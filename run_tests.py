@@ -2229,6 +2229,10 @@ def test_sheet_fold():
         "3 States Ask High Court To Block Abortion Shield Laws",
         "3 GOP states go to US Supreme Court to challenge 3 Democratic-led states' abortion 'shield' laws",
         "Lawyers urge Nigerian Supreme Court to hear case of young musician who nears seventh year in prison on blasphemy charge",
+        # 02.10.2026 live sheet: this bridge chained the Nigerian appeal into the shield fold
+        "Supreme Court to hear case on lawsuit that blocked Marian shrine plan in Kentucky",
+        "Your guide to the California Congressional District 26 race: Irwin vs. Gallucci",
+        "Your guide to L.A. City Charter Amendment DD",
         "Andy Burnham determined to prove John Swinney wrong for claiming he'd be the last Prime Minister",
         "Andy Burnham admits concern Man City owners will be forced to SELL after being found guilty")]
     groups = sl.fold_groups(rows)
@@ -2238,7 +2242,11 @@ def test_sheet_fold():
         bad.append("shield-law fold was %r, expected the four shield-law lines" % shield)
     if any(4 in g for g in groups):
         bad.append("the Nigerian blasphemy appeal was folded into another event")
-    if any(5 in g and 6 in g for g in groups):
+    if any(5 in g for g in groups):
+        bad.append("the Marian shrine case was folded into the shield-law event")
+    if any(6 in g and 7 in g for g in groups):
+        bad.append("two unrelated 'Your guide to' pieces were folded together")
+    if any(8 in g and 9 in g for g in groups):
         bad.append("two different Burnham stories were folded together")
     return bad
 

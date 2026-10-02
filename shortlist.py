@@ -2903,6 +2903,23 @@ FOLD_STOP_RAW = ("supreme court|high court|white house|prime minister|labour par
                  "|voluntary assisted|donald trump|gavin newsom")
 _FOLD_STOP = None
 
+# Words that say what KIND of item it is - a court step, a guide, a filing - not which story.
+# Not counted by the head check in fold_groups.
+FOLD_GENERIC_RAW = ("supreme court high hear hears heard case cases lawsuit lawsuits sue sues "
+                    "sued judge judges ruling rules ruled appeal appeals argument arguments "
+                    "challenge challenges ask asks law laws bill bills state states guide "
+                    "says said new report reports raise raises raised question questions "
+                    "going your more than this that city council")
+FOLD_HEAD_WORDS = 2
+_FOLD_GENERIC = None
+
+
+def _fold_generic():
+    global _FOLD_GENERIC
+    if _FOLD_GENERIC is None:
+        _FOLD_GENERIC = set(sig_words(FOLD_GENERIC_RAW))
+    return _FOLD_GENERIC
+
 
 def _fold_stop():
     global _FOLD_STOP
@@ -2941,7 +2958,10 @@ def fold_groups(rows, ev_groups=None):
     for i, r in enumerate(rows):
         toks = _ordered_sig(r.get("headline") or "")
         for a, b in zip(toks, toks[1:]):
-            if a != b and (a, b) not in _fold_stop():
+            # A phrase with a generic word in it ("court hear", "raises questions",
+            # "guide california") names a kind of item, not an event, so it cannot start one.
+            if a != b and (a, b) not in _fold_stop() and a not in _fold_generic() \
+                    and b not in _fold_generic():
                 postings[(a, b)].add(i)
     for bg, idx in postings.items():
         if not FOLD_BIGRAM_MIN <= len(idx) <= FOLD_BIGRAM_MAX:
@@ -2959,7 +2979,23 @@ def fold_groups(rows, ev_groups=None):
     groups = collections.defaultdict(list)
     for i in range(len(rows)):
         groups[find(i)].append(i)
-    return [g for g in sorted(groups.values(), key=lambda g: g[0]) if len(g) >= 2]
+    # Head check (02.10.2026). Union-find chains: on the 02.10 sheet "Supreme Court to hear
+    # case on lawsuit that blocked Marian shrine plan" joined the shield-law event through
+    # "court ... hear ... lawsuit", and carried ADF's Nigerian blasphemy appeal in behind it,
+    # so a primary source's text was folded away under an unrelated story. Every member must
+    # share FOLD_HEAD_WORDS story-specific words with the line it is folded UNDER (the first
+    # in sheet order), court and procedure words not counting. A chain link that only reaches
+    # a neighbour is dropped back to its own line.
+    generic = _fold_generic()
+    out = []
+    for g in sorted(groups.values(), key=lambda g: g[0]):
+        if len(g) < 2:
+            continue
+        head = sigs[g[0]] - generic
+        kept = [g[0]] + [m for m in g[1:] if len((sigs[m] - generic) & head) >= FOLD_HEAD_WORDS]
+        if len(kept) >= 2:
+            out.append(kept)
+    return out
 
 
 def real_summary(item, max_len=200):
