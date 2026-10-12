@@ -1636,3 +1636,30 @@ SECTION Free Speech & Civil Liberties | The Australian | Government ‘sock pupp
 # Politico's real headline (found 02.10 via the new search) says only "Digital duty".
 SECTION Free Speech & Civil Liberties | Politico | Digital duty punishes harmful social media design not content, says architect
 SECTION Free Speech & Civil Liberties | ABC News (Australia) | eSafety Commissioner to get new powers to order removal of posts
+
+# --- Chris's markup of the 20261005 edition, 05.10.2026 ---------------------------------
+# Rebel News's "Free-speech clubs are forming on campuses across Canada" (02.10) was named as
+# a miss. Rebel News is a filter-mode source and the fetch gate only knew "free speech" with a
+# space, so the hyphenated adjective form was dropped before it ever became a candidate.
+KEYWORD keep | Free-speech clubs are forming on campuses across Canada
+# Daily Caller's whistleblower piece on Nigeria (02.10) was also named; the Daily Caller was not
+# a source at all. Added to extra_feeds.txt as a filter-mode feed; this guards its headline.
+KEYWORD keep | EXCLUSIVE: Nigerian Leaders Turn On Alleged Christian-Killing ‘Mastermind’ After U.S. Pressure According To Whistleblower
+
+# --- Chris, 12.10.2026: The National's SPUC story was credited "inkl" ------------------------
+# Item 332 arrived through Google News with the source tag "inkl" (an aggregator that licenses
+# Newsquest titles). The resolver correctly swapped the redirect for The National's own page,
+# but the credit kept the aggregator's name: the Doc's Top five and the Slack post both read
+# "- inkl" against a thenational.scot link. Chris chose "The National" (not The Herald, its
+# Newsquest sister). An aggregator name is never a masthead; once the link is the
+# publisher's own page the credit must follow it.
+CREDIT The National | inkl | https://www.thenational.scot/news/26626485.anti-abortion-group-issues-legal-threat-snp-amid-conference-row
+# ...but where the link is still the aggregator's own page there is nothing better to name,
+# and the fix must not invent a masthead from nowhere.
+CREDIT inkl | inkl | https://www.inkl.com/news/anti-abortion-group-issues-legal-threat-to-snp
+# Same day, same story pair: the SNP CANCELLING SPUC's fringe event (11 Oct, 12:55) and SPUC
+# THREATENING LEGAL ACTION over the cancellation (11 Oct, 16:09) were folded into one line,
+# so the cancellation never reached the sheet. Chris: "sufficiently different that it could
+# have been included". Two events in one fight - the house rule that a new step is a new
+# event (24.09.2026) applies inside a day as well as across days.
+NOCLUSTER | SNP cancel anti-abortion group's conference event after member backlash | Anti-abortion group issues legal threat to SNP over conference event cancellation

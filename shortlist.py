@@ -2014,6 +2014,12 @@ def _court_heard(headline):
     return bool(COURT_HEARD.search(headline or ""))
 
 
+LEGAL_ACTION = re.compile(
+    r"\b(sues?|sued|suing|lawsuit|legal (threat|action|challenge|bid|case)|threatens? legal"
+    r"|judicial review|takes? .{0,30}\bto court|court challenge|files? (a )?(suit|claim|complaint))\b",
+    re.I)
+
+
 def is_development_of(a, b):
     """True when two same-subject items report DIFFERENT stages, not the same moment.
 
@@ -2033,6 +2039,14 @@ def is_development_of(a, b):
     pa, pb = _permission(ha), _permission(hb)
     if pa and pb:
         return pa != pb
+    # Taking (or threatening) legal action is its own step in a fight, whatever it is about.
+    # Chris, 12.10.2026: "SNP cancel anti-abortion group's conference event" and "Anti-abortion
+    # group issues legal threat to SNP over conference event cancellation" share five words and
+    # were folded into one line, so the cancellation never reached the sheet. Built as an axis
+    # both headlines answer, like PROSPECTIVE, not as new DEVELOPMENT verbs: two headlines that
+    # BOTH report the suit are one moment and still merge.
+    if bool(LEGAL_ACTION.search(ha)) != bool(LEGAL_ACTION.search(hb)):
+        return True
     da, db = _dev_matches(ha), _dev_matches(hb)
     if not da and not db:
         return False
@@ -3411,6 +3425,9 @@ def stamp_corroboration(rows):
     return rows
 
 
+SOURCE_TIER_ALIASES = {"morning star news": "morningstar"}
+
+
 def source_tier_pos(outlet):
     """Index of the SOURCE_TIER entry this outlet matches, or None.
 
@@ -3425,6 +3442,14 @@ def source_tier_pos(outlet):
     path and the cluster path cannot drift on the answer.
     """
     ol = (outlet or "").lower()
+    # Entries written as a domain stop matching when a feed starts labelling itself by
+    # display name: "morningstar" never matches "Morning Star News" (Chris, 12.10.2026 - a
+    # Pakistan arson cluster went to Organiser on a feed-order tie). Aliases map the display
+    # name onto the existing entry, so no index moves. Exact names, not a loose "morning
+    # star": the UK daily of that name is a different paper.
+    for alias, entry in SOURCE_TIER_ALIASES.items():
+        if alias in ol and entry in SOURCE_TIER:
+            return SOURCE_TIER.index(entry)
     for i, t in enumerate(SOURCE_TIER):
         j = ol.find(t)
         if j < 0:

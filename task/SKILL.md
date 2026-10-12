@@ -299,6 +299,12 @@ Four things the sheet gives you that the section lists do not:
   nothing** - every line is still a separate piece and may be the one worth running - and it is
   deliberately NOT in the iN score yet, so the sheet is not reordered by it. Use it to weigh a
   line, and to look for the event's other lines before you pick one of them.
+- **`> SAME EVENT, N more line(s) folded here`** (02.10.2026): other lines on the event above
+  it, moved under it with a short excerpt each, so a big event reads once, not ten times.
+  Nothing is merged: every folded line keeps its number and can be picked, and the provenance
+  rule still applies, so check the folded lines for the primary source before choosing the
+  lead. Folding is strict (a shared distinctive phrase plus two more words), so most of a
+  big event's lines may still sit elsewhere; it catches the clearest cases, not all of them.
 - **Article text, under nearly every line** (added 18.08.2026 — Chris: assess on the text,
   not just the headline; widened 25.08.2026 — rank on the article, not the headline). Four
   kinds of line, and the difference between them matters:
@@ -518,10 +524,46 @@ a soft-404. Chris supplied the real WORLD link on 13.08.2026 — `wng.org/sift/�
 where the resolver had guessed `wng.org/article/…`. No slug pattern would ever produce it,
 which is the point: if the page cannot identify itself, the redirect stays.
 
+## Step 4b: Choose the Slack five NOW — it also opens the Doc (Chris, 02.10.2026)
+
+The five and its Action Desk lines are printed at the top of the Doc as "Top five for the
+UK", so choose them here, while you still hold the sheet, not after publishing. Follow every
+Step 10 rule on what makes the five (UK only, national press first, no repeats of past
+fives, the petition decision per slot) and write the spec to /tmp/five.json. Every five pick
+must be **tier 1** in /tmp/picks.json, so no cap can cut it from the Doc. Then check it:
+
+  cd ~/Downloads/breakfast-briefing && python3 slack_five.py --pre --spec /tmp/five.json
+
+It refuses a non-tier-1 pick, a missing petition decision (and lists the candidates) and a
+repeat of a past five, and prints a preview. Fix and re-run until it says OK.
+
+**Then refresh the counts of the petitions you attached** (02.10.2026). parl-monitor's
+figures date from 13.08.2026, so without this a petition line reads "as of 13 August". Run
+one Looker query for the ids you chose. Print it with:
+
+  cd ~/Downloads/breakfast-briefing && python3 refresh_petitions.py --query <id>,<id>,...
+
+and run it with the Looker MCP `query` tool exactly as printed. The model and field names live
+in petition_source.json, which is private: it is gitignored, because the repo is public, and
+backed up to Drive. Do not copy them into this file.
+
+Paste the tool's result VERBATIM into /tmp/looker_petitions.json (do not retype the numbers),
+then:
+
+  cd ~/Downloads/breakfast-briefing && python3 refresh_petitions.py /tmp/looker_petitions.json
+
+and re-run the `--pre` check: the preview now shows the current counts. refresh_petitions
+refuses a count that falls by more than 5% against what it already holds, since lifetime
+totals do not shrink. If Looker is unavailable, skip this; the lines say "as of 13 August"
+and the edition is fine. Say which happened in the final message.
+finish_edition.sh passes /tmp/five.json to compose only when it is newer than today's
+sweep, so yesterday's spec can never open today's Doc. If you skip this step the Doc
+publishes without a Top five, and Step 10 still needs the spec.
+
 ## Steps 5-9 in one command — and preferably in a fresh session
 
-Once /tmp/picks.json is written, everything that follows is mechanical and needs none of the
-sheet. Run:
+Once /tmp/picks.json and /tmp/five.json are written, everything that follows is mechanical
+and needs none of the sheet. Run:
 
   cd ~/Downloads/breakfast-briefing && ./finish_edition.sh
 
@@ -778,9 +820,11 @@ Only for an edition that reached Step 7 — a verified doc that was marked. No v
 no Slack post, for the same reason it means no marking: an announcement pointing at a briefing
 that does not exist is worse than silence.
 
-**Do not compose the message by hand. `slack_five.py` builds it** (10.09.2026). Write your
-choices to a spec — a list of slots, each a lead index plus optional nested indexes, with
-`note` for your own prose — then:
+**Do not compose the message by hand. `slack_five.py` builds it** (10.09.2026). The spec is
+the /tmp/five.json you wrote and checked at Step 4b; it already opens the Doc, so do not
+change the picks now. If you do, the Slack post and the Doc's Top five will disagree. It is
+a list of slots, each a lead index plus optional nested indexes, with `note` for your own
+prose. Then:
 
   cd ~/Downloads/breakfast-briefing && python3 slack_five.py --history          # what the last fives ran
   cd ~/Downloads/breakfast-briefing && python3 slack_five.py --spec /tmp/five.json \
@@ -798,6 +842,26 @@ nothing. When a slot has no `note`, slack_five prints what the sheet read for th
 (27.09.2026) as material to write one from - never paste it in, write your own sentence from
 it, and leave the note empty if the sheet had no text. **Post the emitted text VERBATIM.** Retyping any part of it restores the exact
 hand-copying that fabricated four links on 31.08.2026.
+
+**Action Desk lines (Chris, 02.10.2026 — "just include it", no approval step).** Under each
+lead, slack_five now adds what parl-monitor knows, as `↳` lines in the post:
+- **Bill** and **Vote** lines attach automatically, and only when the story names the bill or
+  Act. You do nothing for these.
+- **Our petition** is your call, once per slot. The first run refuses any slot that has
+  candidates and prints them. Add `"petition": <id>` to the slot if one of them is plainly
+  the same campaign as the story, or `"petition": null` if none is. Then run it again. Pick on
+  subject, not word overlap: the "shares:" column is a hint and is often wrong. Thursday
+  01.10 is the worked example: the abortion-up-to-birth story took the decriminalisation
+  petition, "one in, one out" took the borders petition, the Prevent list took the
+  police-training petition, grooming gangs took none, and the Hackney mosque story took the
+  petition on criticising Islam (Islam stories reach areas 7 and 8 while staying in their usual
+  sections). When in doubt, choose null; a wrong
+  petition under a story is worse than none.
+- The petition line says "as of <date>" while parl-monitor's campaign figures are stale
+  (last refreshed 13.08.2026). The status line on stderr says so too; mention it in the final
+  message until it is fixed.
+- If the status line reads `ACTION DESK UNAVAILABLE`, the five posts without desk lines. Say
+  so in the final message. Use `--no-desk` only if the desk itself crashes.
 
 Post to **#campaigns-en-gb** (`C9RH217PZ`) with `slack_send_message`. The message is short and
 has a fixed shape, which is the shape the script emits:

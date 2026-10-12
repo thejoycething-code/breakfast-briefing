@@ -30,6 +30,10 @@ pass   | Media: Christian        | Vatican News                | https://www.vat
 pass   | Issues: Religious Freedom | Bitter Winter             | https://bitterwinter.org/feed/
 pass   | Issues: Religious Freedom | UCA News                  | https://www.ucanews.com/rss/news
 pass   | Issues: Religious Freedom | Open Doors UK             | https://www.opendoorsuk.org/feed/
+# Chris, 02.10.2026: both named as misses ("we should have also included"). Neither was a
+# source. ACN's Holy Land piece ran on 01.10; UOJ's English feed is /en/rss (/rss/en is Russian).
+pass   | Issues: Religious Freedom | Aid to the Church in Need (USA) | https://www.churchinneed.org/feed/
+pass   | Issues: Religious Freedom | Union of Orthodox Journalists | https://spzh.eu/en/rss
 pass   | Media: Alternative      | The Daily Signal            | https://www.dailysignal.com/feed/
 pass   | Media: Alternative      | National Review             | https://www.nationalreview.com/feed/
 pass   | Issues: Life            | SPUC                        | https://www.spuc.org.uk/feed
@@ -57,6 +61,11 @@ gnewsf | Media: US and World     | Newsweek                    | newsweek.com
 # /arts-and-culture/rss all 404 and the homepage declares no <link type=application/rss+xml>.
 # Keyword-filtered like the other broad US outlets, or it floods the sweep with celebrity copy.
 gnewsf | Media: US and World     | The Daily Beast             | thedailybeast.com
+# The Daily Caller, added 05.10.2026: Chris named its 02.10 whistleblower exclusive on Nigeria's
+# alleged Christian-killing "mastermind" as a miss, and the outlet was not a source in any form.
+# Its own feed serves 25 items (~2.5 days), deep enough for a weekday window. Keyword-filtered
+# like the other broad US outlets.
+filter | Media: US and World     | The Daily Caller            | https://dailycaller.com/feed/
 filter | Media: US and World     | Politico                    | https://rss.politico.com/politics-news.xml
 filter | Media: UK Mainstream    | GB News                     | https://www.gbnews.com/feeds/news.rss
 filter | Media: US and World     | The Hill                    | https://thehill.com/news/feed/
@@ -91,6 +100,11 @@ gnews  | Issues: Religious Freedom | Pakistan minorities         | kw:blasphemy 
 gnews  | Issues: Religious Freedom | Philippines & SE Asia faith | kw:church OR Christian OR abortion OR "religious freedom"@PH
 gnews  | Issues: Life            | Ireland life & family        | kw:abortion OR surrogacy OR "assisted dying" OR marriage@IE
 gnews  | Issues: Life            | Australia life & family      | kw:abortion OR "voluntary assisted dying" OR surrogacy@AU
+# Chris, 02.10.2026: Politico's piece on Australia's Digital Duty of Care bill ("a new censorship
+# bill") was missed - our only Politico feed is US politics. The bill's own name catches every
+# outlet; the AU edition carries the domestic press, the GB one the international write-ups.
+gnews  | Issues: Free Speech     | Australia speech laws (AU)   | kw:"digital duty of care" OR eSafety OR "misinformation bill"@AU
+gnews  | Issues: Free Speech     | Australia speech laws        | kw:"digital duty of care" Australia
 gnews  | Issues: Gender & Identity | Canada gender & life       | kw:transgender OR \"MAiD\" OR abortion OR "parental rights"@CA
 filter | Media: US and World     | Axios                       | https://api.axios.com/feed/
 filter | Media: Alternative      | The Daily Wire              | https://www.dailywire.com/feeds/rss.xml
@@ -205,7 +219,9 @@ pass   | Media: UK Periodicals   | UnHerd                      | https://unherd.
 pass   | Media: Alternative      | spiked                      | https://www.spiked-online.com/feed/
 # Spectator Australia was on `filter` while its UK sibling was unfiltered - an inconsistency
 # that dropped "It's a mad mad mad mad world" on 13.08.2026 for matching no keyword.
-pass   | Media: UK Periodicals   | The Spectator Australia     | https://www.spectator.com.au/feed/
+# Chris, 02.10.2026: "Listen to the Alborithm" was a miss. This feed files more than 60
+# pieces inside the window and MAX_PER_FEED (60) cut it at position 78 of 100, unreported.
+pass   | Media: UK Periodicals   | The Spectator Australia     | https://www.spectator.com.au/feed/ | max=150
 
 # The Spectator publishes no RSS anywhere and Google/Bing barely index it, so read its
 # index pages directly. These carry no dates: a link absent from seen.json counts as
@@ -1010,6 +1026,19 @@ filter | Media: UK Mainstream    | The Herald (Scotland)       | https://www.her
 # Troy Media was not covered at all.
 filter | Media: Alternative      | Troy Media                  | https://troymedia.com/feed/
 
+# --- Chris's markup on the 28.09.2026 edition: two stories that never reached the sweep -----
+# Prospect was not a source at all. Its /feed 404s (Glide platform, serves an HTML shell), but
+# Google News site search on the GB edition returns its pieces, including the missed Weekly
+# Constitutional "The difference between 'Free Speech' and free speech". Keyword-filtered: it
+# is a general politics-and-culture monthly.
+gnewsf | Media: UK Mainstream    | Prospect Magazine           | prospectmagazine.co.uk@GB
+# The Australian: the two site-wide lines above return ~100 of its busiest items, and 84h of
+# them yielded only 15 in the 28.09 sweep. "Christian lobby urges Islamic antisemitism
+# crackdown through imam standards" (Google titles it "Christian lobby says royal commission
+# ignored religious tensions", 25.09) was not among them. A beat-scoped search returns it,
+# the same fix the Telegraph got on 25.09.
+gnewsf | Media: US and World     | The Australian (faith)      | kw:(Christian OR church OR imam OR Islamic OR Muslim OR religious OR abortion OR euthanasia OR transgender) site:theaustralian.com.au@AU
+
 # --- Free Speech source gaps from Chris's 29.09.2026 markup --------------------------------
 # Al-Monitor: never configured. It follows Turkey's speech and press prosecutions beyond
 # the Goktas-type headline cases - Chris cited its $18B fund-probe fallout piece. Its /rss
@@ -1020,3 +1049,18 @@ gnewsf | Media: US and World      | Al-Monitor                  | al-monitor.com
 # politics.co.uk: never configured, and its own /feed/ is 403 to us, so Google News.
 # Chris cited Labour MP Jonathan Hinder's "the Left must reclaim free speech" there.
 gnewsf | Media: UK Politics       | Politics.co.uk              | politics.co.uk
+
+# --- Chris, 12.10.2026: misses that never reached the sweep ---------------------------------
+# Free Speech Union: its WordPress feed has answered 404 since 05.10.2026 (check_sources had it
+# BROKEN) - the site moved and publishes no feed at all now, so "Robert Jenrick reported to
+# police and Prevent over comments on Islam", the FSU's own release, could not arrive. The
+# /news index lists every article; read it like ADF International's newsroom. Undated cards,
+# so freshness comes from first sighting. The dead feed is retired so it stops counting as a
+# failure.
+scrapesrc | Advocacy: Non-Christian | Free Speech Union          | https://freespeechunion.org/news
+disable | freespeechunion.org/feed
+# The Herald's news and politics feeds are 50 items and do not carry every section: "North
+# Lanarkshire councillor challenges ethics watchdog on free speech" (10.10.2026) was in
+# neither, and Bing's site search is thin. A Google News topic query, the same shape as the
+# Telegraph's and Times's, found it on the day it was checked.
+gnewsf | Media: UK Mainstream    | The Herald (speech)         | kw:("free speech" OR "freedom of speech" OR censorship OR "hate crime" OR "ethics watchdog" OR "Standards Commission") site:heraldscotland.com

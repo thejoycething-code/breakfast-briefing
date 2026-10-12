@@ -1633,9 +1633,18 @@ def test_source_tier_not_substring():
     """
     bad = []
     should = ["The Times", "Church Times", "The Christian Post", "The Telegraph", "Crux",
-              "Catholic Herald", "The Critic", "spiked", "GB News"]
+              "Catholic Herald", "The Critic", "spiked", "GB News",
+              # Chris, 12.10.2026: three entries are written as DOMAINS (morningstar,
+              # persecution.org, ncregister) and stopped matching once their feeds began
+              # labelling themselves by display name. Morning Star News lost a Pakistan
+              # arson cluster to Organiser and Open Magazine on a pure feed-order tie.
+              "Morning Star News", "International Christian Concern",
+              "National Catholic Register"]
     should_not = ["The Times of India", "The Times of Israel", "The Times of India (cities)",
-                  "Korea JoongAng Daily", "Hindustan Times"]
+                  "Korea JoongAng Daily", "Hindustan Times",
+                  # The UK daily of the same name is a different paper entirely; a fix that
+                  # matched "morning star" loosely would hand it Morning Star News's place.
+                  "Morning Star"]
     for o in should:
         if shortlist.source_tier_pos(o) is None:
             bad.append("%s should be in SOURCE_TIER" % o)

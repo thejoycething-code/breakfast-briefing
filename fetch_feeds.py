@@ -109,7 +109,9 @@ FILTER_CATEGORIES = {
 
 KEYWORDS = [
     # Freedom & Liberty
-    r"free speech", r"freedom of (speech|expression|religion|belief)", r"censor\w*",
+    # "free[- ]speech": the hyphenated adjective ("Free-speech clubs ...", Rebel News, 02.10.2026)
+    # was dropped at this gate until 05.10.2026.
+    r"free[- ]speech", r"freedom of (speech|expression|religion|belief)", r"censor\w*",
     # Press-freedom and speech-prosecution vocabulary, added 01.09.2026. The gate held only
     # the explicit phrases above, which a headline about a speech prosecution frequently
     # never uses: Brussels Signal's "Turkish comic who mocked Erdogan rearrested" and the
@@ -361,6 +363,7 @@ WINDOW_RE = re.compile(r"^window\s*=\s*(\d+)\s*h?$", re.I)
 FEED_MAX = {}
 MAX_RE = re.compile(r"^max\s*=\s*(\d+)$", re.I)
 CAPPED = []        # [(feed title, kept, dropped in window)], filled by the sweep
+UNDATED_TAKEN = {}  # {feed title: undated items taken by first sighting}, for the header
 
 
 def feed_max_items(field):
@@ -1576,9 +1579,14 @@ def main():
                         e["date"] = now
                     elif e["date"] < fcutoff:
                         continue
-                if not dateless:
-                    if e["date"] is None:
-                        continue
+                # An RSS item with no date used to be dropped here, silently. Forum
+                # 18's feed (RSS 0.91) carries no dates at all, so every one of its
+                # reports was discarded on every run: Chris named its Luhansk pastor
+                # deportation story as a miss on 12.10.2026, and the only Forum 18
+                # pieces that ever ran had arrived by search. Undated feed items now
+                # take the scrapesrc rule below - new on first sighting, then aged
+                # from that sighting - and are counted on the header, not lost.
+                if not dateless and e["date"] is not None:
                     # Magazines date pieces to a future issue (The Critic runs weeks
                     # ahead). A feed only lists what already exists, so treat a future
                     # date as "just published" rather than throwing the item away.
@@ -1601,10 +1609,12 @@ def main():
                 # An undated card is new only until we have seen it once. Recording the
                 # sighting here - not at publish time - is the whole fix: seen.json only
                 # ever knew about items that made an edition.
-                if dateless and e["date"] is None:
+                if e["date"] is None:
                     if not dateless_is_new(link, firstseen, fcutoff):
                         continue
                     firstseen_add.setdefault(url_key(link), now.isoformat())
+                    if not dateless:
+                        UNDATED_TAKEN[ftitle] = UNDATED_TAKEN.get(ftitle, 0) + 1
                 outlet = (e["source"] or (suffix if is_g else "")
                           or feed_outlet_label(ftitle) or outlet_from_url(link))
                 outlet = re.sub(r"\s+", " ", outlet).strip()[:44]
@@ -1626,7 +1636,7 @@ def main():
                     "published": (e["date"].astimezone(dt.timezone.utc).isoformat()
                                   if e["date"]
                                   else firstseen.get(url_key(link)) or now.isoformat()),
-                    "age_h": (None if dateless else
+                    "age_h": (None if (dateless or e["date"] is None) else
                               round((now - e["date"]).total_seconds() / 3600, 1)),
                     # Publisher topic labels, carried through for the classifier.
                     "categories": [c for c in (e.get("categories") or [])
@@ -1784,6 +1794,11 @@ def main():
                   "(raise with max=NNN on the feed's line in extra_feeds.txt)\n"
                   % (len(CAPPED), "; ".join("%s kept %d, dropped %d" % c
                                             for c in sorted(CAPPED, key=lambda c: -c[2]))))
+    taken = {k: v for k, v in UNDATED_TAKEN.items() if v}
+    if taken:
+        out.write("UNDATED: %d feed(s) gave items with no date, taken as new on first sighting "
+                  "(age shows 'new') - %s\n"
+                  % (len(taken), "; ".join("%s %d" % kv for kv in sorted(taken.items()))))
     out.write("paywalled items (marked £, use \"(£)\" after the outlet name): %d\n"
               % sum(1 for i in kept if i["paywalled"]))
     out.write("cols: N | headline | url | outlet | author | age  "

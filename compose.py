@@ -555,6 +555,65 @@ def publisher_of(url):
     return REPUBLISHER_HOSTS.get(m.group(1).lower()) if m else None
 
 
+# Aggregators that appear as the "source" of a Google News item but never publish anything
+# themselves (Chris, 12.10.2026: The National's SPUC story ran credited "inkl"). Once the
+# resolver has swapped the redirect for the publisher's own page, the credit must name that
+# publisher. Measured over every archived sweep to 12.10.2026: inkl 9 items, PressReader 3;
+# three shipped under an aggregator's name, one of them with a resolved publisher link.
+AGGREGATOR_OUTLETS = {"inkl", "inkl.com", "pressreader", "pressreader.com"}
+# Hosts that front for many publishers and so can never name one.
+_NOT_A_MASTHEAD_HOST = ("news.google.", "google.com", "bing.com", "feedly.com", "inkl.com",
+                        "pressreader.com", "rss.app", "feedburner", "yahoo.com", "msn.com")
+_HOST_MASTHEADS = None
+
+
+def _url_host(url):
+    m = re.match(r"https?://(?:www\.)?([^/:?#]+)", (url or "").strip(), re.I)
+    return m.group(1).lower() if m else ""
+
+
+def host_masthead(url):
+    """The masthead our OWN source lists give for this link's host, or None.
+
+    Still a lookup, as publisher_of's docstring insists - not a guess from the domain. The
+    names come from extra_feeds.txt and sources.opml, which already pair each subscribed
+    publisher with its site, so a host maps to a name only when we subscribe to it under
+    exactly one name. A host listed under two names is ambiguous and maps to nothing.
+    """
+    global _HOST_MASTHEADS
+    if _HOST_MASTHEADS is None:
+        seen = {}
+        try:
+            for line in open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                          "extra_feeds.txt"), encoding="utf-8"):
+                parts = [x.strip() for x in line.split("|")]
+                if line.lstrip().startswith("#") or len(parts) < 4 or not parts[2]:
+                    continue
+                target = parts[3].split()[0] if parts[3] else ""
+                host = _url_host(target if "://" in target else "https://" + target)
+                if host and "." in host:
+                    seen.setdefault(host, set()).add(parts[2])
+        except OSError:
+            pass
+        try:
+            opml = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                     "sources.opml"), encoding="utf-8").read()
+            for m in re.finditer(r'<outline\b[^>]*\btext="([^"]+)"[^>]*\bhtmlUrl="([^"]+)"', opml):
+                host = _url_host(html.unescape(m.group(2)))
+                if host:
+                    seen.setdefault(host, set()).add(html.unescape(m.group(1)).strip())
+        except OSError:
+            pass
+        _HOST_MASTHEADS = {h: next(iter(n)) for h, n in seen.items()
+                           if len(n) == 1 and not any(b in h for b in _NOT_A_MASTHEAD_HOST)}
+    host = _url_host(url)
+    while host:
+        if host in _HOST_MASTHEADS:
+            return _HOST_MASTHEADS[host]
+        host = host.partition(".")[2] if host.count(".") > 1 else ""
+    return None
+
+
 def outlet_of(item):
     """The masthead to credit AND to group by: the feed's name, corrected by the link.
 
@@ -565,7 +624,12 @@ def outlet_of(item):
     papers. That is the column-of-one-name effect the spread exists to prevent, arriving
     through the back door (28.08.2026).
     """
-    return publisher_of(item.get("url")) or tidy_outlet(item.get("outlet") or "")
+    name = publisher_of(item.get("url")) or tidy_outlet(item.get("outlet") or "")
+    if name.strip().lower() in AGGREGATOR_OUTLETS:
+        found = host_masthead(item.get("url"))
+        if found:
+            return tidy_outlet(found)
+    return name
 
 
 def credit(item):
