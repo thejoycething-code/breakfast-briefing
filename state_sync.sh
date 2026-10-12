@@ -260,7 +260,25 @@ PY
       ctype="text/plain; charset=UTF-8"
       is_json "$f" && ctype="application/json"
       case "$f" in *.opml) ctype="text/xml; charset=UTF-8" ;; esac
-      id="$(bb_file_id "$f" "$FOLDER" "$TOKEN")"
+      # Rate limits (12.10.2026): rclone's shared Google project caps requests per minute for
+      # every rclone user at once, and a push is ~2 calls a file (~118 in all). The first
+      # push on the new rclone credential failed 32 of 59 on "Quota exceeded ... Requests per
+      # minute". Only that error is retried, after a pause long enough for the window to
+      # roll; anything else fails at once exactly as before.
+      attempt=0
+      while :; do
+      attempt=$((attempt + 1))
+      if ! id="$(bb_file_id "$f" "$FOLDER" "$TOKEN" 2>/tmp/bb_lookup_err.$$)"; then
+        # A failed lookup must never fall through to the create branch below: that is how a
+        # rate-limited run made a second copy of a file Drive already had.
+        resp="$(cat /tmp/bb_lookup_err.$$)"; rm -f /tmp/bb_lookup_err.$$
+        if [ $attempt -lt 4 ]; then
+          echo "  $f: lookup failed ($resp), retrying in $((attempt * 30))s (attempt $attempt of 3)" >&2
+          sleep $((attempt * 30)); continue
+        fi
+        echo "  $f: PUSH FAILED - could not look it up in Drive: $resp" >&2; rc=1; break
+      fi
+      rm -f /tmp/bb_lookup_err.$$
       if [ -n "$id" ]; then
         resp=$(curl -s -X PATCH \
           "https://www.googleapis.com/upload/drive/v3/files/$id?uploadType=media&supportsAllDrives=true&fields=id" \
@@ -279,9 +297,16 @@ PY
       newid=$(printf '%s' "$resp" | jq -r '.id // empty')
       if [ -n "$newid" ]; then
         echo "  $f: pushed $(wc -c <"$HERE/$f" | tr -d ' ') bytes"
-      else
-        printf '%s' "$resp" | jq -r '.error.message // .' >&2; echo "  $f: PUSH FAILED" >&2; rc=1
+        break
       fi
+      if [ $attempt -lt 4 ] && printf '%s' "$resp" | grep -qiE 'rateLimitExceeded|userRateLimitExceeded|Quota exceeded|Requests per minute'; then
+        echo "  $f: rate-limited, retrying in $((attempt * 30))s (attempt $attempt of 3)" >&2
+        sleep $((attempt * 30))
+        continue
+      fi
+      printf '%s' "$resp" | jq -r '.error.message // .' >&2; echo "  $f: PUSH FAILED" >&2; rc=1
+      break
+      done
     done
     ;;
 

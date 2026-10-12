@@ -131,7 +131,8 @@ existing_id() { bb_file_id "$TITLE" "$FOLDER" "$1"; }
 TOKEN=$(mint_token)
 [ -n "$TOKEN" ] || die "could not mint an access token in mode '$MODE'. Run: $0 --check"
 if [ "$FORCE" = 0 ]; then
-  dup=$(existing_id "$TOKEN")
+  dup=$(existing_id "$TOKEN") \
+    || die "could not check Drive for an existing \"$TITLE\" (lookup failed - see above). Not publishing blind."
   [ -z "$dup" ] || die "\"$TITLE\" already exists ($dup). Re-run with --force to add a second copy."
 fi
 [ "$DRY" = 1 ] && { echo "DRY RUN: would upload $(wc -c <"$HTML" | tr -d ' ') bytes as \"$TITLE\""; exit 0; }

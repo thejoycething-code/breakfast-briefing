@@ -85,15 +85,27 @@ PY
 }
 
 # id of a file with this exact name in this folder, or empty
+# Prints the file's id, or nothing when there is no such file. Returns 2 - and prints
+# nothing - when the LOOKUP itself failed. Before 12.10.2026 an API error (a rate limit, an
+# expired token) printed nothing too, so every caller read "the lookup failed" as "no such
+# file": state_sync.sh then POSTed a second copy of a file Drive already had, and
+# publish.sh's duplicate-Doc guard waved a second edition through. Callers that write must
+# check the status.
 bb_file_id() {
-  local name="$1" folder="$2" tok="$3" q
+  local name="$1" folder="$2" tok="$3" q resp
   q=$(printf "name = '%s' and '%s' in parents and trashed = false" \
         "$(printf '%s' "$name" | sed "s/'/\\\\'/g")" "$folder")
-  curl -s -G "https://www.googleapis.com/drive/v3/files" \
+  resp=$(curl -s -G "https://www.googleapis.com/drive/v3/files" \
     -H "Authorization: Bearer $tok" \
     --data-urlencode "q=$q" --data-urlencode "fields=files(id,name)" \
     --data-urlencode "supportsAllDrives=true" \
-    --data-urlencode "includeItemsFromAllDrives=true" | jq -r '.files[0].id // empty'
+    --data-urlencode "includeItemsFromAllDrives=true")
+  if [ -z "$resp" ] || ! printf '%s' "$resp" | jq -e '.files' >/dev/null 2>&1; then
+    printf '%s' "$resp" | jq -r '.error.message // "no response from Drive"' 2>/dev/null >&2 \
+      || echo "bb_file_id: unreadable response from Drive" >&2
+    return 2
+  fi
+  printf '%s' "$resp" | jq -r '.files[0].id // empty'
 }
 
 bb_auth_hint() {
