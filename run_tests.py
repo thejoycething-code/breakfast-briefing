@@ -659,6 +659,13 @@ def run(verbose=False, known_red=None):
     else:
         failed.append(("smoke", "wpjson feed mode: %s" % "; ".join(wpj)))
 
+    # GOV.UK: every department, gated on headline then issue-section text. See below.
+    gov = test_govuk_source()
+    if not gov:
+        passed += 1
+    else:
+        failed.append(("smoke", "govuk source: %s" % "; ".join(gov)))
+
     # A Google News sitemap must parse as a feed. See the function below.
     nsm = test_news_sitemap_parses_as_a_feed()
     if not nsm:
@@ -2193,6 +2200,103 @@ def test_syndicated_credit():
         bad.append("a copy credited to another provider was accepted")
     if sl.credited_description("<html>no structured data</html>", "Telegraph") is not None:
         bad.append("a page with no JSON-LD was accepted")
+    return bad
+
+
+def test_govuk_source():
+    """The GOV.UK route (18.10.2026). Returns a list of problems; empty means pass.
+
+    The FCDO's CHOICES press release (24.09.2026) is the regression: its headline passes no
+    keyword and its summary places it nowhere, but its text says "safe abortion products",
+    which shortlist.py places in Life. It must come through with that paragraph as its
+    summary. A readout whose text places it nowhere must not. A headline the sweep's own gate
+    passes must not be text-read at all. Offline: text_fetch is injected.
+    """
+    import datetime as _dt
+    import json as _json
+    import fetch_feeds as ff
+    bad = []
+    now = _dt.datetime(2026, 9, 25, 6, 0, tzinfo=_dt.timezone.utc)
+    choices = ("/government/news/new-uk-support-to-help-millions-of-women-gain-greater-choice-"
+               "over-pregnancy-and-access-better-maternal-healthcare")
+    raw = _json.dumps({"total": 3, "results": [
+        {"title": "New UK support to help millions of women gain greater choice over pregnancy "
+                  "and access better maternal healthcare",
+         "link": choices, "public_timestamp": "2026-09-24T10:10:00.000+01:00",
+         "description": "Millions of women and girls in some of the world\u2019s poorest counties "
+                        "will gain greater choice over whether and when to become pregnant due "
+                        "to new UK support.",
+         "content_store_document_type": "press_release",
+         "organisations": [{"title": "Foreign, Commonwealth & Development Office",
+                            "acronym": "FCDO"}]},
+        {"title": "PM meeting with President Trump of the United States: 22 September 2026",
+         "link": "/government/news/pm-meeting-with-president-trump", "description": "",
+         "public_timestamp": "2026-09-24T09:00:00+01:00",
+         "content_store_document_type": "press_release",
+         "organisations": [{"title": "Prime Minister's Office, 10 Downing Street",
+                            "acronym": "Number 10"}]},
+        {"title": "Free speech protections strengthened in universities",
+         "link": "/government/news/free-speech-universities", "description": "",
+         "public_timestamp": "2026-09-24T08:00:00+01:00",
+         "content_store_document_type": "press_release", "organisations": []},
+    ]}).encode()
+    texts = {
+        choices: ["New UK investment will help avert 14 million unintended pregnancies.",
+                  "Access to high-quality contraceptives and safe abortion products will be "
+                  "expanded for millions more women across 54 countries, including conflict zones"],
+        "/government/news/pm-meeting-with-president-trump":
+            ["The Prime Minister met President Trump today.",
+             "They discussed trade, migration and the war in Ukraine."],
+    }
+    asked = []
+
+    def text_fetch(path, summary):
+        asked.append(path)
+        return ff.govuk_passage([summary] + texts.get(path, []))
+
+    try:
+        rows = ff.parse_govuk(raw, "GOV.UK", now - _dt.timedelta(hours=36), filtered=True,
+                              text_fetch=text_fetch)
+    except Exception as exc:  # noqa: BLE001
+        return ["parse_govuk raised %s: %s" % (type(exc).__name__, exc)]
+    by = {r["link"]: r for r in rows}
+    c = by.get("https://www.gov.uk" + choices)
+    if not c:
+        bad.append("CHOICES was dropped: its text places it in Life")
+    else:
+        if "safe abortion products" not in c["summary"]:
+            bad.append("the CHOICES summary is not the paragraph that placed it: %r" % c["summary"])
+        if not c.get("gate_passed"):
+            bad.append("a text pass must carry gate_passed or the headline gate drops it")
+        if c["author"] != "FCDO" or c["date"] is None or c["date"].tzinfo is None:
+            bad.append("department byline or tz-aware date missing: %r %r" % (c["author"], c["date"]))
+        for k in ("title", "link", "date", "author", "source", "feed_title", "summary",
+                  "categories"):
+            if k not in c:
+                bad.append("missing the %r key parse_feed emits" % k)
+    if "https://www.gov.uk/government/news/pm-meeting-with-president-trump" in by:
+        bad.append("a readout whose text places it in no issue section came through")
+    if "https://www.gov.uk/government/news/free-speech-universities" not in by:
+        bad.append("a headline the sweep's own gate passes was dropped")
+    if "/government/news/free-speech-universities" in asked:
+        bad.append("a headline pass was text-read: rule 1 must short-circuit rule 2")
+    old = ff.parse_govuk(raw, "GOV.UK", now + _dt.timedelta(days=30), filtered=True,
+                         text_fetch=text_fetch)
+    if any(r["link"].endswith("pregnancy-and-access-better-maternal-healthcare") for r in old):
+        bad.append("an item outside the window was text-read and kept")
+    try:
+        ff.parse_govuk(b'{"error": "bad request"}', "GOV.UK")
+        bad.append("an error body parsed as an empty feed instead of raising")
+    except ValueError:
+        pass
+    if "govukf" not in ff.FILTERED_MODES:
+        bad.append("govukf is not a filtered mode")
+    ff.load_extra()
+    import os as _os
+    with open(_os.path.join(_os.path.dirname(_os.path.abspath(ff.__file__)), "extra_feeds.txt")) as fh:
+        src = fh.read()
+    if "\ngovukf " not in src or "\nfilter | Govt: News & Research   | GOV.UK news" in src:
+        bad.append("extra_feeds.txt must carry the govukf line and not the old Atom feed")
     return bad
 
 
