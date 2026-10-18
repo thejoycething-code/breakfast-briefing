@@ -243,7 +243,10 @@ pass   | Media: Christian        | Aleteia                     | https://aleteia
 pass   | Media: Christian        | Christianity Today          | https://www.christianitytoday.com/feed/
 pass   | Media: UK Periodicals   | First Things                | https://www.firstthings.com/feed
 filter | Media: UK Mainstream    | Metro                       | https://metro.co.uk/feed/
-filter | Govt: News & Research   | GOV.UK news                 | https://www.gov.uk/search/news-and-communications.atom
+# GOV.UK, every department (18.10.2026): the Search API, gated on headline, summary and -
+# for announcements - the text (fetch_feeds.parse_govuk). Replaces the news-and-communications
+# Atom feed, which holds only its newest 20 entries and missed the FCDO's CHOICES release.
+govukf | Govt: News & Research  | GOV.UK                      | search | max=300
 
 # --- feedless outlets: Google News site: search ---------------------------
 # These outlets publish no usable RSS. Google News gives an accurate headline,
@@ -332,6 +335,7 @@ disable | worldwatchmonitor.org
 disable | ofsted.gov.uk/news/rss
 disable | mod.uk/DefenceInternet
 disable | gov.uk/government/announcements.atom
+disable | gov.uk/search/news-and-communications.atom
 disable | liveactionnews.org
 disable | liveaction.org/news/feed
 # Christian Medical Fellowship dropped (Chris, 18.08.2026). Its own feed answers only

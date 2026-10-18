@@ -338,9 +338,9 @@ def fetch(url, retry_uas=2, data=None, headers=None):
 # Source loading
 # ---------------------------------------------------------------------------
 FEED_MODES = ("pass", "filter", "gnews", "gnewsf", "bing", "bingf",
-              "scrapesrc", "scrapesrcf", "wpjson", "wpjsonf", "feedly")
+              "scrapesrc", "scrapesrcf", "wpjson", "wpjsonf", "feedly", "govuk", "govukf")
 # Modes that keep only items matching the topical keyword list.
-FILTERED_MODES = {"filter", "gnewsf", "bingf", "scrapesrcf", "wpjsonf"}
+FILTERED_MODES = {"filter", "gnewsf", "bingf", "scrapesrcf", "wpjsonf", "govukf"}
 
 
 # Per-feed sweep window, keyed by outlet title (lowercased). Title is used rather than URL
@@ -556,6 +556,10 @@ def load_feeds():
         elif mode == "feedly":
             domain = urllib.parse.urlsplit(target).netloc.replace("www.", "")
             target = feedly_url(target)
+        elif mode.startswith("govuk"):
+            # `search` means the built-in query (every department, GOVUK_TYPES).
+            domain = "gov.uk"
+            target = GOVUK_SEARCH if target in ("", "search") else target
         add(category, title, target, mode, domain)
 
     body = ET.parse(OPML).getroot().find("body")
@@ -710,6 +714,153 @@ def parse_wpjson(raw, feed_title=""):
             "categories": [],
         })
     return out
+
+
+# ---------------------------------------------------------------------------
+# GOV.UK (18.10.2026)
+# ---------------------------------------------------------------------------
+# Every department's announcements, through GOV.UK's documented Search API, replacing the
+# news-and-communications Atom feed. Two misses made the case. The Atom feed holds only its
+# newest 20 entries - under two days at a weekend, a few hours on a weekday - so most of a
+# day's GOV.UK output never reached the sweep. And the keyword gate read only the headline:
+# the FCDO's 24.09.2026 press release on the GBP 254m CHOICES programme is headed "New UK
+# support to help millions of women gain greater choice over pregnancy..." and says "safe
+# abortion products" only in its body. CitizenGO found it by hand three weeks later.
+#
+# So `govukf` follows the briefing's own rules, in order:
+#   1. the headline passes KEYWORD_RE, exactly as for every filtered source; or
+#   2. a paragraph of GOV.UK's summary or the document's text (Content API) would place the
+#      item in one of shortlist.py's specific issue sections: score_sections() at least
+#      SPECIFIC_MIN, Church & Religion and the residual sections excluded. KEYWORD_RE is an
+#      intake gate built for headlines; over body text "Minister", "NHS" and "Border" pass
+#      nearly every press release (117 of 272 on 18.10.2026), while the section rule passes
+#      CHOICES ("safe abortion products": Life 6) and drops appointments and readouts.
+# A text pass puts that paragraph in the item's summary, so the sheet shows the judge WHY a
+# dull headline is there; it is never read by importance() (memory:
+# briefing-text-for-judgement-only). Only items inside the sweep window are text-read.
+# Types are the announcements, policy papers and consultations the old feed carried, plus
+# FCDO grant calls - not guidance, statistics or research, which would swamp the shortlist.
+GOVUK_TYPES = (
+    "press_release", "news_story", "world_news_story", "speech", "written_statement",
+    "oral_statement", "government_response", "correspondence", "policy_paper", "decision",
+    "open_consultation", "consultation_outcome", "international_development_fund",
+    "independent_report",
+)
+# Newest first; 500 of these types is well over a week, more than Monday's 84h.
+GOVUK_SEARCH = "https://www.gov.uk/api/search.json?" + urllib.parse.urlencode(
+    [("count", "500"), ("order", "-public_timestamp")]
+    + [("fields", f) for f in ("title", "link", "description", "public_timestamp",
+                                "organisations", "content_store_document_type")]
+    + [("filter_content_store_document_type", t) for t in GOVUK_TYPES])
+GOVUK_CONTENT = "https://www.gov.uk/api/content"
+GOVUK_TEXT_WORKERS = 6
+GOVUK_TEXT_CAP = 300     # text reads a run; a weekday 36h window needs well under 100
+_GOVUK_BLOCK = re.compile(r"</?(?:p|h[1-6]|li|ul|ol|div|section|blockquote|tr|br)\b[^>]*>", re.I)
+
+
+def _govuk_html(body):
+    """details.body is HTML, or a list of {content_type, content} renderings."""
+    if isinstance(body, list):
+        for b in body:
+            if isinstance(b, dict) and b.get("content_type") == "text/html":
+                return b.get("content") or ""
+        return ""
+    return body if isinstance(body, str) else ""
+
+
+def govuk_paragraphs(payload):
+    """A Content API document's text, one entry per paragraph (body, then guide parts)."""
+    d = (payload or {}).get("details") or {}
+    chunks = [_govuk_html(d.get("body"))]
+    for part in d.get("parts") or []:
+        if isinstance(part, dict):
+            chunks.append(_govuk_html(part.get("body")))
+    out = []
+    for frag in _GOVUK_BLOCK.split("\n".join(chunks)):
+        text = " ".join(html_mod.unescape(re.sub(r"<[^>]+>", " ", frag)).split())
+        if text:
+            out.append(text)
+    return out
+
+
+def govuk_passage(paragraphs, max_len=300):
+    """The paragraph that places the item most strongly in a specific issue section
+    (shortlist.score_sections >= SPECIFIC_MIN), or None. Imported here, not at the top:
+    shortlist imports this module."""
+    import shortlist
+    residual = set(shortlist.RESIDUAL_SECTIONS) | {shortlist.CHURCH}
+    best, best_score = None, 0
+    for para in paragraphs:
+        score = max((sc for sc, sec in shortlist.score_sections(para, "")
+                     if sec not in residual), default=0)
+        if score >= shortlist.SPECIFIC_MIN and score > best_score:
+            best, best_score = para, score
+    if best and len(best) > max_len:
+        best = best[:max_len].rsplit(" ", 1)[0] + "..."
+    return best
+
+
+def _govuk_text_passage(path, summary=""):
+    head = [summary] if summary else []
+    try:
+        payload = json.loads(fetch(GOVUK_CONTENT + urllib.parse.quote(path),
+                                   headers={"Accept": "application/json"}).decode("utf-8", "replace"))
+    except Exception:  # noqa: BLE001 - one unreadable page never costs the source
+        return govuk_passage(head)
+    return govuk_passage(head + govuk_paragraphs(payload))
+
+
+def parse_govuk(raw, feed_title="", cutoff=None, filtered=False, text_fetch=None):
+    """GOV.UK Search API results as feed entries.
+
+    filtered (govukf): keep an entry whose headline passes KEYWORD_RE, or - inside the
+    window - whose summary or text has a paragraph govuk_passage() accepts; that paragraph
+    becomes the summary. Text passes carry gate_passed=True so the sweep's headline gate
+    does not drop them. `text_fetch(path, summary) -> passage | None` is injectable for
+    tests; the default reads the Content API, GOVUK_TEXT_WORKERS at a time.
+    """
+    data = json.loads(raw.decode("utf-8", "replace"))
+    if not isinstance(data, dict) or "results" not in data:
+        raise ValueError("govuk-not-a-search")
+    out = []
+    for r in data.get("results") or []:
+        path = r.get("link") or ""
+        if not path.startswith("/"):
+            continue
+        orgs = [o for o in (r.get("organisations") or []) if isinstance(o, dict)]
+        out.append({
+            "title": html_mod.unescape(r.get("title") or "").strip(),
+            "link": "https://www.gov.uk" + path,
+            "date": parse_date(r.get("public_timestamp") or ""),
+            # The department is the byline; the outlet is GOV.UK.
+            "author": "; ".join(o.get("acronym") or o.get("title") or "" for o in orgs)[:40],
+            "source": feed_title,
+            "source_url": "",
+            "feed_title": feed_title,
+            "summary": html_mod.unescape(r.get("description") or "").strip(),
+            "categories": [(r.get("content_store_document_type") or "").replace("_", " ")],
+            "_path": path,
+        })
+    if not filtered:
+        return out
+    kept, unread = [], []
+    for e in out:
+        if KEYWORD_RE.search(e["title"]):
+            kept.append(e)                      # rule 1: the sweep's own gate passes it
+        elif e["date"] is not None and (cutoff is None or e["date"] >= cutoff):
+            unread.append(e)
+    unread = unread[:GOVUK_TEXT_CAP]
+    if unread:
+        text_fetch = text_fetch or _govuk_text_passage
+        with futures.ThreadPoolExecutor(max_workers=GOVUK_TEXT_WORKERS) as pool:
+            passages = list(pool.map(lambda e: text_fetch(e["_path"], e["summary"]), unread))
+        for e, passage in zip(unread, passages):
+            if passage:                         # rule 2: it would reach an issue section
+                e["summary"], e["gate_passed"] = passage, True
+                kept.append(e)
+    kept.sort(key=lambda e: e["date"] or dt.datetime.min.replace(tzinfo=dt.timezone.utc),
+              reverse=True)
+    return kept
 
 
 def parse_feed(raw):
@@ -1550,6 +1701,9 @@ def main():
                     entries = parse_wpjson(job.result(), ftitle)
                 elif mode == "feedly":
                     entries = parse_feedly(job.result(), ftitle)
+                elif mode.startswith("govuk"):
+                    entries = parse_govuk(job.result(), ftitle, fcutoff,
+                                          filtered=(mode in FILTERED_MODES))
                 else:
                     entries = parse_feed(job.result())
             except Exception as exc:  # noqa: BLE001
@@ -1603,7 +1757,8 @@ def main():
                 # suffix Chris flagged came off a DIRECT feed, so the is_g guard meant it was
                 # never even tested. The length and prose guards inside do the safety work.
                 headline, suffix = strip_outlet_suffix(e["title"], e.get("source") or "")
-                if mode in FILTERED_MODES and not KEYWORD_RE.search(headline):
+                if mode in FILTERED_MODES and not KEYWORD_RE.search(headline) \
+                        and not e.get("gate_passed"):
                     continue
                 link = clean_url(unwrap_link(e["link"]))
                 # An undated card is new only until we have seen it once. Recording the
