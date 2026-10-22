@@ -247,6 +247,15 @@ filter | Media: UK Mainstream    | Metro                       | https://metro.c
 # for announcements - the text (fetch_feeds.parse_govuk). Replaces the news-and-communications
 # Atom feed, which holds only its newest 20 entries and missed the FCDO's CHOICES release.
 govukf | Govt: News & Research  | GOV.UK                      | search | max=300
+# Official statistics (22.10.2026): release-date announcements, releases due today and published
+# statistics on our topics (STATS_TOPICS in fetch_feeds.py), UK-wide from GOV.UK's calendar, and
+# Scotland's from Public Health Scotland's and National Records of Scotland's own calendars.
+# Chris: "we'd be interested also in stats on marriage and conceptions etc."
+stats  | Polls and statistics   | Official statistics: dates announced | announced
+stats  | Polls and statistics   | Official statistics: due today       | due
+stats  | Polls and statistics   | Official statistics: published       | published
+stats  | Polls and statistics   | Public Health Scotland statistics    | phs
+stats  | Polls and statistics   | National Records of Scotland statistics | nrs
 
 # --- feedless outlets: Google News site: search ---------------------------
 # These outlets publish no usable RSS. Google News gives an accurate headline,
