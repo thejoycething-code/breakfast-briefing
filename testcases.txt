@@ -1663,3 +1663,10 @@ CREDIT inkl | inkl | https://www.inkl.com/news/anti-abortion-group-issues-legal-
 # have been included". Two events in one fight - the house rule that a new step is a new
 # event (24.09.2026) applies inside a day as well as across days.
 NOCLUSTER | SNP cancel anti-abortion group's conference event after member backlash | Anti-abortion group issues legal threat to SNP over conference event cancellation
+
+# Official statistics (22.10.2026). Chris: "we'd be interested also in stats on marriage and
+# conceptions etc." The ONS's conceptions release (conceptions and the share ending in
+# abortion) scored nothing and would have reached NO SECTION MATCHED.
+SECTION Life | GOV.UK | Conceptions in England and Wales: 2024
+SECTION Life | GOV.UK | Abortion statistics for England and Wales: 2024
+SECTION Marriage, Family & Education | GOV.UK | Marriages and civil partnerships in England and Wales: 2024 and 2025

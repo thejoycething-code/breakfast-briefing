@@ -330,6 +330,9 @@ SECTIONS = [
             # "carry (a) pregnancy" is an abortion ruling that never says the word.
             r"|\baborted\b|abortionist|pregnancy loss|baby loss|miscarriage(?!s? of justice)"
             r"|stillbirth"
+            # Conceptions, 22.10.2026: the ONS's "Conceptions in England and Wales" release
+            # (conceptions and the share ending in abortion) scored nothing.
+            r"|\bconceptions\b"
             r"|carry (a |the |her )?pregnancy|terminat\w* (a |the |her )?pregnanc"),
         (6, r"assisted (dying|suicide|death)|euthanas|\bMAiD\b|\bMAID\b|right to die"
             r"|dignity in dying|end of life|palliative|hospice|lethal (drug|prescription)"

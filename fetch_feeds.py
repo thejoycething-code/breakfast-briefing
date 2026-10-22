@@ -338,7 +338,7 @@ def fetch(url, retry_uas=2, data=None, headers=None):
 # Source loading
 # ---------------------------------------------------------------------------
 FEED_MODES = ("pass", "filter", "gnews", "gnewsf", "bing", "bingf",
-              "scrapesrc", "scrapesrcf", "wpjson", "wpjsonf", "feedly", "govuk", "govukf")
+              "scrapesrc", "scrapesrcf", "wpjson", "wpjsonf", "feedly", "govuk", "govukf", "stats")
 # Modes that keep only items matching the topical keyword list.
 FILTERED_MODES = {"filter", "gnewsf", "bingf", "scrapesrcf", "wpjsonf", "govukf"}
 
@@ -560,6 +560,12 @@ def load_feeds():
             # `search` means the built-in query (every department, GOVUK_TYPES).
             domain = "gov.uk"
             target = GOVUK_SEARCH if target in ("", "search") else target
+        elif mode == "stats":
+            # Official statistics (22.10.2026): the target is a kind, the URL is per run.
+            if target not in STATS_KINDS:
+                continue
+            target = stats_url(target)
+            domain = urllib.parse.urlsplit(target).netloc.replace("www.", "")
         add(category, title, target, mode, domain)
 
     body = ET.parse(OPML).getroot().find("body")
@@ -861,6 +867,213 @@ def parse_govuk(raw, feed_title="", cutoff=None, filtered=False, text_fetch=None
     kept.sort(key=lambda e: e["date"] or dt.datetime.min.replace(tzinfo=dt.timezone.utc),
               reverse=True)
     return kept
+
+
+# ---------------------------------------------------------------------------
+# Official statistics (22.10.2026)
+# ---------------------------------------------------------------------------
+# Chris asked whether we were watching for the abortion statistics behind the Abortion Act
+# anniversary figures, "and also stats on marriage and conceptions etc." We were not: GOVUK_TYPES
+# leaves statistics out on purpose (they would swamp the shortlist), and no Scottish or NI
+# source was read. DHSC had confirmed "Abortion statistics for England and Wales: 2024" for
+# 03.12.2026 on 21.10.2026, and nothing here would have said so.
+#
+# So a narrow lane, `stats | <category> | <title> | <kind>`, gated on STATS_TOPICS (release
+# titles are bland - "Conceptions in England and Wales: 2024" - so KEYWORD_RE cannot find
+# them; the list mirrors parl-monitor's config/stats_watch.yaml, keep the two in step):
+#   announced  GOV.UK's release calendar (every UK department, the ONS, NISRA, DoH NI): an
+#              announcement new or changed in the window - a date set, confirmed, moved or
+#              cancelled - for a release still to come. Dated when GOV.UK changed it.
+#   due        the same calendar: releases due TODAY (London), dated now, so the 06:30 sweep
+#              says what lands at 09:30. Same link as its announcement: if the announcement
+#              ran, this one shows in "Already sent" with its [ran] date - pick it deliberately.
+#   published  GOV.UK official and accredited statistics published in the window (DHSC, DfE,
+#              MoJ, Home Office...): the release itself, with its own link.
+#   phs / nrs  Public Health Scotland's and National Records of Scotland's own calendars
+#              (Scotland's producers left GOV.UK's): releases due today. PHS embeds its list
+#              as JSON; NRS prints a table. Linked to the calendar page, as there is no
+#              release page until 09:30.
+# Not read: gov.scot (a bot challenge to every request, 22.10.2026).
+STATS_KINDS = ("announced", "due", "published", "phs", "nrs")
+STATS_TOPICS = [
+    # (label, pattern, without) - word-bounded; mirrors config/stats_watch.yaml
+    ("abortion", r"abortion\w*|terminations? of pregnancy", None),
+    ("conceptions", r"conception\w*|teenage pregnanc\w*|pregnancies", None),
+    ("births", r"births?|birth characteristics|fertility|stillbirth\w*|still births|infant mortality"
+               r"|child mortality|vital events",
+     r"soil|cattle|calf|calves|lamb\w*|livestock|animal\w*|sheep|pig\w*|country of birth|breastfeeding"),
+    ("marriage", r"marriage\w*|divorce\w*|civil partnership\w*|cohabit\w*|families and households"
+                 r"|family court|lone parent\w*|forced marriage", None),
+    ("children", r"adoption\w*|adopted|looked after|children in care|children's social work"
+                 r"|special guardianship|fostering|children in need",
+     r"technolog\w*|digital|artificial intelligence|vehicle\w*|electric|business\w*|heat pump\w*"
+     r"|broadband|cloud|workforce"),
+    ("surrogacy", r"surrogacy|parental orders?|fertility treatment|embryo\w*", None),
+    ("end of life", r"assisted dying|assisted deaths?|euthanasia|suicide\w*|palliative|end[- ]of[- ]life",
+     None),
+    ("gender", r"gender identity|gender dysphoria|gender recognition|transgender|sexual orientation", None),
+    ("religion", r"religion|religious|hate crimes?|faith", None),
+    ("education", r"home education|relationships and sex education|children not in school", None),
+    ("trafficking", r"modern slavery|human trafficking|national referral mechanism|prostitution", None),
+    ("organ donation", r"organ donation|organ donors?|transplant\w*", None),
+]
+_STATS_RX = [(lab, re.compile(r"\b(?:%s)\b" % pat, re.I),
+              re.compile(r"\b(?:%s)\b" % wo, re.I) if wo else None) for lab, pat, wo in STATS_TOPICS]
+# Acronyms stay case-sensitive so "ivf" or "nrm" inside ordinary words never count.
+_STATS_CAPS = [("surrogacy", re.compile(r"\b(?:IVF|HFEA)\b")), ("trafficking", re.compile(r"\bNRM\b"))]
+STATS_EXCLUDE = re.compile(r"\b(?:weekly|monthly|dashboard|immuni[sz]ation|vaccination"
+                           r"|awaiting a conclusive grounds|real-time)\b", re.I)
+STATS_FIELDS = ("title", "link", "description", "public_timestamp", "release_timestamp",
+                "statistics_announcement_state", "organisations", "content_store_document_type")
+PHS_FORTHCOMING = "https://www.publichealthscotland.scot/publications/forthcoming-publications/"
+NRS_UPCOMING = "https://www.nrscotland.gov.uk/statistics-and-data/upcoming-publications/"
+STATS_LOOKBACK_DAYS = 4      # wider than Monday's 84h; the sweep's own cutoff trims it
+
+
+def stats_topics(title):
+    """Topic labels a release title is on, [] if none (or excluded as routine)."""
+    t = " ".join((title or "").split())
+    if not t or STATS_EXCLUDE.search(t):
+        return []
+    out = [lab for lab, rx, wo in _STATS_RX if rx.search(t) and not (wo and wo.search(t))]
+    for lab, rx in _STATS_CAPS:
+        if rx.search(t) and lab not in out:
+            out.append(lab)
+    return out
+
+
+def _london_today(now=None):
+    now = now or dt.datetime.now(dt.timezone.utc)
+    try:
+        from zoneinfo import ZoneInfo
+        return now.astimezone(ZoneInfo("Europe/London")).date()
+    except Exception:  # noqa: BLE001 - no tz database: UTC is at most an hour out
+        return now.date()
+
+
+def stats_url(kind, now=None):
+    """The URL a `stats` line fetches. The calendar windows are computed per run."""
+    now = now or dt.datetime.now(dt.timezone.utc)
+    today = _london_today(now)
+    since = (today - dt.timedelta(days=STATS_LOOKBACK_DAYS)).isoformat()
+    base = [("count", "500"), ("order", "-public_timestamp")] + [("fields", f) for f in STATS_FIELDS]
+    if kind == "announced":
+        q = base + [("filter_format", "statistics_announcement"),
+                    ("filter_public_timestamp", "from:" + since),
+                    ("filter_release_timestamp", "from:" + today.isoformat())]
+    elif kind == "due":
+        q = base + [("filter_format", "statistics_announcement"),
+                    ("filter_release_timestamp", "from:{0},to:{0}".format(today.isoformat()))]
+    elif kind == "published":
+        q = base + [("filter_content_store_document_type", "official_statistics"),
+                    ("filter_content_store_document_type", "national_statistics"),
+                    ("filter_public_timestamp", "from:" + since)]
+    elif kind == "phs":
+        return PHS_FORTHCOMING
+    elif kind == "nrs":
+        return NRS_UPCOMING
+    else:
+        raise ValueError("unknown stats kind %r" % kind)
+    return GOVUK_SEARCH.split("?", 1)[0] + "?" + urllib.parse.urlencode(q) + "#stats-" + kind
+
+
+def stats_kind(url):
+    if url.startswith(PHS_FORTHCOMING):
+        return "phs"
+    if url.startswith(NRS_UPCOMING):
+        return "nrs"
+    m = re.search(r"#stats-(\w+)$", url or "")
+    return m.group(1) if m else ""
+
+
+def _long_day(d):
+    return "%s %d %s %d" % (d.strftime("%A"), d.day, d.strftime("%B"), d.year)
+
+
+def _stats_entry(title, link, date, author, feed_title, summary, kind, topics):
+    return {"title": title, "link": link, "date": date, "author": author[:40], "source": feed_title,
+            "source_url": "", "feed_title": feed_title, "summary": summary,
+            "categories": ["official statistics", kind] + topics}
+
+
+def parse_stats(raw, feed_title="", kind="", now=None):
+    """A `stats` line's response as feed entries, on STATS_TOPICS only."""
+    now = now or dt.datetime.now(dt.timezone.utc)
+    today = _london_today(now)
+    out = []
+    if kind in ("announced", "due", "published"):
+        data = json.loads(raw.decode("utf-8", "replace"))
+        if not isinstance(data, dict) or "results" not in data:
+            raise ValueError("govuk-not-a-search")
+        for r in data.get("results") or []:
+            title = html_mod.unescape(r.get("title") or "").strip()
+            path = r.get("link") or ""
+            topics = stats_topics(title)
+            if not topics or not path.startswith("/"):
+                continue
+            orgs = [o for o in (r.get("organisations") or []) if isinstance(o, dict)]
+            author = ", ".join(o.get("acronym") or o.get("title") or "" for o in orgs)
+            state = (r.get("statistics_announcement_state") or "").lower()
+            release = parse_date(r.get("release_timestamp") or "")
+            if kind == "published":
+                summary = html_mod.unescape(r.get("description") or "").strip()
+                date = parse_date(r.get("public_timestamp") or "")
+            elif kind == "due":
+                if state == "cancelled" or not release:
+                    continue
+                # The time as GOV.UK states it (London), not parse_date's UTC.
+                hhmm = (r.get("release_timestamp") or "")[11:16] or "09:30"
+                summary = "Official statistics due out today at %s (%s)." % (hhmm, state or "date set")
+                date = now
+            else:
+                if not release:
+                    continue
+                summary = ("Release cancelled (was due %s)." % _long_day(release.date())
+                           if state == "cancelled" else
+                           "Release date: %s (%s)." % (_long_day(release.date()), state or "date set"))
+                date = parse_date(r.get("public_timestamp") or "")
+            out.append(_stats_entry(title, "https://www.gov.uk" + path, date, author, feed_title,
+                                    summary, kind, topics))
+        return out
+    page = raw.decode("utf-8", "replace")
+    if kind == "phs":
+        m = re.search(r"(?:var|const|let)\s+data\s*=\s*(\{.*?\})\s*;\s*</script>", page, re.S)
+        if not m:
+            raise ValueError("phs-list-not-found")
+        for r in json.loads(m.group(1)).get("records") or []:
+            title = " ".join(html_mod.unescape(re.sub(r"<[^>]+>", " ", r.get("Title") or "")).split())
+            topics = stats_topics(title)
+            if (not topics or str(r.get("NotSet") or "").strip() == "1"
+                    or (r.get("DatePublished") or "")[:10] != today.isoformat()):
+                continue
+            out.append(_stats_entry(title, PHS_FORTHCOMING, now, "Public Health Scotland", feed_title,
+                                    "Official statistics due out today at 09:30 (Public Health "
+                                    "Scotland release calendar).", kind, topics))
+        return out
+    if kind == "nrs":
+        rows = re.findall(r"<tr[^>]*>(.*?)</tr>", page, re.S | re.I)
+        if not rows:
+            raise ValueError("nrs-table-not-found")
+        for row in rows:
+            cells = re.findall(r"<td[^>]*>(.*?)</td>", row, re.S | re.I)
+            if len(cells) < 2:
+                continue
+            when = " ".join(html_mod.unescape(re.sub(r"<[^>]+>", " ", cells[0])).replace("\xa0", " ").split())
+            title = " ".join(html_mod.unescape(re.sub(r"<[^>]+>", " ", cells[1])).split())
+            topics = stats_topics(title)
+            try:
+                due = dt.datetime.strptime(when, "%d %B %Y").date()
+            except ValueError:
+                continue
+            if not topics or due != today:
+                continue
+            href = re.search(r'href="([^"]+)"', cells[1])
+            link = urllib.parse.urljoin(NRS_UPCOMING, html_mod.unescape(href.group(1))) if href else NRS_UPCOMING
+            out.append(_stats_entry(title, link, now, "National Records of Scotland", feed_title,
+                                    "Official statistics due out today (National Records of Scotland "
+                                    "release calendar).", kind, topics))
+        return out
+    raise ValueError("unknown stats kind %r" % kind)
 
 
 def parse_feed(raw):
@@ -1704,6 +1917,8 @@ def main():
                 elif mode.startswith("govuk"):
                     entries = parse_govuk(job.result(), ftitle, fcutoff,
                                           filtered=(mode in FILTERED_MODES))
+                elif mode == "stats":
+                    entries = parse_stats(job.result(), ftitle, stats_kind(furl), now)
                 else:
                     entries = parse_feed(job.result())
             except Exception as exc:  # noqa: BLE001

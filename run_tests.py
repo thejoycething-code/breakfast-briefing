@@ -666,6 +666,13 @@ def run(verbose=False, known_red=None):
     else:
         failed.append(("smoke", "govuk source: %s" % "; ".join(gov)))
 
+    # Official statistics: calendars and releases on our topics. See the function below.
+    sts = test_stats_source()
+    if not sts:
+        passed += 1
+    else:
+        failed.append(("smoke", "stats source: %s" % "; ".join(sts)))
+
     # A Google News sitemap must parse as a feed. See the function below.
     nsm = test_news_sitemap_parses_as_a_feed()
     if not nsm:
@@ -2200,6 +2207,81 @@ def test_syndicated_credit():
         bad.append("a copy credited to another provider was accepted")
     if sl.credited_description("<html>no structured data</html>", "Telegraph") is not None:
         bad.append("a page with no JSON-LD was accepted")
+    return bad
+
+
+def test_stats_source():
+    """Official statistics (22.10.2026). Returns a list of problems; empty means pass.
+
+    Chris asked whether we were watching for the abortion statistics, "and also stats on
+    marriage and conceptions etc." DHSC confirmed "Abortion statistics for England and Wales:
+    2024" for 03.12.2026 on 21.10.2026 and nothing in the sweep said so. These are the claims:
+    a release-date announcement on our topics comes through with its date in the summary; the
+    routine monthly counts and off-topic releases do not; a release due today is dated now and
+    says when it lands, in London time; Scotland's two calendars give today's releases and
+    nothing else. Offline.
+    """
+    import datetime as _dt
+    import json as _json
+    import fetch_feeds as ff
+    bad = []
+    now = _dt.datetime(2026, 12, 3, 6, 30, tzinfo=_dt.timezone.utc)
+    cal = _json.dumps({"total": 4, "results": [
+        {"title": "Abortion statistics for England and Wales: 2024",
+         "link": "/government/statistics/announcements/abortion-statistics-for-england-and-wales-2024",
+         "public_timestamp": "2026-12-02T14:09:02Z", "release_timestamp": "2026-12-03T09:30:00.000+00:00",
+         "statistics_announcement_state": "confirmed", "organisations": [{"acronym": "DHSC"}]},
+        {"title": "Marriages and civil partnerships in England and Wales: 2024 and 2025",
+         "link": "/government/statistics/announcements/marriages-2024-2025",
+         "public_timestamp": "2026-12-02T08:20:03Z", "release_timestamp": "2026-12-03T09:30:00.000+00:00",
+         "statistics_announcement_state": "provisional", "organisations": [{"acronym": "ONS"}]},
+        {"title": "Monthly Marriages (Northern Ireland): November 2026",
+         "link": "/government/statistics/announcements/monthly-marriages-ni-nov-2026",
+         "public_timestamp": "2026-12-02T13:51:33Z", "release_timestamp": "2026-12-11T09:30:00.000+00:00",
+         "statistics_announcement_state": "confirmed", "organisations": [{"acronym": "NISRA"}]},
+        {"title": "Multiplication tables check attainment: 2026",
+         "link": "/government/statistics/announcements/mtc-2026",
+         "public_timestamp": "2026-12-02T16:46:06Z", "release_timestamp": "2026-12-19T09:30:00.000+00:00",
+         "statistics_announcement_state": "confirmed", "organisations": [{"acronym": "DfE"}]},
+    ]}).encode()
+    try:
+        ann = ff.parse_stats(cal, "Official statistics: dates announced", "announced", now)
+        due = ff.parse_stats(cal, "Official statistics: due today", "due", now)
+    except Exception as exc:  # noqa: BLE001
+        return ["parse_stats raised %s: %s" % (type(exc).__name__, exc)]
+    titles = [e["title"] for e in ann]
+    if titles != ["Abortion statistics for England and Wales: 2024",
+                  "Marriages and civil partnerships in England and Wales: 2024 and 2025"]:
+        bad.append("announced kept %r" % titles)
+    elif ann[0]["summary"] != "Release date: Thursday 3 December 2026 (confirmed).":
+        bad.append("announcement summary %r" % ann[0]["summary"])
+    elif ann[0]["author"] != "DHSC" or "abortion" not in ann[0]["categories"]:
+        bad.append("announcement byline/topic %r %r" % (ann[0]["author"], ann[0]["categories"]))
+    if [e["date"] for e in due] != [now, now]:
+        bad.append("due-today items must be dated now: %r" % [e["date"] for e in due])
+    elif due and due[0]["summary"] != "Official statistics due out today at 09:30 (confirmed).":
+        bad.append("due summary %r" % due[0]["summary"])
+    phs = ('<script>var data = {"records": [{"id": 1, "DatePublished": "2026-12-03T00:00:00+00:00", '
+           '"Title": "Teenage Pregnancies", "Synopsis": "", "NotSet": ""}, {"id": 2, "DatePublished": '
+           '"2026-12-03T00:00:00+00:00", "Title": "Prescribing for opioid dependence", "Synopsis": "", '
+           '"NotSet": ""}, {"id": 3, "DatePublished": "2027-05-01T00:00:00+01:00", "Title": '
+           '"Abortions Statistics", "Synopsis": "", "NotSet": "1"}]};</script>').encode()
+    got = [e["title"] for e in ff.parse_stats(phs, "Public Health Scotland statistics", "phs", now)]
+    if got != ["Teenage Pregnancies"]:
+        bad.append("phs kept %r (only today's release on our topics)" % got)
+    nrs = ('<table><tr><td><p>Date</p></td><td><p>Publication title</p></td></tr>'
+           '<tr><td><p>3&nbsp;December 2026</p></td><td><p><a href="/publications/vital-q3/">Quarterly '
+           'births, deaths and other vital events, Q3 2026</a></p></td></tr>'
+           '<tr><td><p>3 December 2026</p></td><td><p>Births registered weekly in Scotland</p></td></tr>'
+           '<tr><td><p>Winter 2026/27</p></td><td><p>Life Expectancy in Scotland</p></td></tr>'
+           '</table>').encode()
+    got = ff.parse_stats(nrs, "National Records of Scotland statistics", "nrs", now)
+    if [e["link"] for e in got] != ["https://www.nrscotland.gov.uk/publications/vital-q3/"]:
+        bad.append("nrs kept %r" % [(e["title"], e["link"]) for e in got])
+    if ff.stats_kind(ff.stats_url("announced", now)) != "announced":
+        bad.append("stats_kind does not round-trip stats_url")
+    if ff.stats_topics("AI adoption in UK businesses") or ff.stats_topics("Soil fertility, England"):
+        bad.append("off-topic 'adoption'/'fertility' titles matched")
     return bad
 
 
